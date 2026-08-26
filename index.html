@@ -159,6 +159,12 @@
       margin-top: 22px;
     }
 
+    .result-count {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 0.92rem;
+    }
+
     .text-search-result {
       margin-top: 12px;
       padding: 15px;
@@ -167,13 +173,14 @@
       background: #fff;
     }
 
-    .text-search-result > a {
+    .result-title {
+      display: block;
       color: #1d4ed8;
       font-weight: bold;
       text-decoration: none;
     }
 
-    .text-search-result > a:hover {
+    .result-title:hover {
       text-decoration: underline;
     }
 
@@ -275,6 +282,7 @@
     const searchableItems = [...document.querySelectorAll(".searchable-item")];
 
     const documents = [];
+    const maximumResults = 300;
 
     function normalize(text) {
       return (text || "")
@@ -309,25 +317,82 @@
         : "";
     }
 
-    function makeSnippet(text, query) {
-      const plainText = (text || "").replace(/\s+/g, " ").trim();
-      const cleanText = normalize(plainText);
+    function findAllMatches(text, query) {
+      const cleanText = normalize(text);
       const cleanQuery = normalize(query);
-      const position = cleanText.indexOf(cleanQuery);
 
-      if (position === -1) {
-        return plainText.slice(0, 240) + "…";
+      if (!cleanQuery) {
+        return [];
       }
 
-      const start = Math.max(0, position - 110);
+      const matches = [];
+      let position = 0;
+
+      while (true) {
+        const foundAt = cleanText.indexOf(cleanQuery, position);
+
+        if (foundAt === -1) {
+          break;
+        }
+
+        matches.push(foundAt);
+        position = foundAt + cleanQuery.length;
+
+        if (matches.length >= maximumResults) {
+          break;
+        }
+      }
+
+      return matches;
+    }
+
+    function makeSnippet(text, position, query) {
+      const plainText = (text || "").replace(/\s+/g, " ").trim();
+      const cleanQuery = normalize(query);
+
+      const start = Math.max(0, position - 115);
       const end = Math.min(
         plainText.length,
-        position + cleanQuery.length + 150
+        position + cleanQuery.length + 155
       );
 
       return (start > 0 ? "… " : "") +
         plainText.slice(start, end).trim() +
         (end < plainText.length ? " …" : "");
+    }
+
+    function getWordsBefore(text, position, count = 7) {
+      const beforeText = text.slice(Math.max(0, position - 160), position).trim();
+      const words = beforeText.split(/\s+/).filter(Boolean);
+
+      return words.slice(-count).join(" ");
+    }
+
+    function getWordsAfter(text, position, query, count = 7) {
+      const start = position + normalize(query).length;
+      const afterText = text.slice(start, start + 160).trim();
+      const words = afterText.split(/\s+/).filter(Boolean);
+
+      return words.slice(0, count).join(" ");
+    }
+
+    function makeTextFragmentUrl(url, text, position, query) {
+      const prefix = getWordsBefore(text, position);
+      const suffix = getWordsAfter(text, position, query);
+
+      let fragment = "";
+
+      if (prefix) {
+        fragment += `${encodeURIComponent(prefix)}-`;
+      }
+
+      fragment += encodeURIComponent(query);
+
+      if (suffix) {
+        fragment += `-${encodeURIComponent(suffix)}`;
+      }
+
+      return `${url}#:~:text=${fragment}`;
     }
 
     function highlightSnippet(snippet, query) {
@@ -347,10 +412,6 @@
         pattern,
         match => `<mark>${match}</mark>`
       );
-    }
-
-    function makeTextFragmentUrl(url, query) {
-      return `${url}#:~:text=${encodeURIComponent(query)}`;
     }
 
     async function loadTextDocuments() {
@@ -406,12 +467,30 @@
         return;
       }
 
-      const matches = documents.filter(document =>
-        normalize(document.title).includes(cleanQuery) ||
-        normalize(document.text).includes(cleanQuery)
-      );
+      const allResults = [];
 
-      if (matches.length === 0) {
+      documents.forEach(document => {
+        const positions = findAllMatches(document.text, query);
+
+        positions.forEach((position, index) => {
+          const snippet = makeSnippet(document.text, position, query);
+          const fragmentUrl = makeTextFragmentUrl(
+            document.url,
+            document.text,
+            position,
+            query
+          );
+
+          allResults.push({
+            title: document.title,
+            snippet: snippet,
+            url: fragmentUrl,
+            number: index + 1
+          });
+        });
+      });
+
+      if (allResults.length === 0) {
         searchResults.innerHTML = "";
         noResults.style.display = "block";
         return;
@@ -419,28 +498,38 @@
 
       noResults.style.display = "none";
 
-      searchResults.innerHTML = matches.map(document => {
-        const snippet = makeSnippet(document.text, query);
-        const fragmentUrl = makeTextFragmentUrl(document.url, query);
+      const shownResults = allResults.slice(0, maximumResults);
 
-        return `
+      let resultCountText = `تعداد نتایج: ${allResults.length}`;
+
+      if (allResults.length > maximumResults) {
+        resultCountText += ` — فقط ${maximumResults} نتیجهٔ نخست نمایش داده شده است.`;
+      }
+
+      searchResults.innerHTML = `
+        <p class="result-count">${resultCountText}</p>
+        ${shownResults.map(result => `
           <article class="text-search-result">
-            <a href="${fragmentUrl}" target="_blank" rel="noopener">
-              ${escapeHtml(document.title)}
+            <a
+              class="result-title"
+              href="${result.url}"
+              target="_blank"
+              rel="noopener">
+              ${escapeHtml(result.title)} — نتیجهٔ ${result.number}
             </a>
 
-            <p>${highlightSnippet(snippet, query)}</p>
+            <p>${highlightSnippet(result.snippet, query)}</p>
 
             <a
               class="found-word-link"
-              href="${fragmentUrl}"
+              href="${result.url}"
               target="_blank"
               rel="noopener">
-              رفتن به عبارت پیدا‌شده: «${escapeHtml(query)}»
+              رفتن به همین عبارت: «${escapeHtml(query)}»
             </a>
           </article>
-        `;
-      }).join("");
+        `).join("")}
+      `;
     }
 
     searchInput.addEventListener("input", function () {
