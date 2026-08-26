@@ -325,45 +325,31 @@
       return [...new Set(paragraphs)];
     }
 
-    function makeTextFragmentUrl(url, paragraph, query) {
+    function makeShortSentence(paragraph, query) {
       const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
       const cleanQuery = normalize(query);
       const normalizedParagraph = normalize(cleanParagraph);
       const position = normalizedParagraph.indexOf(cleanQuery);
 
       if (position === -1) {
-        return `${url}#:~:text=${encodeURIComponent(query)}`;
+        return cleanParagraph.slice(0, 180);
       }
 
-      const before = cleanParagraph
-        .slice(Math.max(0, position - 90), position)
+      const start = Math.max(0, position - 60);
+      const end = Math.min(
+        cleanParagraph.length,
+        position + cleanQuery.length + 90
+      );
+
+      return cleanParagraph
+        .slice(start, end)
         .trim()
-        .split(/\s+/)
-        .slice(-6)
-        .join(" ");
+        .replace(/^[،؛:.\-–—\s]+/, "")
+        .replace(/[،؛:.\-–—\s]+$/, "");
+    }
 
-      const afterStart = position + cleanQuery.length;
-
-      const after = cleanParagraph
-        .slice(afterStart, afterStart + 90)
-        .trim()
-        .split(/\s+/)
-        .slice(0, 6)
-        .join(" ");
-
-      let fragment = "";
-
-      if (before) {
-        fragment += `${encodeURIComponent(before)}-`;
-      }
-
-      fragment += encodeURIComponent(query);
-
-      if (after) {
-        fragment += `-${encodeURIComponent(after)}`;
-      }
-
-      return `${url}#:~:text=${fragment}`;
+    function makeTextFragmentUrl(url, textFragment) {
+      return `${url}#:~:text=${encodeURIComponent(textFragment)}`;
     }
 
     function highlightText(text, query) {
@@ -443,10 +429,12 @@
       documents.forEach(document => {
         document.paragraphs.forEach(paragraph => {
           if (normalize(paragraph).includes(cleanQuery)) {
+            const sentence = makeShortSentence(paragraph, query);
+
             allResults.push({
               title: document.title,
-              paragraph: paragraph,
-              url: makeTextFragmentUrl(document.url, paragraph, query)
+              text: sentence,
+              url: makeTextFragmentUrl(document.url, sentence)
             });
           }
         });
@@ -482,14 +470,14 @@
               ${escapeHtml(result.title)} — نتیجهٔ ${index + 1}
             </a>
 
-            <p>${highlightText(result.paragraph, query)}</p>
+            <p>${highlightText(result.text, query)}</p>
 
             <a
               class="found-word-link"
               href="${result.url}"
               target="_blank"
               rel="noopener">
-              رفتن به این بخش از متن
+              رفتن به عبارت یافت‌شده
             </a>
           </article>
         `).join("")}
