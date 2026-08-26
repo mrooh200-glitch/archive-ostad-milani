@@ -304,7 +304,7 @@
         .replace(/'/g, "&#039;");
     }
 
-    function getTextFromHtml(html) {
+    function getParagraphsFromHtml(html) {
       const parser = new DOMParser();
       const page = parser.parseFromString(html, "text/html");
 
@@ -312,95 +312,66 @@
         "script, style, noscript, svg, iframe, header, footer, nav"
       ).forEach(element => element.remove());
 
-      return page.body
-        ? page.body.textContent.replace(/\s+/g, " ").trim()
-        : "";
+      const blocks = [
+        ...page.body.querySelectorAll(
+          "h1, h2, h3, h4, h5, h6, p, li, blockquote, td, th"
+        )
+      ];
+
+      const paragraphs = blocks
+        .map(block => block.textContent.replace(/\s+/g, " ").trim())
+        .filter(text => text.length > 0);
+
+      return [...new Set(paragraphs)];
     }
 
-    function findAllMatches(text, query) {
-      const cleanText = normalize(text);
+    function makeTextFragmentUrl(url, paragraph, query) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
       const cleanQuery = normalize(query);
+      const normalizedParagraph = normalize(cleanParagraph);
+      const position = normalizedParagraph.indexOf(cleanQuery);
 
-      if (!cleanQuery) {
-        return [];
+      if (position === -1) {
+        return `${url}#:~:text=${encodeURIComponent(query)}`;
       }
 
-      const matches = [];
-      let position = 0;
+      const before = cleanParagraph
+        .slice(Math.max(0, position - 90), position)
+        .trim()
+        .split(/\s+/)
+        .slice(-6)
+        .join(" ");
 
-      while (true) {
-        const foundAt = cleanText.indexOf(cleanQuery, position);
+      const afterStart = position + cleanQuery.length;
 
-        if (foundAt === -1) {
-          break;
-        }
-
-        matches.push(foundAt);
-        position = foundAt + cleanQuery.length;
-
-        if (matches.length >= maximumResults) {
-          break;
-        }
-      }
-
-      return matches;
-    }
-
-    function makeSnippet(text, position, query) {
-      const plainText = (text || "").replace(/\s+/g, " ").trim();
-      const cleanQuery = normalize(query);
-
-      const start = Math.max(0, position - 115);
-      const end = Math.min(
-        plainText.length,
-        position + cleanQuery.length + 155
-      );
-
-      return (start > 0 ? "… " : "") +
-        plainText.slice(start, end).trim() +
-        (end < plainText.length ? " …" : "");
-    }
-
-    function getWordsBefore(text, position, count = 7) {
-      const beforeText = text.slice(Math.max(0, position - 160), position).trim();
-      const words = beforeText.split(/\s+/).filter(Boolean);
-
-      return words.slice(-count).join(" ");
-    }
-
-    function getWordsAfter(text, position, query, count = 7) {
-      const start = position + normalize(query).length;
-      const afterText = text.slice(start, start + 160).trim();
-      const words = afterText.split(/\s+/).filter(Boolean);
-
-      return words.slice(0, count).join(" ");
-    }
-
-    function makeTextFragmentUrl(url, text, position, query) {
-      const prefix = getWordsBefore(text, position);
-      const suffix = getWordsAfter(text, position, query);
+      const after = cleanParagraph
+        .slice(afterStart, afterStart + 90)
+        .trim()
+        .split(/\s+/)
+        .slice(0, 6)
+        .join(" ");
 
       let fragment = "";
 
-      if (prefix) {
-        fragment += `${encodeURIComponent(prefix)}-`;
+      if (before) {
+        fragment += `${encodeURIComponent(before)}-`;
       }
 
       fragment += encodeURIComponent(query);
 
-      if (suffix) {
-        fragment += `-${encodeURIComponent(suffix)}`;
+      if (after) {
+        fragment += `-${encodeURIComponent(after)}`;
       }
 
       return `${url}#:~:text=${fragment}`;
     }
 
-    function highlightSnippet(snippet, query) {
-      const escapedSnippet = escapeHtml(snippet);
+    function highlightText(text, query) {
+      const escapedText = escapeHtml(text);
       const escapedQuery = escapeHtml(query);
 
       if (!escapedQuery) {
-        return escapedSnippet;
+        return escapedText;
       }
 
       const pattern = new RegExp(
@@ -408,7 +379,7 @@
         "gi"
       );
 
-      return escapedSnippet.replace(
+      return escapedText.replace(
         pattern,
         match => `<mark>${match}</mark>`
       );
@@ -428,12 +399,12 @@
           }
 
           const html = await response.text();
-          const text = getTextFromHtml(html);
+          const paragraphs = getParagraphsFromHtml(html);
 
           documents.push({
             title: title,
             url: url,
-            text: text
+            paragraphs: paragraphs
           });
         } catch (error) {
           console.warn("Text file not loaded:", url, error);
@@ -470,23 +441,14 @@
       const allResults = [];
 
       documents.forEach(document => {
-        const positions = findAllMatches(document.text, query);
-
-        positions.forEach((position, index) => {
-          const snippet = makeSnippet(document.text, position, query);
-          const fragmentUrl = makeTextFragmentUrl(
-            document.url,
-            document.text,
-            position,
-            query
-          );
-
-          allResults.push({
-            title: document.title,
-            snippet: snippet,
-            url: fragmentUrl,
-            number: index + 1
-          });
+        document.paragraphs.forEach(paragraph => {
+          if (normalize(paragraph).includes(cleanQuery)) {
+            allResults.push({
+              title: document.title,
+              paragraph: paragraph,
+              url: makeTextFragmentUrl(document.url, paragraph, query)
+            });
+          }
         });
       });
 
@@ -500,32 +462,34 @@
 
       const shownResults = allResults.slice(0, maximumResults);
 
-      let resultCountText = `تعداد نتایج: ${allResults.length}`;
+      let countMessage = `تعداد نتیجه‌ها: ${allResults.length}`;
 
       if (allResults.length > maximumResults) {
-        resultCountText += ` — فقط ${maximumResults} نتیجهٔ نخست نمایش داده شده است.`;
+        countMessage +=
+          ` — فقط ${maximumResults} نتیجهٔ نخست نمایش داده شده است.`;
       }
 
       searchResults.innerHTML = `
-        <p class="result-count">${resultCountText}</p>
-        ${shownResults.map(result => `
+        <p class="result-count">${countMessage}</p>
+
+        ${shownResults.map((result, index) => `
           <article class="text-search-result">
             <a
               class="result-title"
               href="${result.url}"
               target="_blank"
               rel="noopener">
-              ${escapeHtml(result.title)} — نتیجهٔ ${result.number}
+              ${escapeHtml(result.title)} — نتیجهٔ ${index + 1}
             </a>
 
-            <p>${highlightSnippet(result.snippet, query)}</p>
+            <p>${highlightText(result.paragraph, query)}</p>
 
             <a
               class="found-word-link"
               href="${result.url}"
               target="_blank"
               rel="noopener">
-              رفتن به همین عبارت: «${escapeHtml(query)}»
+              رفتن به این بخش از متن
             </a>
           </article>
         `).join("")}
