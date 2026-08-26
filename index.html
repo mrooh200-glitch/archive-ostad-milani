@@ -325,8 +325,39 @@
       return [...new Set(paragraphs)];
     }
 
-    function makeTextFragmentUrl(url, query) {
-      return `${url}#:~:text=${encodeURIComponent(query.trim())}`;
+    function getFragmentText(paragraph, query) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const cleanQuery = normalize(query);
+      const normalizedParagraph = normalize(cleanParagraph);
+      const position = normalizedParagraph.indexOf(cleanQuery);
+
+      if (position === -1) {
+        return query.trim();
+      }
+
+      const beforeText = cleanParagraph.slice(0, position);
+      const targetText = cleanParagraph.slice(
+        position,
+        position + cleanQuery.length
+      );
+      const afterText = cleanParagraph.slice(
+        position + cleanQuery.length
+      );
+
+      const nextWords = afterText
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2);
+
+      return [targetText, ...nextWords]
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function makeTextFragmentUrl(url, fragmentText) {
+      return `${url}#:~:text=${encodeURIComponent(fragmentText)}`;
     }
 
     function highlightText(text, query) {
@@ -406,10 +437,12 @@
       documents.forEach(document => {
         document.paragraphs.forEach(paragraph => {
           if (normalize(paragraph).includes(cleanQuery)) {
+            const fragmentText = getFragmentText(paragraph, query);
+
             allResults.push({
               title: document.title,
               paragraph: paragraph,
-              url: makeTextFragmentUrl(document.url, query)
+              url: makeTextFragmentUrl(document.url, fragmentText)
             });
           }
         });
