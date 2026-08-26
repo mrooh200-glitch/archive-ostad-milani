@@ -115,29 +115,6 @@
       padding: 0 20px 20px;
     }
 
-    .folder {
-      margin-top: 8px;
-      border: 1px solid #dbe3ee;
-      border-radius: 11px;
-      overflow: hidden;
-      background: #fbfdff;
-    }
-
-    .folder > summary {
-      padding: 13px 15px;
-      color: #1d4f7a;
-    }
-
-    .folder > summary::before {
-      content: "📁";
-      width: 34px;
-      font-size: 1rem;
-    }
-
-    .folder[open] > summary::before {
-      content: "📂";
-    }
-
     .book-list {
       margin: 0;
       padding: 0 20px 14px 0;
@@ -190,13 +167,13 @@
       background: #fff;
     }
 
-    .text-search-result a {
+    .text-search-result > a {
       color: #1d4ed8;
       font-weight: bold;
       text-decoration: none;
     }
 
-    .text-search-result a:hover {
+    .text-search-result > a:hover {
       text-decoration: underline;
     }
 
@@ -207,6 +184,26 @@
       line-height: 2;
     }
 
+    .found-word-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: #1d4ed8;
+      font-size: 0.9rem;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .found-word-link:hover {
+      text-decoration: underline;
+    }
+
+    mark {
+      padding: 1px 3px;
+      border-radius: 3px;
+      background: #fde68a;
+      color: inherit;
+    }
+
     #noResults {
       display: none;
       margin: 18px 0 0;
@@ -214,13 +211,6 @@
       border-radius: 10px;
       background: #fff7ed;
       color: #9a3412;
-    }
-
-    footer {
-      margin-top: 26px;
-      text-align: center;
-      color: #94a3b8;
-      font-size: 0.85rem;
     }
   </style>
 </head>
@@ -253,6 +243,7 @@
               class="searchable-item"
               data-title="متن درس معرفة الله محشی معرفت الله"
               data-url="marefatollah-mohashsha.htm">
+
               <a
                 href="marefatollah-mohashsha.htm"
                 target="_blank"
@@ -274,10 +265,6 @@
     <p id="noResults">
       نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
     </p>
-
-    <footer>
-      برای باز کردن هر منبع، روی عنوان آن کلیک کنید.
-    </footer>
   </main>
 
   <script>
@@ -300,6 +287,15 @@
         .trim();
     }
 
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
     function getTextFromHtml(html) {
       const parser = new DOMParser();
       const page = parser.parseFromString(html, "text/html");
@@ -308,7 +304,9 @@
         "script, style, noscript, svg, iframe, header, footer, nav"
       ).forEach(element => element.remove());
 
-      return page.body ? page.body.textContent : "";
+      return page.body
+        ? page.body.textContent.replace(/\s+/g, " ").trim()
+        : "";
     }
 
     function makeSnippet(text, query) {
@@ -330,6 +328,29 @@
       return (start > 0 ? "… " : "") +
         plainText.slice(start, end).trim() +
         (end < plainText.length ? " …" : "");
+    }
+
+    function highlightSnippet(snippet, query) {
+      const escapedSnippet = escapeHtml(snippet);
+      const escapedQuery = escapeHtml(query);
+
+      if (!escapedQuery) {
+        return escapedSnippet;
+      }
+
+      const pattern = new RegExp(
+        escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        "gi"
+      );
+
+      return escapedSnippet.replace(
+        pattern,
+        match => `<mark>${match}</mark>`
+      );
+    }
+
+    function makeTextFragmentUrl(url, query) {
+      return `${url}#:~:text=${encodeURIComponent(query)}`;
     }
 
     async function loadTextDocuments() {
@@ -374,9 +395,9 @@
 
       searchableItems.forEach(item => {
         const title = normalize(item.dataset.title || item.textContent);
-        const matched = !cleanQuery || title.includes(cleanQuery);
+        const titleMatched = !cleanQuery || title.includes(cleanQuery);
 
-        item.classList.toggle("hidden", !matched);
+        item.classList.toggle("hidden", !titleMatched);
       });
 
       if (!cleanQuery) {
@@ -398,14 +419,28 @@
 
       noResults.style.display = "none";
 
-      searchResults.innerHTML = matches.map(document => `
-        <article class="text-search-result">
-          <a href="${document.url}" target="_blank" rel="noopener">
-            ${document.title}
-          </a>
-          <p>${makeSnippet(document.text, cleanQuery)}</p>
-        </article>
-      `).join("");
+      searchResults.innerHTML = matches.map(document => {
+        const snippet = makeSnippet(document.text, query);
+        const fragmentUrl = makeTextFragmentUrl(document.url, query);
+
+        return `
+          <article class="text-search-result">
+            <a href="${fragmentUrl}" target="_blank" rel="noopener">
+              ${escapeHtml(document.title)}
+            </a>
+
+            <p>${highlightSnippet(snippet, query)}</p>
+
+            <a
+              class="found-word-link"
+              href="${fragmentUrl}"
+              target="_blank"
+              rel="noopener">
+              رفتن به عبارت پیدا‌شده: «${escapeHtml(query)}»
+            </a>
+          </article>
+        `;
+      }).join("");
     }
 
     searchInput.addEventListener("input", function () {
