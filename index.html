@@ -224,6 +224,51 @@
       color: inherit;
     }
 
+    .pagination {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin: 24px 0 0;
+      direction: rtl;
+    }
+
+    .page-button {
+      min-width: 38px;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+
+    .page-button:hover:not(:disabled) {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+
+    .page-button.current-page {
+      border-color: #1d4ed8;
+      background: #1d4ed8;
+      color: #fff;
+      cursor: default;
+    }
+
+    .page-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .page-dots {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 5px;
+      color: #64748b;
+    }
+
     #noResults {
       display: none;
       margin: 18px 0 0;
@@ -231,6 +276,23 @@
       border-radius: 10px;
       background: #fff7ed;
       color: #9a3412;
+    }
+
+    @media (max-width: 520px) {
+      .container {
+        width: min(100% - 22px, 960px);
+        padding-top: 28px;
+      }
+
+      .branch-content {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      .page-button {
+        min-width: 34px;
+        padding: 6px 8px;
+      }
     }
   </style>
 </head>
@@ -348,7 +410,6 @@
 
         <div class="branch-content">
           <ul class="book-list">
-
             <li>
               <a
                 class="pdf-link"
@@ -358,7 +419,6 @@
                 معرفت الله تعالی
               </a>
             </li>
-
           </ul>
         </div>
       </details>
@@ -371,6 +431,12 @@
       aria-live="polite">
     </section>
 
+    <nav
+      id="pagination"
+      class="pagination"
+      aria-label="صفحه‌های نتایج جست‌وجو">
+    </nav>
+
     <p id="noResults">
       نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
     </p>
@@ -380,11 +446,15 @@
     const searchInput = document.getElementById("siteSearch");
     const searchStatus = document.getElementById("searchStatus");
     const searchResults = document.getElementById("searchResults");
+    const pagination = document.getElementById("pagination");
     const noResults = document.getElementById("noResults");
     const searchableItems = [...document.querySelectorAll(".searchable-item")];
 
     const documents = [];
-    const maximumResults = 300;
+    const resultsPerPage = 8;
+    let currentResults = [];
+    let currentQuery = "";
+    let currentPage = 1;
 
     function normalize(text) {
       return (text || "")
@@ -518,6 +588,164 @@
       }
     }
 
+    function pageButton(label, page, disabled = false, isCurrent = false) {
+      const currentAttribute = isCurrent ? 'aria-current="page"' : "";
+      const currentClass = isCurrent ? " current-page" : "";
+
+      return `
+        <button
+          class="page-button${currentClass}"
+          type="button"
+          data-page="${page}"
+          ${disabled ? "disabled" : ""}
+          ${currentAttribute}
+          aria-label="${label}">
+          ${label}
+        </button>
+      `;
+    }
+
+    function getPageNumbers(totalPages, page) {
+      const pages = [];
+
+      if (totalPages <= 7) {
+        for (let number = 1; number <= totalPages; number++) {
+          pages.push(number);
+        }
+        return pages;
+      }
+
+      pages.push(1);
+
+      if (page > 4) {
+        pages.push("dots-right");
+      }
+
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+
+      for (let number = start; number <= end; number++) {
+        pages.push(number);
+      }
+
+      if (page < totalPages - 3) {
+        pages.push("dots-left");
+      }
+
+      pages.push(totalPages);
+
+      return pages;
+    }
+
+    function renderPagination(totalPages) {
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const buttons = [];
+
+      buttons.push(
+        pageButton(
+          "صفحهٔ قبلی",
+          currentPage - 1,
+          currentPage === 1
+        )
+      );
+
+      getPageNumbers(totalPages, currentPage).forEach(item => {
+        if (typeof item === "string") {
+          buttons.push('<span class="page-dots" aria-hidden="true">…</span>');
+        } else {
+          buttons.push(
+            pageButton(
+              `صفحهٔ ${item}`,
+              item,
+              false,
+              item === currentPage
+            )
+          );
+        }
+      });
+
+      buttons.push(
+        pageButton(
+          "صفحهٔ بعدی",
+          currentPage + 1,
+          currentPage === totalPages
+        )
+      );
+
+      pagination.innerHTML = buttons.join("");
+
+      pagination.querySelectorAll(".page-button:not(:disabled)")
+        .forEach(button => {
+          button.addEventListener("click", () => {
+            const selectedPage = Number(button.dataset.page);
+
+            if (
+              selectedPage >= 1 &&
+              selectedPage <= totalPages &&
+              selectedPage !== currentPage
+            ) {
+              currentPage = selectedPage;
+              renderCurrentPage();
+              searchResults.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+              });
+            }
+          });
+        });
+    }
+
+    function renderCurrentPage() {
+      const totalResults = currentResults.length;
+      const totalPages = Math.ceil(totalResults / resultsPerPage);
+
+      if (currentPage > totalPages) {
+        currentPage = totalPages;
+      }
+
+      const startIndex = (currentPage - 1) * resultsPerPage;
+      const endIndex = startIndex + resultsPerPage;
+      const pageResults = currentResults.slice(startIndex, endIndex);
+
+      const firstResult = startIndex + 1;
+      const lastResult = Math.min(endIndex, totalResults);
+
+      searchResults.innerHTML = `
+        <p class="result-count">
+          تعداد نتیجه‌ها: ${totalResults}
+          — نمایش نتیجه‌های ${firstResult} تا ${lastResult}
+        </p>
+
+        ${pageResults.map((result, index) => `
+          <article class="text-search-result">
+            <a
+              class="result-title"
+              href="${result.url}"
+              target="_blank"
+              rel="noopener">
+              ${escapeHtml(result.title)} — نتیجهٔ ${startIndex + index + 1}
+            </a>
+
+            <p>${highlightText(result.paragraph, currentQuery)}</p>
+
+            <a
+              class="found-word-link"
+              href="${result.url}"
+              target="_blank"
+              rel="noopener">
+              رفتن به عبارت یافت‌شده
+            </a>
+          </article>
+        `).join("")}
+      `;
+
+      renderPagination(totalPages);
+    }
+
     function renderResults(query) {
       const cleanQuery = normalize(query);
 
@@ -529,7 +757,11 @@
       });
 
       if (!cleanQuery) {
+        currentResults = [];
+        currentQuery = "";
+        currentPage = 1;
         searchResults.innerHTML = "";
+        pagination.innerHTML = "";
         noResults.style.display = "none";
         return;
       }
@@ -551,47 +783,21 @@
       });
 
       if (allResults.length === 0) {
+        currentResults = [];
+        currentQuery = query;
+        currentPage = 1;
         searchResults.innerHTML = "";
+        pagination.innerHTML = "";
         noResults.style.display = "block";
         return;
       }
 
       noResults.style.display = "none";
+      currentResults = allResults;
+      currentQuery = query;
+      currentPage = 1;
 
-      const shownResults = allResults.slice(0, maximumResults);
-
-      let countMessage = `تعداد نتیجه‌ها: ${allResults.length}`;
-
-      if (allResults.length > maximumResults) {
-        countMessage +=
-          ` — فقط ${maximumResults} نتیجهٔ نخست نمایش داده شده است.`;
-      }
-
-      searchResults.innerHTML = `
-        <p class="result-count">${countMessage}</p>
-
-        ${shownResults.map((result, index) => `
-          <article class="text-search-result">
-            <a
-              class="result-title"
-              href="${result.url}"
-              target="_blank"
-              rel="noopener">
-              ${escapeHtml(result.title)} — نتیجهٔ ${index + 1}
-            </a>
-
-            <p>${highlightText(result.paragraph, query)}</p>
-
-            <a
-              class="found-word-link"
-              href="${result.url}"
-              target="_blank"
-              rel="noopener">
-              رفتن به عبارت یافت‌شده
-            </a>
-          </article>
-        `).join("")}
-      `;
+      renderCurrentPage();
     }
 
     searchInput.addEventListener("input", function () {
