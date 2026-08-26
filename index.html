@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>آرشیو کتب، مقالات و دروس استاد میلانی
-    (حفظه‌الله)</title>
+
+  <title>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</title>
 
   <style>
     * {
@@ -46,7 +46,7 @@
     .search-box {
       display: block;
       width: 100%;
-      margin: 22px 0 28px;
+      margin: 22px 0 8px;
       padding: 14px 18px;
       border: 1px solid #cbd5e1;
       border-radius: 12px;
@@ -60,6 +60,13 @@
     .search-box:focus {
       border-color: #2563eb;
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .search-status {
+      min-height: 28px;
+      margin: 0 0 20px;
+      color: #64748b;
+      font-size: 0.9rem;
     }
 
     .tree {
@@ -106,15 +113,6 @@
 
     .branch-content {
       padding: 0 20px 20px;
-    }
-
-    .empty-message {
-      margin: 0;
-      padding: 15px;
-      border: 1px dashed #cbd5e1;
-      border-radius: 10px;
-      background: #f8fafc;
-      color: #64748b;
     }
 
     .folder {
@@ -164,13 +162,13 @@
     }
 
     .book-list a::before {
-      content: "PDF";
+      content: "HTML";
       display: inline-block;
       margin-left: 9px;
       padding: 1px 7px;
       border-radius: 5px;
-      background: #fee2e2;
-      color: #b91c1c;
+      background: #dcfce7;
+      color: #166534;
       font-size: 0.72rem;
       font-weight: bold;
       direction: ltr;
@@ -178,6 +176,35 @@
 
     .hidden {
       display: none !important;
+    }
+
+    .text-search-results {
+      margin-top: 22px;
+    }
+
+    .text-search-result {
+      margin-top: 12px;
+      padding: 15px;
+      border: 1px solid #dbe3ee;
+      border-radius: 11px;
+      background: #fff;
+    }
+
+    .text-search-result a {
+      color: #1d4ed8;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .text-search-result a:hover {
+      text-decoration: underline;
+    }
+
+    .text-search-result p {
+      margin: 10px 0 0;
+      color: #475569;
+      font-size: 0.93rem;
+      line-height: 2;
     }
 
     #noResults {
@@ -201,7 +228,191 @@
 <body>
   <main class="container">
     <header>
-      <h1>آرشیو کتب، مقالات و متن دروس استاد میلانی 
-        (حفظه‌الله) </h1>
-      <p class="subtitle">دسترسی و جست‌وجو در منابع آرشیو</p>
+      <h1>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</h1>
+      <p class="subtitle">دسترسی و جست‌وجو در عنوان‌ها و متن دروس آرشیو</p>
     </header>
+
+    <input
+      id="siteSearch"
+      class="search-box"
+      type="search"
+      placeholder="جست‌وجو در عنوان‌ها و متن درس‌ها…"
+      aria-label="جست‌وجو در منابع و متن دروس">
+
+    <p id="searchStatus" class="search-status">
+      در حال آماده‌سازی جست‌وجوی متون…
+    </p>
+
+    <section class="tree" aria-label="فهرست منابع">
+      <details class="main-branch" open>
+        <summary>دروس و متون</summary>
+
+        <div class="branch-content">
+          <ul class="book-list">
+            <li
+              class="searchable-item"
+              data-title="متن درس معرفة الله محشی معرفت الله"
+              data-url="marefatollah-mohashsha.htm">
+              <a
+                href="marefatollah-mohashsha.htm"
+                target="_blank"
+                rel="noopener">
+                متن درس معرفة الله (محشّی)
+              </a>
+            </li>
+          </ul>
+        </div>
+      </details>
+    </section>
+
+    <section
+      id="searchResults"
+      class="text-search-results"
+      aria-live="polite">
+    </section>
+
+    <p id="noResults">
+      نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
+    </p>
+
+    <footer>
+      برای باز کردن هر منبع، روی عنوان آن کلیک کنید.
+    </footer>
+  </main>
+
+  <script>
+    const searchInput = document.getElementById("siteSearch");
+    const searchStatus = document.getElementById("searchStatus");
+    const searchResults = document.getElementById("searchResults");
+    const noResults = document.getElementById("noResults");
+    const searchableItems = [...document.querySelectorAll(".searchable-item")];
+
+    const documents = [];
+
+    function normalize(text) {
+      return (text || "")
+        .toLowerCase()
+        .replace(/[يى]/g, "ی")
+        .replace(/ك/g, "ک")
+        .replace(/ۀ/g, "ه")
+        .replace(/ة/g, "ه")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function getTextFromHtml(html) {
+      const parser = new DOMParser();
+      const page = parser.parseFromString(html, "text/html");
+
+      page.querySelectorAll(
+        "script, style, noscript, svg, iframe, header, footer, nav"
+      ).forEach(element => element.remove());
+
+      return page.body ? page.body.textContent : "";
+    }
+
+    function makeSnippet(text, query) {
+      const plainText = (text || "").replace(/\s+/g, " ").trim();
+      const cleanText = normalize(plainText);
+      const cleanQuery = normalize(query);
+      const position = cleanText.indexOf(cleanQuery);
+
+      if (position === -1) {
+        return plainText.slice(0, 240) + "…";
+      }
+
+      const start = Math.max(0, position - 110);
+      const end = Math.min(
+        plainText.length,
+        position + cleanQuery.length + 150
+      );
+
+      return (start > 0 ? "… " : "") +
+        plainText.slice(start, end).trim() +
+        (end < plainText.length ? " …" : "");
+    }
+
+    async function loadTextDocuments() {
+      const jobs = searchableItems.map(async item => {
+        const link = item.querySelector("a");
+        const title = item.dataset.title || link.textContent;
+        const url = item.dataset.url || link.getAttribute("href");
+
+        try {
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            throw new Error("File could not be loaded");
+          }
+
+          const html = await response.text();
+          const text = getTextFromHtml(html);
+
+          documents.push({
+            title: title,
+            url: url,
+            text: text
+          });
+        } catch (error) {
+          console.warn("Text file not loaded:", url, error);
+        }
+      });
+
+      await Promise.all(jobs);
+
+      if (documents.length > 0) {
+        searchStatus.textContent =
+          `جست‌وجو در متن ${documents.length} درس آماده است.`;
+      } else {
+        searchStatus.textContent =
+          "متن درس بارگذاری نشد؛ فعلاً جست‌وجو فقط در عنوان انجام می‌شود.";
+      }
+    }
+
+    function renderResults(query) {
+      const cleanQuery = normalize(query);
+
+      searchableItems.forEach(item => {
+        const title = normalize(item.dataset.title || item.textContent);
+        const matched = !cleanQuery || title.includes(cleanQuery);
+
+        item.classList.toggle("hidden", !matched);
+      });
+
+      if (!cleanQuery) {
+        searchResults.innerHTML = "";
+        noResults.style.display = "none";
+        return;
+      }
+
+      const matches = documents.filter(document =>
+        normalize(document.title).includes(cleanQuery) ||
+        normalize(document.text).includes(cleanQuery)
+      );
+
+      if (matches.length === 0) {
+        searchResults.innerHTML = "";
+        noResults.style.display = "block";
+        return;
+      }
+
+      noResults.style.display = "none";
+
+      searchResults.innerHTML = matches.map(document => `
+        <article class="text-search-result">
+          <a href="${document.url}" target="_blank" rel="noopener">
+            ${document.title}
+          </a>
+          <p>${makeSnippet(document.text, cleanQuery)}</p>
+        </article>
+      `).join("");
+    }
+
+    searchInput.addEventListener("input", function () {
+      renderResults(this.value);
+    });
+
+    loadTextDocuments();
+  </script>
+</body>
+</html>
