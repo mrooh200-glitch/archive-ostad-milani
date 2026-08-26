@@ -164,10 +164,6 @@
       direction: ltr;
     }
 
-    .hidden {
-      display: none !important;
-    }
-
     .text-search-results {
       margin-top: 22px;
     }
@@ -452,6 +448,7 @@
 
     const documents = [];
     const resultsPerPage = 8;
+
     let currentResults = [];
     let currentQuery = "";
     let currentPage = 1;
@@ -646,11 +643,7 @@
       const buttons = [];
 
       buttons.push(
-        pageButton(
-          "صفحهٔ قبلی",
-          currentPage - 1,
-          currentPage === 1
-        )
+        pageButton("صفحهٔ قبلی", currentPage - 1, currentPage === 1)
       );
 
       getPageNumbers(totalPages, currentPage).forEach(item => {
@@ -690,6 +683,7 @@
             ) {
               currentPage = selectedPage;
               renderCurrentPage();
+
               searchResults.scrollIntoView({
                 behavior: "smooth",
                 block: "start"
@@ -748,13 +742,6 @@
 
     function renderResults(query) {
       const cleanQuery = normalize(query);
-
-      searchableItems.forEach(item => {
-        const title = normalize(item.dataset.title || item.textContent);
-        const titleMatched = !cleanQuery || title.includes(cleanQuery);
-
-        item.classList.toggle("hidden", !titleMatched);
-      });
 
       if (!cleanQuery) {
         currentResults = [];
