@@ -39,6 +39,8 @@
 
     box.id = "inPageSearchBox";
     box.innerHTML = `
+      <h2 id="inPageSearchTitle">${document.title}</h2>
+
       <div class="in-page-search-row">
         <label for="inPageSearchInput">جست‌وجو در همین متن</label>
 
@@ -61,9 +63,7 @@
         </button>
       </div>
 
-      <p id="inPageSearchStatus" aria-live="polite">
-        برای جست‌وجو در این متن، عبارت مورد نظر را وارد کنید.
-      </p>
+      <p id="inPageSearchStatus" aria-live="polite"></p>
     `;
 
     document.body.insertBefore(box, document.body.firstChild);
@@ -80,6 +80,17 @@
         box-shadow: 0 3px 10px rgba(15, 23, 42, 0.10);
         font-family: Tahoma, Arial, sans-serif;
         direction: rtl;
+      }
+
+      #inPageSearchTitle {
+        width: min(1100px, 100%);
+        margin: 0 auto 10px;
+        padding-bottom: 8px;
+        border-bottom: 3px solid #2563eb;
+        color: #173b63;
+        font-size: 1.05rem;
+        font-weight: bold;
+        line-height: 1.6;
       }
 
       .in-page-search-row {
@@ -304,8 +315,7 @@
     const status = document.getElementById("inPageSearchStatus");
 
     if (!document.getElementById("inPageSearchInput").value.trim()) {
-      status.textContent =
-        "برای جست‌وجو در این متن، عبارت مورد نظر را وارد کنید.";
+      status.textContent = "";
       return;
     }
 
