@@ -62,6 +62,44 @@
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
 
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 0 0 20px;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 13px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: #fff;
+      color: #475569;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .tab-button:hover {
+      background: #eff6ff;
+    }
+
+    .tab-button.active-tab {
+      border-color: #1d4ed8;
+      background: #1d4ed8;
+      color: #fff;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active-panel {
+      display: block;
+    }
+
     .tree {
       background: #fff;
       border: 1px solid #dbe3ee;
@@ -294,138 +332,164 @@
       <p class="subtitle">دسترسی و جست‌وجو در عنوان‌ها و متن دروس آرشیو</p>
     </header>
 
-    <input
-      id="siteSearch"
-      class="search-box"
-      type="search"
-      placeholder="جست‌وجو در عنوان‌ها و متن درس‌ها…"
-      aria-label="جست‌وجو در منابع و متن دروس">
+    <nav class="tabs" aria-label="بخش‌های صفحه">
+      <button
+        id="browseTabButton"
+        class="tab-button active-tab"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="browsePanel">
+        مطالعهٔ کتاب‌ها
+      </button>
 
-    <section class="tree" aria-label="فهرست منابع">
-
-      <details class="main-branch" open>
-        <summary>دروس و متون قابل جست‌وجو</summary>
-
-        <div class="branch-content">
-          <ul class="book-list">
-
-            <li
-              class="searchable-item"
-              data-title="آقای جوادی و حدوث"
-              data-url="Aghaye-Javadi-va-Hodous.htm">
-              <a
-                class="html-link"
-                href="Aghaye-Javadi-va-Hodous.htm"
-                target="_blank"
-                rel="noopener">
-                آقای جوادی و حدوث
-              </a>
-            </li>
-
-            <li
-              class="searchable-item"
-              data-title="اثبات توحید و بطلان وحدت وجود"
-              data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
-              <a
-                class="html-link"
-                href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
-                target="_blank"
-                rel="noopener">
-                اثبات توحید و بطلان وحدت وجود
-              </a>
-            </li>
-
-            <li
-              class="searchable-item"
-              data-title="فراتر از عرفان"
-              data-url="Faratar-az-Erfan.htm">
-              <a
-                class="html-link"
-                href="Faratar-az-Erfan.htm"
-                target="_blank"
-                rel="noopener">
-                فراتر از عرفان
-              </a>
-            </li>
-
-            <li
-              class="searchable-item"
-              data-title="اصول المعارف الالهیة"
-              data-url="Osoul-al-Maaref-al-Elahiyya.htm">
-              <a
-                class="html-link"
-                href="Osoul-al-Maaref-al-Elahiyya.htm"
-                target="_blank"
-                rel="noopener">
-                اصول المعارف الالهیة
-              </a>
-            </li>
-
-            <li
-              class="searchable-item"
-              data-title="الإعلان عن اسرار الفلسفة والعرفان"
-              data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
-              <a
-                class="html-link"
-                href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
-                target="_blank"
-                rel="noopener">
-                الإعلان عن اسرار الفلسفة والعرفان
-              </a>
-            </li>
-
-            <li
-              class="searchable-item"
-              data-title="متن درس معرفة الله محشی"
-              data-url="marefatollah-mohashsha.htm">
-              <a
-                class="html-link"
-                href="marefatollah-mohashsha.htm"
-                target="_blank"
-                rel="noopener">
-                متن درس معرفة الله (محشّی)
-              </a>
-            </li>
-
-          </ul>
-        </div>
-      </details>
-
-      <details class="main-branch" open>
-        <summary>نسخه‌های PDF</summary>
-
-        <div class="branch-content">
-          <ul class="book-list">
-            <li>
-              <a
-                class="pdf-link"
-                href="Marefat-Taala-Allah-bellah.pdf"
-                target="_blank"
-                rel="noopener">
-                معرفت الله تعالی
-              </a>
-            </li>
-          </ul>
-        </div>
-      </details>
-
-    </section>
-
-    <section
-      id="searchResults"
-      class="text-search-results"
-      aria-live="polite">
-    </section>
-
-    <nav
-      id="pagination"
-      class="pagination"
-      aria-label="صفحه‌های نتایج جست‌وجو">
+      <button
+        id="searchTabButton"
+        class="tab-button"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="searchPanel">
+        جست‌وجو
+      </button>
     </nav>
 
-    <p id="noResults">
-      نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
-    </p>
+    <div id="browsePanel" class="tab-panel active-panel">
+      <section class="tree" aria-label="فهرست منابع">
+
+        <details class="main-branch" open>
+          <summary>دروس و متون قابل جست‌وجو</summary>
+
+          <div class="branch-content">
+            <ul class="book-list">
+
+              <li
+                class="searchable-item"
+                data-title="آقای جوادی و حدوث"
+                data-url="Aghaye-Javadi-va-Hodous.htm">
+                
+                  class="html-link"
+                  href="Aghaye-Javadi-va-Hodous.htm"
+                  target="_blank"
+                  rel="noopener">
+                  آقای جوادی و حدوث
+                </a>
+              </li>
+
+              <li
+                class="searchable-item"
+                data-title="اثبات توحید و بطلان وحدت وجود"
+                data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
+                
+                  class="html-link"
+                  href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
+                  target="_blank"
+                  rel="noopener">
+                  اثبات توحید و بطلان وحدت وجود
+                </a>
+              </li>
+
+              <li
+                class="searchable-item"
+                data-title="فراتر از عرفان"
+                data-url="Faratar-az-Erfan.htm">
+                
+                  class="html-link"
+                  href="Faratar-az-Erfan.htm"
+                  target="_blank"
+                  rel="noopener">
+                  فراتر از عرفان
+                </a>
+              </li>
+
+              <li
+                class="searchable-item"
+                data-title="اصول المعارف الالهیة"
+                data-url="Osoul-al-Maaref-al-Elahiyya.htm">
+                
+                  class="html-link"
+                  href="Osoul-al-Maaref-al-Elahiyya.htm"
+                  target="_blank"
+                  rel="noopener">
+                  اصول المعارف الالهیة
+                </a>
+              </li>
+
+              <li
+                class="searchable-item"
+                data-title="الإعلان عن اسرار الفلسفة والعرفان"
+                data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
+                
+                  class="html-link"
+                  href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
+                  target="_blank"
+                  rel="noopener">
+                  الإعلان عن اسرار الفلسفة والعرفان
+                </a>
+              </li>
+
+              <li
+                class="searchable-item"
+                data-title="متن درس معرفة الله محشی"
+                data-url="marefatollah-mohashsha.htm">
+                
+                  class="html-link"
+                  href="marefatollah-mohashsha.htm"
+                  target="_blank"
+                  rel="noopener">
+                  متن درس معرفة الله (محشّی)
+                </a>
+              </li>
+
+            </ul>
+          </div>
+        </details>
+
+        <details class="main-branch" open>
+          <summary>نسخه‌های PDF</summary>
+
+          <div class="branch-content">
+            <ul class="book-list">
+              <li>
+                
+                  class="pdf-link"
+                  href="Marefat-Taala-Allah-bellah.pdf"
+                  target="_blank"
+                  rel="noopener">
+                  معرفت الله تعالی
+                </a>
+              </li>
+            </ul>
+          </div>
+        </details>
+
+      </section>
+    </div>
+
+    <div id="searchPanel" class="tab-panel">
+      <input
+        id="siteSearch"
+        class="search-box"
+        type="search"
+        placeholder="جست‌وجو در عنوان‌ها و متن درس‌ها…"
+        aria-label="جست‌وجو در منابع و متن دروس">
+
+      <section
+        id="searchResults"
+        class="text-search-results"
+        aria-live="polite">
+      </section>
+
+      <nav
+        id="pagination"
+        class="pagination"
+        aria-label="صفحه‌های نتایج جست‌وجو">
+      </nav>
+
+      <p id="noResults">
+        نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
+      </p>
+    </div>
   </main>
 
   <script>
@@ -434,6 +498,29 @@
     const pagination = document.getElementById("pagination");
     const noResults = document.getElementById("noResults");
     const searchableItems = [...document.querySelectorAll(".searchable-item")];
+
+    const browseTabButton = document.getElementById("browseTabButton");
+    const searchTabButton = document.getElementById("searchTabButton");
+    const browsePanel = document.getElementById("browsePanel");
+    const searchPanel = document.getElementById("searchPanel");
+
+    function activateTab(tabName) {
+      const showSearch = tabName === "search";
+
+      browseTabButton.classList.toggle("active-tab", !showSearch);
+      searchTabButton.classList.toggle("active-tab", showSearch);
+      browseTabButton.setAttribute("aria-selected", String(!showSearch));
+      searchTabButton.setAttribute("aria-selected", String(showSearch));
+      browsePanel.classList.toggle("active-panel", !showSearch);
+      searchPanel.classList.toggle("active-panel", showSearch);
+
+      if (showSearch) {
+        searchInput.focus();
+      }
+    }
+
+    browseTabButton.addEventListener("click", () => activateTab("browse"));
+    searchTabButton.addEventListener("click", () => activateTab("search"));
 
     const documents = [];
     const resultsPerPage = 8;
@@ -697,7 +784,7 @@
 
         ${pageResults.map((result, index) => `
           <article class="text-search-result">
-            <a
+            
               class="result-title"
               href="${result.url}"
               target="_blank"
@@ -707,7 +794,7 @@
 
             <p>${highlightText(result.paragraph, currentQuery)}</p>
 
-            <a
+            
               class="found-word-link"
               href="${result.url}"
               target="_blank"
