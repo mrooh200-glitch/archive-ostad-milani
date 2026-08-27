@@ -358,7 +358,7 @@
       <section class="tree" aria-label="فهرست منابع">
 
       <details class="main-branch" open>
-        <summary>دروس و متون قابل جست‌وجو</summary>
+        <summary></summary>
 
         <div class="branch-content">
           <ul class="book-list">
@@ -367,7 +367,7 @@
               class="searchable-item"
               data-title="آقای جوادی و حدوث"
               data-url="Aghaye-Javadi-va-Hodous.htm">
-              <a
+              
                 class="html-link"
                 href="Aghaye-Javadi-va-Hodous.htm"
                 target="_blank"
@@ -380,7 +380,7 @@
               class="searchable-item"
               data-title="اثبات توحید و بطلان وحدت وجود"
               data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
-              <a
+              
                 class="html-link"
                 href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
                 target="_blank"
@@ -391,22 +391,9 @@
 
             <li
               class="searchable-item"
-              data-title="فراتر از عرفان"
-              data-url="Faratar-az-Erfan.htm">
-              <a
-                class="html-link"
-                href="Faratar-az-Erfan.htm"
-                target="_blank"
-                rel="noopener">
-                فراتر از عرفان
-              </a>
-            </li>
-
-            <li
-              class="searchable-item"
               data-title="اصول المعارف الالهیة"
               data-url="Osoul-al-Maaref-al-Elahiyya.htm">
-              <a
+              
                 class="html-link"
                 href="Osoul-al-Maaref-al-Elahiyya.htm"
                 target="_blank"
@@ -419,7 +406,7 @@
               class="searchable-item"
               data-title="الإعلان عن اسرار الفلسفة والعرفان"
               data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
-              <a
+              
                 class="html-link"
                 href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
                 target="_blank"
@@ -430,9 +417,22 @@
 
             <li
               class="searchable-item"
+              data-title="فراتر از عرفان"
+              data-url="Faratar-az-Erfan.htm">
+              
+                class="html-link"
+                href="Faratar-az-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                فراتر از عرفان
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
               data-title="متن درس معرفة الله محشی"
               data-url="marefatollah-mohashsha.htm">
-              <a
+              
                 class="html-link"
                 href="marefatollah-mohashsha.htm"
                 target="_blank"
@@ -451,7 +451,7 @@
         <div class="branch-content">
           <ul class="book-list">
             <li>
-              <a
+              
                 class="pdf-link"
                 href="Marefat-Taala-Allah-bellah.pdf"
                 target="_blank"
@@ -464,6 +464,17 @@
       </details>
 
     </section>
+
+      <input
+        id="titleSearch"
+        class="search-box"
+        type="search"
+        placeholder="جست‌وجو در عنوان کتاب‌ها…"
+        aria-label="جست‌وجو در عنوان کتاب‌ها">
+
+      <p id="titleNoResults" style="display:none; margin: 10px 0 0; color:#9a3412;">
+        عنوانی پیدا نشد.
+      </p>
     </div>
 
     <div id="searchPanel" class="tab-panel">
@@ -471,7 +482,7 @@
         id="siteSearch"
         class="search-box"
         type="search"
-        placeholder="جست‌وجو در عنوان‌ها و متن درس‌ها…"
+        placeholder=""
         aria-label="جست‌وجو در منابع و متن دروس">
 
       <section
@@ -498,6 +509,10 @@
     const pagination = document.getElementById("pagination");
     const noResults = document.getElementById("noResults");
     const searchableItems = [...document.querySelectorAll(".searchable-item")];
+
+    const titleSearchInput = document.getElementById("titleSearch");
+    const titleNoResults = document.getElementById("titleNoResults");
+    const allBookListItems = [...document.querySelectorAll(".book-list li")];
 
     const browseTabButton = document.getElementById("browseTabButton");
     const searchTabButton = document.getElementById("searchTabButton");
@@ -785,7 +800,7 @@
 
         ${pageResults.map((result, index) => `
           <article class="text-search-result">
-            <a
+            
               class="result-title"
               href="${result.url}"
               target="_blank"
@@ -795,7 +810,7 @@
 
             <p>${highlightText(result.paragraph, currentQuery)}</p>
 
-            <a
+            
               class="found-word-link"
               href="${result.url}"
               target="_blank"
@@ -858,6 +873,45 @@
 
     searchInput.addEventListener("input", function () {
       renderResults(this.value);
+    });
+
+    function filterTitles(query) {
+      const cleanQuery = normalize(query);
+      let visibleCount = 0;
+
+      allBookListItems.forEach(item => {
+        const titleText = item.dataset.title ||
+          item.querySelector("a")?.textContent ||
+          "";
+
+        const matchesQuery = !cleanQuery ||
+          normalize(titleText).includes(cleanQuery);
+
+        item.style.display = matchesQuery ? "" : "none";
+
+        if (matchesQuery) {
+          visibleCount++;
+        }
+      });
+
+      document.querySelectorAll(".main-branch").forEach(branch => {
+        const hasVisibleItem = [...branch.querySelectorAll("li")]
+          .some(item => item.style.display !== "none");
+
+        if (cleanQuery) {
+          branch.open = hasVisibleItem;
+          branch.style.display = hasVisibleItem ? "" : "none";
+        } else {
+          branch.style.display = "";
+        }
+      });
+
+      titleNoResults.style.display =
+        cleanQuery && visibleCount === 0 ? "block" : "none";
+    }
+
+    titleSearchInput.addEventListener("input", function () {
+      filterTitles(this.value);
     });
 
     loadTextDocuments();
