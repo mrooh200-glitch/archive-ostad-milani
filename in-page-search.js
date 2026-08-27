@@ -104,11 +104,8 @@
     const style = document.createElement("style");
     style.textContent = `
       #inPageSearchBox {
-        position: fixed;
+        position: sticky;
         top: 0;
-        right: 0;
-        left: 0;
-        width: 100%;
         z-index: 9999;
         box-sizing: border-box;
         padding: 10px 14px;
@@ -116,7 +113,8 @@
         background: #ffffff;
         box-shadow: 0 3px 10px rgba(15, 23, 42, 0.10);
         font-family: Tahoma, Arial, sans-serif;
-        direction: rtl;
+        direction: rtl !important;
+        text-align: right !important;
       }
 
       #inPageSearchTitle {
@@ -128,6 +126,8 @@
         font-size: 1.05rem;
         font-weight: bold;
         line-height: 1.6;
+        direction: rtl !important;
+        text-align: right !important;
       }
 
       .in-page-search-row {
@@ -221,19 +221,17 @@
 
     document.head.appendChild(style);
 
-    function reserveSpaceForFixedBox() {
+    function reserveScrollOffsetForStickyBox() {
       const boxHeight = box.offsetHeight;
 
       document.documentElement.style.setProperty(
         "scroll-padding-top",
         boxHeight + "px"
       );
-
-      document.body.style.paddingTop = boxHeight + "px";
     }
 
-    reserveSpaceForFixedBox();
-    window.addEventListener("resize", reserveSpaceForFixedBox);
+    reserveScrollOffsetForStickyBox();
+    window.addEventListener("resize", reserveScrollOffsetForStickyBox);
   }
 
   function isSearchInterface(node) {
