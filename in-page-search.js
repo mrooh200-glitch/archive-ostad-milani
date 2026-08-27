@@ -167,7 +167,7 @@
         <input
           id="inPageSearchInput"
           type="search"
-          placeholder="عبارت مورد نظر را بنویسید…"
+          placeholder="کلمه یا عبارت مورد نظر را بنویسید."
           autocomplete="off">
 
         <button id="inPageSearchPrevious" type="button" disabled>
