@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f4f7fb;
+      color: #1f2937;
+      font-family: Tahoma, Arial, sans-serif;
+      line-height: 1.9;
+    }
+
+    .container {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0 64px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #173b63;
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: #64748b;
+      font-size: 0.98rem;
+    }
+
+    .search-box {
+      display: block;
+      width: 100%;
+      margin: 22px 0 8px;
+      padding: 14px 18px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      outline: none;
+      background: #fff;
+      color: #1f2937;
+      font: inherit;
+      font-size: 1rem;
+    }
+
+    .search-box:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .tree {
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+      margin-top: 20px;
+    }
+
+    details {
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    details:last-child {
+      border-bottom: 0;
+    }
+
+    summary {
+      padding: 17px 20px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: bold;
+      color: #173b63;
+      user-select: none;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    summary::before {
+      content: "＋";
+      display: inline-block;
+      width: 28px;
+      color: #2563eb;
+      font-size: 1.25rem;
+      vertical-align: middle;
+    }
+
+    details[open] > summary::before {
+      content: "−";
+    }
+
+    .branch-content {
+      padding: 0 20px 20px;
+    }
+
+    .book-list {
+      margin: 0;
+      padding: 0 20px 14px 0;
+      list-style: none;
+    }
+
+    .book-list li {
+      border-top: 1px solid #edf2f7;
+    }
+
+    .book-list a {
+      display: block;
+      padding: 11px 10px;
+      color: #1d4ed8;
+      text-decoration: none;
+      border-radius: 7px;
+    }
+
+    .book-list a:hover {
+      background: #eff6ff;
+      text-decoration: underline;
+    }
+
+    .html-link::before {
+      content: "HTML";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 0.72rem;
+      font-weight: bold;
+      direction: ltr;
+    }
+
+    .pdf-link::before {
+      content: "PDF";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-size: 0.72rem;
+      font-weight: bold;
+      direction: ltr;
+    }
+
+    .text-search-results {
+      margin-top: 22px;
+    }
+
+    .result-count {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 0.92rem;
+    }
+
+    .text-search-result {
+      margin-top: 12px;
+      padding: 15px;
+      border: 1px solid #dbe3ee;
+      border-radius: 11px;
+      background: #fff;
+    }
+
+    .result-title {
+      display: block;
+      color: #1d4ed8;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .result-title:hover {
+      text-decoration: underline;
+    }
+
+    .text-search-result p {
+      margin: 10px 0 0;
+      color: #475569;
+      font-size: 0.93rem;
+      line-height: 2;
+    }
+
+    .found-word-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: #1d4ed8;
+      font-size: 0.9rem;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .found-word-link:hover {
+      text-decoration: underline;
+    }
+
+    mark {
+      padding: 1px 3px;
+      border-radius: 3px;
+      background: #fde68a;
+      color: inherit;
+    }
+
+    .pagination {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin: 24px 0 0;
+      direction: rtl;
+    }
+
+    .page-button {
+      min-width: 38px;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+
+    .page-button:hover:not(:disabled) {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+
+    .page-button.current-page {
+      border-color: #1d4ed8;
+      background: #1d4ed8;
+      color: #fff;
+      cursor: default;
+    }
+
+    .page-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .page-dots {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 5px;
+      color: #64748b;
+    }
+
+    #noResults {
+      display: none;
+      margin: 18px 0 0;
+      padding: 13px 15px;
+      border-radius: 10px;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    @media (max-width: 520px) {
+      .container {
+        width: min(100% - 22px, 960px);
+        padding-top: 28px;
+      }
+
+      .branch-content {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      .page-button {
+        min-width: 34px;
+        padding: 6px 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <header>
+      <h1>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</h1>
+      <p class="subtitle">دسترسی و جست‌وجو در عنوان‌ها و متن دروس آرشیو</p>
+    </header>
+
+    <input
+      id="siteSearch"
+      class="search-box"
+      type="search"
+      placeholder="جست‌وجو در عنوان‌ها و متن درس‌ها…"
+      aria-label="جست‌وجو در منابع و متن دروس">
+
+    <section class="tree" aria-label="فهرست منابع">
+
+      <details class="main-branch" open>
+        <summary>دروس و متون قابل جست‌وجو</summary>
+
+        <div class="branch-content">
+          <ul class="book-list">
+
+            <li
+              class="searchable-item"
+              data-title="آقای جوادی و حدوث"
+              data-url="Aghaye-Javadi-va-Hodous.htm">
+              <a
+                class="html-link"
+                href="Aghaye-Javadi-va-Hodous.htm"
+                target="_blank"
+                rel="noopener">
+                آقای جوادی و حدوث
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="اثبات توحید و بطلان وحدت وجود"
+              data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
+              <a
+                class="html-link"
+                href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
+                target="_blank"
+                rel="noopener">
+                اثبات توحید و بطلان وحدت وجود
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="فراتر از عرفان"
+              data-url="Faratar-az-Erfan.htm">
+              <a
+                class="html-link"
+                href="Faratar-az-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                فراتر از عرفان
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="اصول المعارف الالهیة"
+              data-url="Osoul-al-Maaref-al-Elahiyya.htm">
+              <a
+                class="html-link"
+                href="Osoul-al-Maaref-al-Elahiyya.htm"
+                target="_blank"
+                rel="noopener">
+                اصول المعارف الالهیة
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="الإعلان عن اسرار الفلسفة والعرفان"
+              data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
+              <a
+                class="html-link"
+                href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                الإعلان عن اسرار الفلسفة والعرفان
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="متن درس معرفة الله محشی"
+              data-url="marefatollah-mohashsha.htm">
+              <a
+                class="html-link"
+                href="marefatollah-mohashsha.htm"
+                target="_blank"
+                rel="noopener">
+                متن درس معرفة الله (محشّی)
+              </a>
+            </li>
+
+          </ul>
+        </div>
+      </details>
+
+      <details class="main-branch" open>
+        <summary>نسخه‌های PDF</summary>
+
+        <div class="branch-content">
+          <ul class="book-list">
+            <li>
+              <a
+                class="pdf-link"
+                href="Marefat-Taala-Allah-bellah.pdf"
+                target="_blank"
+                rel="noopener">
+                معرفت الله تعالی
+              </a>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+    </section>
+
+    <section
+      id="searchResults"
+      class="text-search-results"
+      aria-live="polite">
+    </section>
+
+    <nav
+      id="pagination"
+      class="pagination"
+      aria-label="صفحه‌های نتایج جست‌وجو">
+    </nav>
+
+    <p id="noResults">
+      نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
+    </p>
+  </main>
+
+  <script>
+    const searchInput = document.getElementById("siteSearch");
+    const searchResults = document.getElementById("searchResults");
+    const pagination = document.getElementById("pagination");
+    const noResults = document.getElementById("noResults");
+    const searchableItems = [...document.querySelectorAll(".searchable-item")];
+
+    const documents = [];
+    const resultsPerPage = 8;
+
+    let currentResults = [];
+    let currentQuery = "";
+    let currentPage = 1;
+
+    function normalize(text) {
+      return (text || "")
+        .toLowerCase()
+        .replace(/[يى]/g, "ی")
+        .replace(/ك/g, "ک")
+        .replace(/ۀ/g, "ه")
+        .replace(/ة/g, "ه")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function getParagraphsFromHtml(html) {
+      const parser = new DOMParser();
+      const page = parser.parseFromString(html, "text/html");
+
+      page.querySelectorAll(
+        "script, style, noscript, svg, iframe, header, footer, nav"
+      ).forEach(element => element.remove());
+
+      const blocks = [
+        ...page.body.querySelectorAll(
+          "h1, h2, h3, h4, h5, h6, p, li, blockquote, td, th"
+        )
+      ];
+
+      const paragraphs = blocks
+        .map(block => block.textContent.replace(/\s+/g, " ").trim())
+        .filter(text => text.length > 0);
+
+      return [...new Set(paragraphs)];
+    }
+
+    function getFragmentText(paragraph, query) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const cleanQuery = normalize(query);
+      const normalizedParagraph = normalize(cleanParagraph);
+      const position = normalizedParagraph.indexOf(cleanQuery);
+
+      if (position === -1) {
+        return query.trim();
+      }
+
+      const targetText = cleanParagraph.slice(
+        position,
+        position + cleanQuery.length
+      );
+
+      const afterText = cleanParagraph.slice(
+        position + cleanQuery.length
+      );
+
+      const nextWords = afterText
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2);
+
+      return [targetText, ...nextWords]
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function makeTextFragmentUrl(url, fragmentText) {
+      return `${url}#:~:text=${encodeURIComponent(fragmentText)}`;
+    }
+
+    function highlightText(text, query) {
+      const escapedText = escapeHtml(text);
+      const escapedQuery = escapeHtml(query);
+
+      if (!escapedQuery) {
+        return escapedText;
+      }
+
+      const pattern = new RegExp(
+        escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+        "gi"
+      );
+
+      return escapedText.replace(
+        pattern,
+        match => `<mark>${match}</mark>`
+      );
+    }
+
+    async function loadTextDocuments() {
+      const jobs = searchableItems.map(async item => {
+        const link = item.querySelector("a");
+        const title = item.dataset.title || link.textContent;
+        const url = item.dataset.url || link.getAttribute("href");
+
+        try {
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            throw new Error("File could not be loaded");
+          }
+
+          const html = await response.text();
+          const paragraphs = getParagraphsFromHtml(html);
+
+          documents.push({
+            title: title,
+            url: url,
+            paragraphs: paragraphs
+          });
+        } catch (error) {
+          console.warn("Text file not loaded:", url, error);
+        }
+      });
+
+      await Promise.all(jobs);
+    }
+
+    function pageButton(label, page, disabled = false, isCurrent = false) {
+      const currentAttribute = isCurrent ? 'aria-current="page"' : "";
+      const currentClass = isCurrent ? " current-page" : "";
+
+      return `
+        <button
+          class="page-button${currentClass}"
+          type="button"
+          data-page="${page}"
+          ${disabled ? "disabled" : ""}
+          ${currentAttribute}
+          aria-label="${label}">
+          ${label}
+        </button>
+      `;
+    }
+
+    function getPageNumbers(totalPages, page) {
+      const pages = [];
+
+      if (totalPages <= 7) {
+        for (let number = 1; number <= totalPages; number++) {
+          pages.push(number);
+        }
+        return pages;
+      }
+
+      pages.push(1);
+
+      if (page > 4) {
+        pages.push("dots-right");
+      }
+
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+
+      for (let number = start; number <= end; number++) {
+        pages.push(number);
+      }
+
+      if (page < totalPages - 3) {
+        pages.push("dots-left");
+      }
+
+      pages.push(totalPages);
+
+      return pages;
+    }
+
+    function renderPagination(totalPages) {
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const buttons = [];
+
+      buttons.push(
+        pageButton("صفحهٔ قبلی", currentPage - 1, currentPage === 1)
+      );
+
+      getPageNumbers(totalPages, currentPage).forEach(item => {
+        if (typeof item === "string") {
+          buttons.push('<span class="page-dots" aria-hidden="true">…</span>');
+        } else {
+          buttons.push(
+            pageButton(
+              `صفحهٔ ${item}`,
+              item,
+              false,
+              item === currentPage
+            )
+          );
+        }
+      });
+
+      buttons.push(
+        pageButton(
+          "صفحهٔ بعدی",
+          currentPage + 1,
+          currentPage === totalPages
+        )
+      );
+
+      pagination.innerHTML = buttons.join("");
+
+      pagination.querySelectorAll(".page-button:not(:disabled)")
+        .forEach(button => {
+          button.addEventListener("click", () => {
+            const selectedPage = Number(button.dataset.page);
+
+            if (
+              selectedPage >= 1 &&
+              selectedPage <= totalPages &&
+              selectedPage !== currentPage
+            ) {
+              currentPage = selectedPage;
+              renderCurrentPage();
+
+              searchResults.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+              });
+            }
+          });
+        });
+    }
+
+    function renderCurrentPage() {
+      const totalResults = currentResults.length;
+      const totalPages = Math.ceil(totalResults / resultsPerPage);
+
+      if (currentPage > totalPages) {
+        currentPage = totalPages;
+      }
+
+      const startIndex = (currentPage - 1) * resultsPerPage;
+      const endIndex = startIndex + resultsPerPage;
+      const pageResults = currentResults.slice(startIndex, endIndex);
+
+      const firstResult = startIndex + 1;
+      const lastResult = Math.min(endIndex, totalResults);
+
+      searchResults.innerHTML = `
+        <p class="result-count">
+          تعداد نتیجه‌ها: ${totalResults}
+          — نمایش نتیجه‌های ${firstResult} تا ${lastResult}
+        </p>
+
+        ${pageResults.map((result, index) => `
+          <article class="text-search-result">
+            <a
+              class="result-title"
+              href="${result.url}"
+              target="_blank"
+              rel="noopener">
+              ${escapeHtml(result.title)} — نتیجهٔ ${startIndex + index + 1}
+            </a>
+
+            <p>${highlightText(result.paragraph, currentQuery)}</p>
+
+            <a
+              class="found-word-link"
+              href="${result.url}"
+              target="_blank"
+              rel="noopener">
+              رفتن به عبارت یافت‌شده
+            </a>
+          </article>
+        `).join("")}
+      `;
+
+      renderPagination(totalPages);
+    }
+
+    function renderResults(query) {
+      const cleanQuery = normalize(query);
+
+      if (!cleanQuery) {
+        currentResults = [];
+        currentQuery = "";
+        currentPage = 1;
+        searchResults.innerHTML = "";
+        pagination.innerHTML = "";
+        noResults.style.display = "none";
+        return;
+      }
+
+      const allResults = [];
+
+      documents.forEach(document => {
+        document.paragraphs.forEach(paragraph => {
+          if (normalize(paragraph).includes(cleanQuery)) {
+            const fragmentText = getFragmentText(paragraph, query);
+
+            allResults.push({
+              title: document.title,
+              paragraph: paragraph,
+              url: makeTextFragmentUrl(document.url, fragmentText)
+            });
+          }
+        });
+      });
+
+      if (allResults.length === 0) {
+        currentResults = [];
+        currentQuery = query;
+        currentPage = 1;
+        searchResults.innerHTML = "";
+        pagination.innerHTML = "";
+        noResults.style.display = "block";
+        return;
+      }
+
+      noResults.style.display = "none";
+      currentResults = allResults;
+      currentQuery = query;
+      currentPage = 1;
+
+      renderCurrentPage();
+    }
+
+    searchInput.addEventListener("input", function () {
+      renderResults(this.value);
+    });
+
+    loadTextDocuments();
+  </script>
+</body>
+</html>
