@@ -30,6 +30,93 @@
       .trim();
   }
 
+  // ---- Root-based (stemming) search --------------------------------
+  // Light rule-based stemmer for Persian + Arabic. Strips one leading
+  // prefix and up to two trailing suffixes from a word so that
+  // different inflected forms of (roughly) the same root can be
+  // matched together. Not a full morphological analyzer - just
+  // enough to connect common everyday forms (plurals, "-tar/-tarin",
+  // "mi-/nemi-" verb prefixes, Arabic-style "al-"/"wa-" prefixes,
+  // feminine/plural endings, etc).
+
+  const STEM_MIN_ROOT_LENGTH = 2;
+
+  // Note: single-letter Arabic proclitics (و/ف/ب/ل/ک) are deliberately
+  // NOT included here - they falsely strip the first letter of countless
+  // ordinary Persian words (e.g. "کتاب" -> "تاب"), doing far more harm
+  // than good on this mostly-Persian corpus.
+  const STEM_PREFIXES = [
+    "نمی", "می", "بی",
+    "وال", "بال", "فال", "کال", "لل",
+    "ال"
+  ].sort((a, b) => b.length - a.length);
+
+  const STEM_SUFFIXES = [
+    "هایمان", "هایتان", "هایشان",
+    "هایم", "هایت", "هایش",
+    "ترین", "های", "گان",
+    "یم", "ید", "ند", "تر",
+    "ها", "ان", "ات", "ون", "ین", "یه",
+    "ی", "ه"
+  ].sort((a, b) => b.length - a.length);
+
+  const WORD_PATTERN = /[\u0621-\u06FF]+(?:\u200c[\u0621-\u06FF]+)*/g;
+
+  function stripDiacritics(text) {
+    return (text || "")
+      .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+      .replace(/[\u200c\u200e\u200f]/g, "")
+      .replace(/[أإآ]/g, "ا")
+      .replace(/ؤ/g, "و")
+      .replace(/ئ/g, "ی");
+  }
+
+  function cleanWord(word) {
+    return normalize(stripDiacritics(word));
+  }
+
+  function stemWord(word) {
+    let stemmed = cleanWord(word);
+
+    for (const prefix of STEM_PREFIXES) {
+      if (
+        stemmed.startsWith(prefix) &&
+        stemmed.length - prefix.length >= STEM_MIN_ROOT_LENGTH
+      ) {
+        stemmed = stemmed.slice(prefix.length);
+        break;
+      }
+    }
+
+    for (let pass = 0; pass < 2; pass++) {
+      for (const suffix of STEM_SUFFIXES) {
+        if (
+          stemmed.endsWith(suffix) &&
+          stemmed.length - suffix.length >= STEM_MIN_ROOT_LENGTH
+        ) {
+          stemmed = stemmed.slice(0, -suffix.length);
+          break;
+        }
+      }
+    }
+
+    return stemmed;
+  }
+
+  function getQueryStems(query) {
+    return query
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map(stemWord)
+      .filter(Boolean);
+  }
+
+  function isRootSearchEnabled() {
+    const toggle = document.getElementById("inPageSearchRoot");
+    return !!(toggle && toggle.checked);
+  }
+
   const bookTitlesByFileName = {
     "Aghaye-Javadi-va-Hodous.htm": "آقای جوادی و حدوث",
     "Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm":
@@ -94,6 +181,11 @@
         <button id="inPageSearchClear" type="button" disabled>
           پاک کردن
         </button>
+
+        <label class="in-page-search-root-label" for="inPageSearchRoot">
+          <input id="inPageSearchRoot" type="checkbox">
+          جست‌وجوی ریشه‌ای
+        </label>
       </div>
 
       <p id="inPageSearchStatus" aria-live="polite"></p>
@@ -180,6 +272,23 @@
         cursor: not-allowed;
       }
 
+      .in-page-search-root-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #173b63;
+        font-size: 0.84rem;
+        font-weight: normal;
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .in-page-search-root-label input {
+        margin: 0;
+        cursor: pointer;
+      }
+
       #inPageSearchStatus {
         width: min(1100px, 100%);
         min-height: 20px;
@@ -255,19 +364,7 @@
     currentMatch = -1;
   }
 
-  function highlightMatches(query) {
-    const normalizedQuery = normalize(query);
-
-    if (!normalizedQuery) {
-      return [];
-    }
-
-    const patternSource = buildQueryPattern(query);
-
-    if (!patternSource) {
-      return [];
-    }
-
+  function getSearchableTextNodes() {
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
@@ -295,9 +392,61 @@
       nodes.push(walker.currentNode);
     }
 
+    return nodes;
+  }
+
+  function wrapRanges(node, ranges) {
+    const originalText = node.nodeValue;
+    const fragment = document.createDocumentFragment();
+    const createdMatches = [];
+    let lastIndex = 0;
+
+    ranges.forEach(range => {
+      if (range.start > lastIndex) {
+        fragment.appendChild(
+          document.createTextNode(
+            originalText.slice(lastIndex, range.start)
+          )
+        );
+      }
+
+      const mark = document.createElement("mark");
+      mark.className = "in-page-search-match";
+      mark.textContent = originalText.slice(range.start, range.end);
+
+      fragment.appendChild(mark);
+      createdMatches.push(mark);
+
+      lastIndex = range.end;
+    });
+
+    if (lastIndex < originalText.length) {
+      fragment.appendChild(
+        document.createTextNode(originalText.slice(lastIndex))
+      );
+    }
+
+    node.parentNode.replaceChild(fragment, node);
+
+    return createdMatches;
+  }
+
+  function highlightLiteralMatches(query) {
+    const normalizedQuery = normalize(query);
+
+    if (!normalizedQuery) {
+      return [];
+    }
+
+    const patternSource = buildQueryPattern(query);
+
+    if (!patternSource) {
+      return [];
+    }
+
     const createdMatches = [];
 
-    nodes.forEach(node => {
+    getSearchableTextNodes().forEach(node => {
       const originalText = node.nodeValue;
       const normalizedText = normalize(originalText);
 
@@ -313,41 +462,67 @@
 
       pattern.lastIndex = 0;
 
-      const fragment = document.createDocumentFragment();
-      let lastIndex = 0;
+      const ranges = [];
       let match;
 
       while ((match = pattern.exec(originalText)) !== null) {
-        if (match.index > lastIndex) {
-          fragment.appendChild(
-            document.createTextNode(
-              originalText.slice(lastIndex, match.index)
-            )
-          );
-        }
-
-        const mark = document.createElement("mark");
-        mark.className = "in-page-search-match";
-        mark.textContent = match[0];
-
-        fragment.appendChild(mark);
-        createdMatches.push(mark);
-
-        lastIndex = match.index + match[0].length;
+        ranges.push({
+          start: match.index,
+          end: match.index + match[0].length
+        });
       }
 
-      if (lastIndex < originalText.length) {
-        fragment.appendChild(
-          document.createTextNode(
-            originalText.slice(lastIndex)
-          )
-        );
-      }
-
-      node.parentNode.replaceChild(fragment, node);
+      createdMatches.push(...wrapRanges(node, ranges));
     });
 
     return createdMatches;
+  }
+
+  function highlightStemMatches(query) {
+    const queryStems = getQueryStems(query);
+
+    if (queryStems.length === 0) {
+      return [];
+    }
+
+    const createdMatches = [];
+
+    getSearchableTextNodes().forEach(node => {
+      const originalText = node.nodeValue;
+      const ranges = [];
+      let match;
+
+      WORD_PATTERN.lastIndex = 0;
+
+      while ((match = WORD_PATTERN.exec(originalText)) !== null) {
+        const wordStem = stemWord(match[0]);
+
+        if (wordStem && queryStems.includes(wordStem)) {
+          ranges.push({
+            start: match.index,
+            end: match.index + match[0].length
+          });
+        }
+      }
+
+      if (ranges.length === 0) {
+        return;
+      }
+
+      createdMatches.push(...wrapRanges(node, ranges));
+    });
+
+    return createdMatches;
+  }
+
+  function highlightMatches(query) {
+    if (!query.trim()) {
+      return [];
+    }
+
+    return isRootSearchEnabled() ?
+      highlightStemMatches(query) :
+      highlightLiteralMatches(query);
   }
 
   function updateButtons() {
@@ -476,6 +651,14 @@
     });
 
     clearButton.addEventListener("click", clearSearch);
+
+    const rootToggle = document.getElementById("inPageSearchRoot");
+
+    rootToggle.addEventListener("change", () => {
+      if (input.value.trim()) {
+        performSearch();
+      }
+    });
 
     document.addEventListener("keydown", event => {
       const isMac = navigator.platform.toUpperCase().includes("MAC");
