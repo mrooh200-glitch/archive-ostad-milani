@@ -122,9 +122,9 @@
       #inPageSearchTitle {
         width: min(1100px, 100%);
         margin: 0 auto 10px;
-        padding-bottom: 8px;
+        padding: 0 26px 8px;
         border-bottom: 3px solid #2563eb;
-        color: #173b63;
+        color: #b45309;
         font-size: 1.05rem;
         font-weight: bold;
         line-height: 1.6;
