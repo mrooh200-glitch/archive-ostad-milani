@@ -30,8 +30,41 @@
       .trim();
   }
 
+  const bookTitlesByFileName = {
+    "Aghaye-Javadi-va-Hodous.htm": "آقای جوادی و حدوث",
+    "Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm":
+      "اثبات توحید و بطلان وحدت وجود",
+    "Faratar-az-Erfan.htm": "فراتر از عرفان",
+    "Osoul-al-Maaref-al-Elahiyya.htm": "اصول المعارف الالهیة",
+    "al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm":
+      "الإعلان عن اسرار الفلسفة والعرفان",
+    "marefatollah-mohashsha.htm": "متن درس معرفة الله (محشّی)"
+  };
+
+  function getPageTitle() {
+    const fileName = decodeURIComponent(
+      (location.pathname.split("/").pop() || "").trim()
+    );
+
+    if (bookTitlesByFileName[fileName]) {
+      return bookTitlesByFileName[fileName];
+    }
+
+    return document.title || "";
+  }
+
   function escapeRegExp(text) {
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function buildQueryPattern(query) {
+    const collapsed = query.trim().replace(/\s+/g, " ");
+
+    if (!collapsed) {
+      return "";
+    }
+
+    return escapeRegExp(collapsed).replace(/ /g, "\\s+");
   }
 
   function createSearchBox() {
@@ -39,7 +72,7 @@
 
     box.id = "inPageSearchBox";
     box.innerHTML = `
-      <h2 id="inPageSearchTitle">${document.title}</h2>
+      <h2 id="inPageSearchTitle">${getPageTitle()}</h2>
 
       <div class="in-page-search-row">
         <label for="inPageSearchInput">جست‌وجو در همین متن</label>
@@ -71,9 +104,13 @@
     const style = document.createElement("style");
     style.textContent = `
       #inPageSearchBox {
-        position: sticky;
+        position: fixed;
         top: 0;
+        right: 0;
+        left: 0;
+        width: 100%;
         z-index: 9999;
+        box-sizing: border-box;
         padding: 10px 14px;
         border-bottom: 1px solid #cbd5e1;
         background: #ffffff;
@@ -183,6 +220,20 @@
     `;
 
     document.head.appendChild(style);
+
+    function reserveSpaceForFixedBox() {
+      const boxHeight = box.offsetHeight;
+
+      document.documentElement.style.setProperty(
+        "scroll-padding-top",
+        boxHeight + "px"
+      );
+
+      document.body.style.paddingTop = boxHeight + "px";
+    }
+
+    reserveSpaceForFixedBox();
+    window.addEventListener("resize", reserveSpaceForFixedBox);
   }
 
   function isSearchInterface(node) {
@@ -210,6 +261,12 @@
     const normalizedQuery = normalize(query);
 
     if (!normalizedQuery) {
+      return [];
+    }
+
+    const patternSource = buildQueryPattern(query);
+
+    if (!patternSource) {
       return [];
     }
 
@@ -250,10 +307,7 @@
         return;
       }
 
-      const pattern = new RegExp(
-        escapeRegExp(query.trim()),
-        "gi"
-      );
+      const pattern = new RegExp(patternSource, "gi");
 
       if (!pattern.test(originalText)) {
         return;
