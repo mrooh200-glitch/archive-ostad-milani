@@ -1,0 +1,1536 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f4f7fb;
+      color: #1f2937;
+      font-family: Tahoma, Arial, sans-serif;
+      line-height: 1.9;
+    }
+
+    .container {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0 64px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #173b63;
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: #64748b;
+      font-size: 0.98rem;
+    }
+
+    .search-box {
+      display: block;
+      width: 100%;
+      margin: 22px 0 8px;
+      padding: 14px 18px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      outline: none;
+      background: #fff;
+      color: #1f2937;
+      font: inherit;
+      font-size: 1rem;
+    }
+
+    .search-box:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .search-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .search-controls {
+      position: sticky;
+      top: 20px;
+    }
+
+    .search-results-column {
+      min-width: 0;
+    }
+
+    @media (max-width: 760px) {
+      .search-layout {
+        display: block;
+      }
+
+      .search-controls {
+        position: static;
+        margin-bottom: 8px;
+      }
+    }
+
+    .results-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 10px;
+    }
+
+    .copy-selected-button {
+      padding: 7px 12px;
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+
+    .copy-selected-button:hover:not(:disabled) {
+      background: #dbeafe;
+    }
+
+    .copy-selected-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .result-header-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .result-checkbox {
+      margin-top: 4px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .root-search-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 2px 14px;
+      color: #475569;
+      font-size: 0.88rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .root-search-label input {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 0 0 20px;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 13px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: #fff;
+      color: #475569;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .tab-button:hover {
+      background: #eff6ff;
+    }
+
+    .tab-button.active-tab {
+      border-color: #1d4ed8;
+      background: #1d4ed8;
+      color: #fff;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active-panel {
+      display: block;
+    }
+
+    .tree {
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+      margin-top: 20px;
+    }
+
+    .title-search-tree {
+      margin-bottom: 20px;
+    }
+
+    .title-search-content {
+      padding: 18px 20px;
+    }
+
+    .title-search-input {
+      margin: 0;
+    }
+
+    details {
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    details:last-child {
+      border-bottom: 0;
+    }
+
+    summary {
+      padding: 17px 20px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: bold;
+      color: #173b63;
+      user-select: none;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    summary::before {
+      content: "＋";
+      display: inline-block;
+      width: 28px;
+      color: #2563eb;
+      font-size: 1.25rem;
+      vertical-align: middle;
+    }
+
+    details[open] > summary::before {
+      content: "−";
+    }
+
+    .branch-content {
+      padding: 0 20px 20px;
+    }
+
+    .book-list {
+      margin: 0;
+      padding: 0 20px 14px 0;
+      list-style: none;
+    }
+
+    .book-list li {
+      border-top: 1px solid #edf2f7;
+    }
+
+    .book-list a {
+      display: block;
+      padding: 11px 10px;
+      color: #1d4ed8;
+      text-decoration: none;
+      border-radius: 7px;
+    }
+
+    .book-list a:hover {
+      background: #eff6ff;
+      text-decoration: underline;
+    }
+
+    .html-link::before {
+      content: "HTML";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 0.72rem;
+      font-weight: bold;
+      direction: ltr;
+    }
+
+    .pdf-link::before {
+      content: "PDF";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-size: 0.72rem;
+      font-weight: bold;
+      direction: ltr;
+    }
+
+    .text-search-results {
+      margin-top: 22px;
+    }
+
+    .result-count {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 0.92rem;
+    }
+
+    .text-search-result {
+      margin-top: 12px;
+      padding: 15px;
+      border: 1px solid #dbe3ee;
+      border-radius: 11px;
+      background: #fff;
+    }
+
+    .result-title {
+      display: block;
+      color: #1d4ed8;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .result-title:hover {
+      text-decoration: underline;
+    }
+
+    .text-search-result p {
+      margin: 10px 0 0;
+      color: #475569;
+      font-size: 0.93rem;
+      line-height: 2;
+    }
+
+    .found-word-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: #1d4ed8;
+      font-size: 0.9rem;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .found-word-link:hover {
+      text-decoration: underline;
+    }
+
+    mark {
+      padding: 1px 3px;
+      border-radius: 3px;
+      background: #fde68a;
+      color: inherit;
+    }
+
+    .pagination {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin: 24px 0 0;
+      direction: rtl;
+    }
+
+    .page-button {
+      min-width: 38px;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+
+    .page-button:hover:not(:disabled) {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+
+    .page-button.current-page {
+      border-color: #1d4ed8;
+      background: #1d4ed8;
+      color: #fff;
+      cursor: default;
+    }
+
+    .page-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .page-dots {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 5px;
+      color: #64748b;
+    }
+
+    #noResults {
+      display: none;
+      margin: 18px 0 0;
+      padding: 13px 15px;
+      border-radius: 10px;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    @media (max-width: 520px) {
+      .container {
+        width: min(100% - 22px, 960px);
+        padding-top: 28px;
+      }
+
+      .branch-content {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      .page-button {
+        min-width: 34px;
+        padding: 6px 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <header>
+      <h1>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</h1>
+      <p class="subtitle">دسترسی و جست‌وجو در عنوان‌ها و متن دروس آرشیو</p>
+    </header>
+
+    <nav class="tabs" aria-label="بخش‌های صفحه">
+      <button
+        id="browseTabButton"
+        class="tab-button active-tab"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="browsePanel">
+        مطالعهٔ کتاب‌ها
+      </button>
+
+      <button
+        id="searchTabButton"
+        class="tab-button"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="searchPanel">
+        جست‌وجو
+      </button>
+    </nav>
+
+    <div id="browsePanel" class="tab-panel active-panel">
+      <section class="tree title-search-tree" aria-label="جست‌وجو در عنوان کتاب‌ها">
+        <div class="branch-content title-search-content">
+          <input
+            id="titleSearch"
+            class="search-box title-search-input"
+            type="search"
+            placeholder="جست‌وجو در عنوان کتاب‌ها…"
+            aria-label="جست‌وجو در عنوان کتاب‌ها">
+
+          <p id="titleNoResults" style="display:none; margin: 10px 0 0; color:#9a3412;">
+            عنوانی پیدا نشد.
+          </p>
+        </div>
+      </section>
+
+      <section class="tree" aria-label="فهرست منابع">
+
+      <details class="main-branch" open>
+        <summary></summary>
+
+        <div class="branch-content">
+          <ul class="book-list">
+
+            <li
+              class="searchable-item"
+              data-title="آقای جوادی و حدوث"
+              data-url="Aghaye-Javadi-va-Hodous.htm">
+              <a
+                class="html-link"
+                href="Aghaye-Javadi-va-Hodous.htm"
+                target="_blank"
+                rel="noopener">
+                آقای جوادی و حدوث
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="اثبات توحید و بطلان وحدت وجود"
+              data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
+              <a
+                class="html-link"
+                href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
+                target="_blank"
+                rel="noopener">
+                اثبات توحید و بطلان وحدت وجود
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="اصول المعارف الالهیة"
+              data-url="Osoul-al-Maaref-al-Elahiyya.htm">
+              <a
+                class="html-link"
+                href="Osoul-al-Maaref-al-Elahiyya.htm"
+                target="_blank"
+                rel="noopener">
+                اصول المعارف الالهیة
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="الإعلان عن اسرار الفلسفة والعرفان"
+              data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
+              <a
+                class="html-link"
+                href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                الإعلان عن اسرار الفلسفة والعرفان
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="فراتر از عرفان"
+              data-url="Faratar-az-Erfan.htm">
+              <a
+                class="html-link"
+                href="Faratar-az-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                فراتر از عرفان
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="متن درس معرفة الله محشی"
+              data-url="marefatollah-mohashsha.htm">
+              <a
+                class="html-link"
+                href="marefatollah-mohashsha.htm"
+                target="_blank"
+                rel="noopener">
+                متن درس معرفة الله (محشّی)
+              </a>
+            </li>
+
+          </ul>
+        </div>
+      </details>
+
+      <details class="main-branch" open>
+        <summary>نسخه‌های PDF</summary>
+
+        <div class="branch-content">
+          <ul class="book-list">
+            <li>
+              <a
+                class="pdf-link"
+                href="Marefat-Taala-Allah-bellah.pdf"
+                target="_blank"
+                rel="noopener">
+                معرفت الله تعالی
+              </a>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+    </section>
+    </div>
+
+    <div id="searchPanel" class="tab-panel">
+      <div class="search-layout">
+        <div class="search-controls">
+          <input
+            id="siteSearch"
+            class="search-box"
+            type="search"
+            placeholder="کلمه یا عبارت مورد نظر را بنویسید."
+            aria-label="جست‌وجو در منابع و متن دروس">
+
+          <label class="root-search-label" for="siteSearchRoot">
+            <input id="siteSearchRoot" type="checkbox">
+            جست‌وجوی ریشه‌ای (تطبیق با اشکال مختلف کلمه)
+          </label>
+        </div>
+
+        <div class="search-results-column">
+          <section
+            id="searchResults"
+            class="text-search-results"
+            aria-live="polite">
+          </section>
+
+          <nav
+            id="pagination"
+            class="pagination"
+            aria-label="صفحه‌های نتایج جست‌وجو">
+          </nav>
+
+          <p id="noResults">
+            نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const searchInput = document.getElementById("siteSearch");
+    const searchResults = document.getElementById("searchResults");
+    const pagination = document.getElementById("pagination");
+    const noResults = document.getElementById("noResults");
+    const searchableItems = [...document.querySelectorAll(".searchable-item")];
+
+    const titleSearchInput = document.getElementById("titleSearch");
+    const titleNoResults = document.getElementById("titleNoResults");
+    const allBookListItems = [...document.querySelectorAll(".book-list li")];
+
+    const browseTabButton = document.getElementById("browseTabButton");
+    const searchTabButton = document.getElementById("searchTabButton");
+    const browsePanel = document.getElementById("browsePanel");
+    const searchPanel = document.getElementById("searchPanel");
+
+    function activateTab(tabName) {
+      const showSearch = tabName === "search";
+
+      browseTabButton.classList.toggle("active-tab", !showSearch);
+      searchTabButton.classList.toggle("active-tab", showSearch);
+      browseTabButton.setAttribute("aria-selected", String(!showSearch));
+      searchTabButton.setAttribute("aria-selected", String(showSearch));
+      browsePanel.classList.toggle("active-panel", !showSearch);
+      searchPanel.classList.toggle("active-panel", showSearch);
+
+      if (showSearch) {
+        searchInput.focus();
+      }
+    }
+
+    browseTabButton.addEventListener("click", () => activateTab("browse"));
+    searchTabButton.addEventListener("click", () => activateTab("search"));
+
+
+    const documents = [];
+    const resultsPerPage = 8;
+
+    let currentResults = [];
+    let currentQuery = "";
+    let currentPage = 1;
+    let currentRootMode = false;
+    const selectedResultIndexes = new Set();
+
+    async function copyTextToClipboard(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (error) {
+        // fall through to the legacy fallback below
+      }
+
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        return successful;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function updateCopyButtonState() {
+      const button = document.getElementById("copySelectedButton");
+
+      if (!button) {
+        return;
+      }
+
+      const count = selectedResultIndexes.size;
+
+      button.disabled = count === 0;
+      button.textContent = count > 0 ?
+        `کپی موارد انتخاب‌شده (${count})` :
+        "کپی موارد انتخاب‌شده";
+    }
+
+    async function handleCopySelectedResults() {
+      const button = document.getElementById("copySelectedButton");
+
+      const selected = [...selectedResultIndexes]
+        .sort((a, b) => a - b)
+        .map(index => currentResults[index])
+        .filter(Boolean);
+
+      if (selected.length === 0) {
+        return;
+      }
+
+      const text = selected
+        .map(result => `${result.title}\n"${result.paragraph}"`)
+        .join("\n\n");
+
+      const ok = await copyTextToClipboard(text);
+
+      if (button) {
+        button.textContent = ok ? "کپی شد!" : "خطا در کپی";
+        setTimeout(updateCopyButtonState, 1500);
+      }
+    }
+
+    const siteSearchRoot = document.getElementById("siteSearchRoot");
+
+    function normalize(text) {
+      return (text || "")
+        .toLowerCase()
+        .replace(/[يى]/g, "ی")
+        .replace(/ك/g, "ک")
+        .replace(/ۀ/g, "ه")
+        .replace(/ة/g, "ه")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    // Character-variant equivalence classes - same letter pairs as
+    // normalize() above (ي/ی/ى, ك/ک, ة/ه/ۀ). Used when building a
+    // regex that must match directly against the ORIGINAL (non-
+    // normalized) text - e.g. for highlighting - so a query typed
+    // with either the Persian or Arabic form of a letter still
+    // matches/highlights the other form wherever it appears.
+    const CHAR_VARIANTS = {
+      "ي": "يیى", "ی": "يیى", "ى": "يیى",
+      "ك": "كک", "ک": "كک",
+      "ة": "ةه", "ه": "ةهۀ", "ۀ": "ۀه"
+    };
+
+    function escapeRegExpChar(ch) {
+      return ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function charClassFor(ch) {
+      const variants = CHAR_VARIANTS[ch];
+
+      if (variants) {
+        const unique = [...new Set(variants.split(""))];
+        return `[${unique.join("")}]`;
+      }
+
+      return escapeRegExpChar(ch);
+    }
+
+    // ---- Root-based (stemming) search ------------------------------
+    // Same stemmer as in-page-search.js (kept in sync manually, since
+    // this page doesn't load that file). Two layers, applied in order:
+    //  1) Arabic root-and-pattern (وزن) extraction, a simplified
+    //     version of the classic ISRI algorithm: recognizes the most
+    //     common "augment letter" positions (سألتمونيه) in 4/5/6-letter
+    //     words and strips them to reach the 3-letter triliteral root.
+    //     This is what connects surface-different words like حادثه /
+    //     حدوث / حوادث / حادث, or کتاب / کاتب / مکتوب / الکتاب, which
+    //     no amount of prefix/suffix stripping alone can do.
+    //  2) A light Persian/Arabic affix stripper (prefixes می‌/نمی‌/بی‌/
+    //     ال, suffixes ها/ان/تر/ترین/...) for words the pattern step
+    //     doesn't fully resolve.
+    // Pattern extraction runs BEFORE the generic suffix stripper so
+    // real root letters aren't cannibalized by an accidentally-
+    // matching generic suffix (e.g. "کریم" ends in "یم", also a
+    // common verb suffix - resolving the فعیل pattern first keeps the
+    // "م" that a naive suffix strip would have removed).
+    // Not a full morphological analyzer or dictionary lookup - it
+    // will still miss irregular/weak-letter verbs and occasionally
+    // produce a wrong or overly short root. Good enough for
+    // connecting the common derivational families in this archive; a
+    // dictionary-based approach (e.g. the Arramooz word/root
+    // database) would be the next step up in accuracy if ever needed.
+
+    const STEM_MIN_ROOT_LENGTH = 2;
+
+    // Note: single-letter Arabic proclitics (و/ف/ب/ل/ک) are deliberately
+    // NOT included here - they falsely strip the first letter of countless
+    // ordinary Persian words (e.g. "کتاب" -> "تاب"), doing far more harm
+    // than good on this mostly-Persian corpus.
+    const STEM_PREFIXES = [
+      "نمی", "می", "بی",
+      "وال", "بال", "فال", "کال", "لل",
+      "ال"
+    ].sort((a, b) => b.length - a.length);
+
+    const STEM_SUFFIXES = [
+      "هایمان", "هایتان", "هایشان",
+      "هایم", "هایت", "هایش",
+      "ترین", "های", "گان",
+      "یم", "ید", "ند", "تر",
+      "ها", "ان", "ات", "ون", "ین", "یه",
+      "ی", "ه"
+    ].sort((a, b) => b.length - a.length);
+
+    // "سألتمونيه" - the classic set of Arabic augment letters (with ي
+    // normalized to ی), used when deciding whether a leading/trailing
+    // letter on a long word is likely an augment rather than a root
+    // letter.
+    const AUGMENT_LETTERS = new Set(
+      ["ا", "و", "ی", "ت", "ن", "م", "س", "ه"]
+    );
+
+    const WORD_PATTERN = /[\u0621-\u06FF]+(?:\u200c[\u0621-\u06FF]+)*/g;
+
+    function stripDiacritics(text) {
+      return (text || "")
+        .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+        .replace(/[\u200c\u200e\u200f]/g, "")
+        .replace(/[أإآ]/g, "ا")
+        .replace(/ؤ/g, "و")
+        .replace(/ئ/g, "ی");
+    }
+
+    function cleanWord(word) {
+      return normalize(stripDiacritics(word));
+    }
+
+    // Reduce a 4-letter word to its 3-letter root by removing one
+    // augment letter at the position where a known measure (وزن) puts
+    // it. Returns null if no recognized pattern applies.
+    function reduceFourLetter(word) {
+      const c0 = word[0];
+      const c1 = word[1];
+      const c2 = word[2];
+      const c3 = word[3];
+
+      if (c1 === "ا") return c0 + c2 + c3; // فاعل  (حادث -> حدث)
+      if (c2 === "ا") return c0 + c1 + c3; // فِعال (کتاب -> کتب)
+      if (c2 === "و") return c0 + c1 + c3; // فعول  (حدوث -> حدث)
+      if (c2 === "ی") return c0 + c1 + c3; // فعیل  (کریم -> کرم)
+      if (c0 === "م") return c1 + c2 + c3; // مفعل  (مکتب -> کتب)
+      if (c0 === "ت") return c1 + c2 + c3; // تفعّل (تعلم -> علم)
+
+      return null;
+    }
+
+    // Reduce a 5-letter word to its 3-letter root by removing two
+    // augment letters at known measure positions.
+    function reduceFiveLetter(word) {
+      const c0 = word[0];
+      const c1 = word[1];
+      const c2 = word[2];
+      const c3 = word[3];
+      const c4 = word[4];
+
+      if (c1 === "و" && c2 === "ا") return c0 + c3 + c4; // فواعل (حوادث -> حدث)
+      if (c0 === "م" && c2 === "ا") return c1 + c3 + c4; // مفاعل (مساجد -> سجد)
+      if (c0 === "م" && c3 === "و") return c1 + c2 + c4; // مفعول (مکتوب -> کتب)
+      if (c0 === "ت" && c3 === "ی") return c1 + c2 + c4; // تفعیل (توحید -> وحد)
+      if (c1 === "ت" && c3 === "ا") return c0 + c2 + c4; // تفاعل-ish
+      if (c2 === "ا" && c3 === "ی") return c0 + c1 + c4; // فعائل (رسائل -> رسل)
+
+      return null;
+    }
+
+    // For 6+ letter words, fall back to peeling one plausible augment
+    // letter off either end and letting the loop in deaugmentToRoot()
+    // retry the shorter word.
+    function reduceLongWord(word) {
+      const first = word[0];
+
+      if (AUGMENT_LETTERS.has(first) && word.length - 1 >= 4) {
+        return word.slice(1);
+      }
+
+      const last = word[word.length - 1];
+
+      if (AUGMENT_LETTERS.has(last) && word.length - 1 >= 4) {
+        return word.slice(0, -1);
+      }
+
+      return null;
+    }
+
+    function deaugmentToRoot(word) {
+      let w = word;
+      let guard = 0;
+
+      while (w.length > 3 && guard < 4) {
+        guard += 1;
+
+        let reduced = null;
+
+        if (w.length === 4) {
+          reduced = reduceFourLetter(w);
+        } else if (w.length === 5) {
+          reduced = reduceFiveLetter(w);
+        } else if (w.length >= 6) {
+          reduced = reduceLongWord(w);
+        }
+
+        if (reduced === null || reduced.length >= w.length) {
+          break;
+        }
+
+        w = reduced;
+      }
+
+      return w;
+    }
+
+    function stripOnePrefix(word) {
+      for (const prefix of STEM_PREFIXES) {
+        if (
+          word.startsWith(prefix) &&
+          word.length - prefix.length >= STEM_MIN_ROOT_LENGTH
+        ) {
+          return word.slice(prefix.length);
+        }
+      }
+
+      return word;
+    }
+
+    function stripSuffixes(word) {
+      let result = word;
+
+      for (let pass = 0; pass < 2; pass++) {
+        for (const suffix of STEM_SUFFIXES) {
+          if (
+            result.endsWith(suffix) &&
+            result.length - suffix.length >= STEM_MIN_ROOT_LENGTH
+          ) {
+            result = result.slice(0, -suffix.length);
+            break;
+          }
+        }
+      }
+
+      return result;
+    }
+
+    function stemWord(word) {
+      let w = stripOnePrefix(cleanWord(word));
+
+      if (w.length > 3) {
+        const patternResult = deaugmentToRoot(w);
+
+        if (patternResult.length === 3) {
+          return patternResult;
+        }
+
+        w = patternResult;
+      }
+
+      w = stripSuffixes(w);
+
+      if (w.length > 3) {
+        w = deaugmentToRoot(w);
+      }
+
+      return w;
+    }
+
+    function getQueryStems(query) {
+      return query
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(stemWord)
+        .filter(Boolean);
+    }
+
+    function findWordsInText(text) {
+      const words = [];
+      let match;
+
+      WORD_PATTERN.lastIndex = 0;
+
+      while ((match = WORD_PATTERN.exec(text)) !== null) {
+        words.push({
+          text: match[0],
+          start: match.index,
+          end: match.index + match[0].length,
+          stem: stemWord(match[0])
+        });
+      }
+
+      return words;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function getParagraphsFromHtml(html) {
+      const parser = new DOMParser();
+      const page = parser.parseFromString(html, "text/html");
+
+      page.querySelectorAll(
+        "script, style, noscript, svg, iframe, header, footer, nav"
+      ).forEach(element => element.remove());
+
+      const blocks = [
+        ...page.body.querySelectorAll(
+          "h1, h2, h3, h4, h5, h6, p, li, blockquote, td, th"
+        )
+      ];
+
+      const paragraphs = blocks
+        .map(block => block.textContent.replace(/\s+/g, " ").trim())
+        .filter(text => text.length > 0);
+
+      return [...new Set(paragraphs)];
+    }
+
+    function buildFragmentText(cleanParagraph, position, matchLength) {
+      const targetText = cleanParagraph.slice(
+        position,
+        position + matchLength
+      );
+
+      const afterText = cleanParagraph.slice(position + matchLength);
+
+      const nextWords = afterText
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2);
+
+      return [targetText, ...nextWords]
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function getFragmentText(paragraph, query) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const cleanQuery = normalize(query);
+      const normalizedParagraph = normalize(cleanParagraph);
+      const pattern = buildWholeWordPattern(cleanQuery);
+      const match = pattern.exec(normalizedParagraph);
+      const position = match ? match.index : normalizedParagraph.indexOf(cleanQuery);
+
+      if (position === -1) {
+        return query.trim();
+      }
+
+      return buildFragmentText(cleanParagraph, position, cleanQuery.length);
+    }
+
+    function getStemFragmentText(paragraph, queryStems) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const words = findWordsInText(cleanParagraph);
+      const matchedWord = words.find(
+        word => word.stem && queryStems.includes(word.stem)
+      );
+
+      if (!matchedWord) {
+        return "";
+      }
+
+      return buildFragmentText(
+        cleanParagraph,
+        matchedWord.start,
+        matchedWord.end - matchedWord.start
+      );
+    }
+
+    function makeTextFragmentUrl(url, fragmentText, extraParams) {
+      let finalUrl = url;
+
+      if (extraParams) {
+        const params = new URLSearchParams(extraParams);
+        const paramString = params.toString();
+
+        if (paramString) {
+          finalUrl += (url.includes("?") ? "&" : "?") + paramString;
+        }
+      }
+
+      return `${finalUrl}#:~:text=${encodeURIComponent(fragmentText)}`;
+    }
+
+    function highlightText(text, query) {
+      const escapedText = escapeHtml(text);
+      const collapsedQuery = query.trim().replace(/\s+/g, " ");
+
+      if (!collapsedQuery) {
+        return escapedText;
+      }
+
+      const charPattern = collapsedQuery
+        .split("")
+        .map(ch => (ch === " " ? "\\s+" : charClassFor(ch)))
+        .join("");
+
+      const pattern = new RegExp(
+        `(?<![${WORD_BOUNDARY_CHARS}])${charPattern}(?![${WORD_BOUNDARY_CHARS}])`,
+        "gi"
+      );
+
+      return escapedText.replace(
+        pattern,
+        match => `<mark>${match}</mark>`
+      );
+    }
+
+    function highlightStemText(text, queryStems) {
+      const words = findWordsInText(text);
+      let result = "";
+      let lastIndex = 0;
+
+      words.forEach(word => {
+        if (word.stem && queryStems.includes(word.stem)) {
+          result += escapeHtml(text.slice(lastIndex, word.start));
+          result += `<mark>${escapeHtml(text.slice(word.start, word.end))}</mark>`;
+          lastIndex = word.end;
+        }
+      });
+
+      result += escapeHtml(text.slice(lastIndex));
+
+      return result;
+    }
+
+    async function loadTextDocuments() {
+      const jobs = searchableItems.map(async item => {
+        const link = item.querySelector("a");
+        const title = item.dataset.title || link.textContent;
+        const url = item.dataset.url || link.getAttribute("href");
+
+        try {
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            throw new Error("File could not be loaded");
+          }
+
+          const html = await response.text();
+          const paragraphs = getParagraphsFromHtml(html);
+
+          documents.push({
+            title: title,
+            url: url,
+            paragraphs: paragraphs
+          });
+        } catch (error) {
+          console.warn("Text file not loaded:", url, error);
+        }
+      });
+
+      await Promise.all(jobs);
+    }
+
+    function pageButton(label, page, disabled = false, isCurrent = false) {
+      const currentAttribute = isCurrent ? 'aria-current="page"' : "";
+      const currentClass = isCurrent ? " current-page" : "";
+
+      return `
+        <button
+          class="page-button${currentClass}"
+          type="button"
+          data-page="${page}"
+          ${disabled ? "disabled" : ""}
+          ${currentAttribute}
+          aria-label="${label}">
+          ${label}
+        </button>
+      `;
+    }
+
+    function getPageNumbers(totalPages, page) {
+      const pages = [];
+
+      if (totalPages <= 7) {
+        for (let number = 1; number <= totalPages; number++) {
+          pages.push(number);
+        }
+        return pages;
+      }
+
+      pages.push(1);
+
+      if (page > 4) {
+        pages.push("dots-right");
+      }
+
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+
+      for (let number = start; number <= end; number++) {
+        pages.push(number);
+      }
+
+      if (page < totalPages - 3) {
+        pages.push("dots-left");
+      }
+
+      pages.push(totalPages);
+
+      return pages;
+    }
+
+    function renderPagination(totalPages) {
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const buttons = [];
+
+      buttons.push(
+        pageButton("صفحهٔ قبلی", currentPage - 1, currentPage === 1)
+      );
+
+      getPageNumbers(totalPages, currentPage).forEach(item => {
+        if (typeof item === "string") {
+          buttons.push('<span class="page-dots" aria-hidden="true">…</span>');
+        } else {
+          buttons.push(
+            pageButton(
+              `صفحهٔ ${item}`,
+              item,
+              false,
+              item === currentPage
+            )
+          );
+        }
+      });
+
+      buttons.push(
+        pageButton(
+          "صفحهٔ بعدی",
+          currentPage + 1,
+          currentPage === totalPages
+        )
+      );
+
+      pagination.innerHTML = buttons.join("");
+
+      pagination.querySelectorAll(".page-button:not(:disabled)")
+        .forEach(button => {
+          button.addEventListener("click", () => {
+            const selectedPage = Number(button.dataset.page);
+
+            if (
+              selectedPage >= 1 &&
+              selectedPage <= totalPages &&
+              selectedPage !== currentPage
+            ) {
+              currentPage = selectedPage;
+              renderCurrentPage();
+
+              searchResults.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+              });
+            }
+          });
+        });
+    }
+
+    function renderCurrentPage() {
+      const totalResults = currentResults.length;
+      const totalPages = Math.ceil(totalResults / resultsPerPage);
+
+      if (currentPage > totalPages) {
+        currentPage = totalPages;
+      }
+
+      const startIndex = (currentPage - 1) * resultsPerPage;
+      const endIndex = startIndex + resultsPerPage;
+      const pageResults = currentResults.slice(startIndex, endIndex);
+
+      const firstResult = startIndex + 1;
+      const lastResult = Math.min(endIndex, totalResults);
+
+      searchResults.innerHTML = `
+        <div class="results-toolbar">
+          <p class="result-count">
+            تعداد نتیجه‌ها: ${totalResults}
+            — نمایش نتیجه‌های ${firstResult} تا ${lastResult}
+          </p>
+
+          <button
+            type="button"
+            id="copySelectedButton"
+            class="copy-selected-button"
+            disabled>
+            کپی موارد انتخاب‌شده
+          </button>
+        </div>
+
+        ${pageResults.map((result, index) => {
+          const globalIndex = startIndex + index;
+          const checkedAttr = selectedResultIndexes.has(globalIndex) ?
+            "checked" : "";
+
+          return `
+          <article class="text-search-result">
+            <div class="result-header-row">
+              <input
+                type="checkbox"
+                class="result-checkbox"
+                data-global-index="${globalIndex}"
+                ${checkedAttr}
+                aria-label="انتخاب این نتیجه">
+
+              <a
+                class="result-title"
+                href="${result.url}"
+                target="_blank"
+                rel="noopener">
+                ${escapeHtml(result.title)} — نتیجهٔ ${globalIndex + 1}
+              </a>
+            </div>
+
+            <p>${
+              currentRootMode ?
+                highlightStemText(result.paragraph, getQueryStems(currentQuery)) :
+                highlightText(result.paragraph, currentQuery)
+            }</p>
+
+            <a
+              class="found-word-link"
+              href="${result.url}"
+              target="_blank"
+              rel="noopener">
+              رفتن به عبارت یافت‌شده
+            </a>
+          </article>
+        `;
+        }).join("")}
+      `;
+
+      renderPagination(totalPages);
+
+      searchResults
+        .querySelectorAll(".result-checkbox")
+        .forEach(checkbox => {
+          checkbox.addEventListener("change", () => {
+            const index = parseInt(checkbox.dataset.globalIndex, 10);
+
+            if (checkbox.checked) {
+              selectedResultIndexes.add(index);
+            } else {
+              selectedResultIndexes.delete(index);
+            }
+
+            updateCopyButtonState();
+          });
+        });
+
+      const copyButton = document.getElementById("copySelectedButton");
+
+      if (copyButton) {
+        copyButton.addEventListener("click", handleCopySelectedResults);
+      }
+
+      updateCopyButtonState();
+    }
+
+    // Boundary used so normal (non-root) search only matches whole
+    // words - e.g. searching "وجود" must not match inside "الوجود"
+    // or "موجودات". \b doesn't work here since JS regex \w is
+    // ASCII-only, so this uses an explicit lookaround against the
+    // Arabic Unicode letter block (plus ZWNJ, so a half-spaced
+    // compound like "کتاب‌خانه" still counts as one word).
+    const WORD_BOUNDARY_CHARS = "\\u0621-\\u06FF\\u200c";
+
+    function buildWholeWordPattern(normalizedQuery) {
+      const escaped = normalizedQuery
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/ /g, "\\s+");
+
+      return new RegExp(
+        `(?<![${WORD_BOUNDARY_CHARS}])${escaped}(?![${WORD_BOUNDARY_CHARS}])`,
+        "i"
+      );
+    }
+
+    function renderResults(query) {
+      const rootMode = !!(siteSearchRoot && siteSearchRoot.checked);
+      const cleanQuery = normalize(query);
+      const queryStems = rootMode ? getQueryStems(query) : [];
+      const hasQuery = rootMode ? queryStems.length > 0 : !!cleanQuery;
+      const wholeWordPattern = (!rootMode && cleanQuery) ?
+        buildWholeWordPattern(cleanQuery) :
+        null;
+
+      selectedResultIndexes.clear();
+
+      if (!hasQuery) {
+        currentResults = [];
+        currentQuery = "";
+        currentRootMode = rootMode;
+        currentPage = 1;
+        searchResults.innerHTML = "";
+        pagination.innerHTML = "";
+        noResults.style.display = "none";
+        return;
+      }
+
+      const allResults = [];
+
+      documents.forEach(document => {
+        document.paragraphs.forEach(paragraph => {
+          if (rootMode) {
+            const paragraphStems = new Set(
+              findWordsInText(paragraph)
+                .map(word => word.stem)
+                .filter(Boolean)
+            );
+
+            const matchesAll = queryStems.every(
+              stem => paragraphStems.has(stem)
+            );
+
+            if (matchesAll) {
+              const fragmentText =
+                getStemFragmentText(paragraph, queryStems) || query.trim();
+
+              allResults.push({
+                title: document.title,
+                paragraph: paragraph,
+                url: makeTextFragmentUrl(document.url, fragmentText, {
+                  q: query.trim(),
+                  root: "1"
+                })
+              });
+            }
+          } else if (wholeWordPattern.test(normalize(paragraph))) {
+            const fragmentText = getFragmentText(paragraph, query);
+
+            allResults.push({
+              title: document.title,
+              paragraph: paragraph,
+              url: makeTextFragmentUrl(document.url, fragmentText, {
+                q: query.trim()
+              })
+            });
+          }
+        });
+      });
+
+      if (allResults.length === 0) {
+        currentResults = [];
+        currentQuery = query;
+        currentRootMode = rootMode;
+        currentPage = 1;
+        searchResults.innerHTML = "";
+        pagination.innerHTML = "";
+        noResults.style.display = "block";
+        return;
+      }
+
+      noResults.style.display = "none";
+      currentResults = allResults;
+      currentQuery = query;
+      currentRootMode = rootMode;
+      currentPage = 1;
+
+      renderCurrentPage();
+    }
+
+    searchInput.addEventListener("input", function () {
+      renderResults(this.value);
+    });
+
+    if (siteSearchRoot) {
+      siteSearchRoot.addEventListener("change", function () {
+        if (searchInput.value.trim()) {
+          renderResults(searchInput.value);
+        }
+      });
+    }
+
+    function filterTitles(query) {
+      const cleanQuery = normalize(query);
+      let visibleCount = 0;
+
+      allBookListItems.forEach(item => {
+        const titleText = item.dataset.title ||
+          item.querySelector("a")?.textContent ||
+          "";
+
+        const matchesQuery = !cleanQuery ||
+          normalize(titleText).includes(cleanQuery);
+
+        item.style.display = matchesQuery ? "" : "none";
+
+        if (matchesQuery) {
+          visibleCount++;
+        }
+      });
+
+      document.querySelectorAll(".main-branch").forEach(branch => {
+        const hasVisibleItem = [...branch.querySelectorAll("li")]
+          .some(item => item.style.display !== "none");
+
+        if (cleanQuery) {
+          branch.open = hasVisibleItem;
+          branch.style.display = hasVisibleItem ? "" : "none";
+        } else {
+          branch.style.display = "";
+        }
+      });
+
+      titleNoResults.style.display =
+        cleanQuery && visibleCount === 0 ? "block" : "none";
+    }
+
+    titleSearchInput.addEventListener("input", function () {
+      filterTitles(this.value);
+    });
+
+    loadTextDocuments();
+  </script>
+</body>
+</html>
