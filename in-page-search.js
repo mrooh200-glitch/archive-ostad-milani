@@ -465,6 +465,14 @@
           پاک کردن
         </button>
 
+        <button
+          id="inPageVoiceInput"
+          type="button"
+          class="in-page-voice-input-button"
+          title="جست‌وجوی صوتی">
+          🎤 جست‌وجوی صوتی
+        </button>
+
         <label class="in-page-search-root-label" for="inPageSearchRoot">
           <input id="inPageSearchRoot" type="checkbox">
           جست‌وجوی ریشه‌ای
@@ -658,6 +666,33 @@
         }
       }
 
+      .in-page-voice-input-button {
+        padding: 8px 12px;
+        border: 1px solid #93c5fd;
+        border-radius: 8px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.8rem;
+        white-space: nowrap;
+      }
+
+      .in-page-voice-input-button:hover:not(:disabled) {
+        background: #dbeafe;
+      }
+
+      .in-page-voice-input-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .in-page-voice-input-button.is-listening {
+        background: #fee2e2;
+        border-color: #fca5a5;
+        color: #b91c1c;
+      }
+
       #inPageSearchResults {
         display: none;
         box-sizing: border-box;
@@ -784,7 +819,7 @@
           position: fixed;
           top: 0;
           left: 0;
-          width: 300px;
+          width: 220px;
           max-width: 90vw;
           bottom: 0;
           border-left: 1px solid #cbd5e1;
@@ -797,7 +832,7 @@
            whole page content to the right by the panel's width
            whenever it's open, so nothing is covered. */
         body.in-page-search-results-open {
-          margin-left: 300px;
+          margin-left: 220px;
           transition: margin-left 0.15s ease;
         }
       }
@@ -1948,6 +1983,62 @@
     updateStatus();
   }
 
+  // ---- Voice input (item 1) ------------------------------------------
+  // Mirrors the site-wide search's voice-typing button (index.htm) so
+  // the same "speak your query" option exists in this file's own
+  // in-page search box, not just on the main search page.
+  let inPageVoiceRecognition = null;
+
+  function getSpeechRecognitionCtor() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }
+
+  function toggleInPageVoiceInput() {
+    const Ctor = getSpeechRecognitionCtor();
+    const button = document.getElementById("inPageVoiceInput");
+    const input = document.getElementById("inPageSearchInput");
+
+    if (!Ctor) {
+      if (button) {
+        button.textContent = "🎤 پشتیبانی نمی‌شود";
+      }
+      return;
+    }
+
+    if (inPageVoiceRecognition) {
+      inPageVoiceRecognition.stop();
+      return;
+    }
+
+    inPageVoiceRecognition = new Ctor();
+    inPageVoiceRecognition.lang = "fa-IR";
+    inPageVoiceRecognition.interimResults = false;
+    inPageVoiceRecognition.maxAlternatives = 1;
+
+    inPageVoiceRecognition.addEventListener("start", () => {
+      if (button) {
+        button.classList.add("is-listening");
+        button.textContent = "🎤 در حال شنیدن…";
+      }
+    });
+
+    inPageVoiceRecognition.addEventListener("result", event => {
+      const transcript = event.results[0][0].transcript;
+      input.value = transcript;
+      performSearch();
+    });
+
+    inPageVoiceRecognition.addEventListener("end", () => {
+      if (button) {
+        button.classList.remove("is-listening");
+        button.textContent = "🎤 جست‌وجوی صوتی";
+      }
+      inPageVoiceRecognition = null;
+    });
+
+    inPageVoiceRecognition.start();
+  }
+
   function performSearch() {
     const input = document.getElementById("inPageSearchInput");
     const query = input.value.trim();
@@ -1986,6 +2077,85 @@
     renderResultsPanel();
   }
 
+  // Item 3: "رفتن به عبارت یافت‌شده" on the main site search links here
+  // with a browser text fragment (#:~:text=...) that identifies ONE
+  // specific occurrence, built from that occurrence's matched text
+  // plus the two words after it (see index.htm's buildFragmentText).
+  // Previously this file ignored that and always landed on match #1
+  // for the query. These helpers rebuild the same "matched text + two
+  // following words" string for each highlighted match here, so the
+  // one the link actually pointed at can be found and jumped to.
+  function getTextFragmentFromHash() {
+    const marker = "#:~:text=";
+    const hash = location.hash || "";
+    const index = hash.indexOf(marker);
+
+    if (index === -1) {
+      return null;
+    }
+
+    const raw = hash.slice(index + marker.length);
+
+    try {
+      return decodeURIComponent(raw);
+    } catch (error) {
+      return raw;
+    }
+  }
+
+  const FRAGMENT_BLOCK_SELECTOR =
+    "h1, h2, h3, h4, h5, h6, p, li, blockquote, td, th";
+
+  function getWordsAfterMark(mark, count) {
+    const block = mark.closest(FRAGMENT_BLOCK_SELECTOR) || mark.parentElement;
+
+    if (!block) {
+      return "";
+    }
+
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+    let afterMark = false;
+    let collected = "";
+
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+
+      if (mark.contains(node)) {
+        afterMark = true;
+        continue;
+      }
+
+      if (afterMark) {
+        collected += " " + node.textContent;
+
+        if (collected.trim().split(/\s+/).filter(Boolean).length >= count) {
+          break;
+        }
+      }
+    }
+
+    return collected.trim().split(/\s+/).filter(Boolean).slice(0, count).join(" ");
+  }
+
+  function getMatchFragmentText(mark) {
+    const matchText = mark.textContent.replace(/\s+/g, " ").trim();
+    const nextWords = getWordsAfterMark(mark, 2);
+
+    return normalize([matchText, nextWords].filter(Boolean).join(" "));
+  }
+
+  function findMatchIndexForFragment(fragmentText) {
+    if (!fragmentText) {
+      return -1;
+    }
+
+    const normalizedFragment = normalize(fragmentText);
+
+    return matches.findIndex(
+      mark => getMatchFragmentText(mark) === normalizedFragment
+    );
+  }
+
   function applyIncomingQueryFromUrl() {
     const params = new URLSearchParams(location.search);
     const incomingQuery = params.get("q");
@@ -2009,6 +2179,15 @@
     }
 
     performSearch();
+
+    // Land on the exact occurrence the link pointed at, if it can be
+    // found among this file's matches; otherwise leave performSearch's
+    // default of match #1.
+    const targetIndex = findMatchIndexForFragment(getTextFragmentFromHash());
+
+    if (targetIndex !== -1) {
+      showMatch(targetIndex);
+    }
   }
 
   function initialize() {
@@ -2058,6 +2237,11 @@
     });
 
     clearButton.addEventListener("click", clearSearch);
+
+    const voiceButton = document.getElementById("inPageVoiceInput");
+    if (voiceButton) {
+      voiceButton.addEventListener("click", toggleInPageVoiceInput);
+    }
 
     const rootToggle = document.getElementById("inPageSearchRoot");
     const showDerivativesToggle = document.getElementById("inPageShowDerivatives");
