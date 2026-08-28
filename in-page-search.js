@@ -52,6 +52,34 @@
     }
   }
 
+  // Copies both a plain-text version (for targets that only accept
+  // text) and an HTML version (for targets that accept rich paste -
+  // Word, Gmail, WhatsApp/Telegram desktop, etc.). The HTML version
+  // turns each long reference URL into a short clickable "لینک منبع"
+  // link instead of dumping the raw address into the pasted text.
+  async function copyRichTextToClipboard(text, html) {
+    try {
+      if (
+        navigator.clipboard &&
+        window.isSecureContext &&
+        typeof ClipboardItem !== "undefined" &&
+        navigator.clipboard.write
+      ) {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "text/plain": new Blob([text], { type: "text/plain" }),
+            "text/html": new Blob([html], { type: "text/html" })
+          })
+        ]);
+        return true;
+      }
+    } catch (error) {
+      // fall through to the plain-text-only fallback below
+    }
+
+    return copyTextToClipboard(text);
+  }
+
   function normalize(text) {
     return (text || "")
       .toLowerCase()
@@ -1836,18 +1864,39 @@
     // selected matches necessarily come from this same page).
     // Item 3: each snippet gets its own reference link right under
     // it, so a pasted result can be traced back to its exact spot.
-    const header = `——— عنوان: ${getPageTitle()} ———`;
+    // The link itself is kept short and clickable: in plain-text
+    // targets the raw URL still appears (there's no way around that
+    // in plain text), but anywhere rich/HTML paste is supported, it
+    // collapses to a short "لینک منبع" hyperlink instead.
+    const pageTitle = getPageTitle();
+    const header = `——— عنوان: ${pageTitle} ———`;
 
-    const body = selected
-      .map((mark, index) => (
-        `${index + 1}. "${getSnippetPlainText(mark)}"\n` +
-        `[لینک منبع](${buildMatchUrl(mark)})`
-      ))
+    const textBody = selected
+      .map((mark, index) => {
+        const snippet = getSnippetPlainText(mark);
+        const url = buildMatchUrl(mark);
+        return `${index + 1}. "${snippet}"\nلینک منبع: ${url}`;
+      })
       .join("\n\n");
 
-    const text = `${header}\n\n${body}`;
+    const text = `${header}\n\n${textBody}`;
 
-    const ok = await copyTextToClipboard(text);
+    const htmlBody = selected
+      .map((mark, index) => {
+        const snippet = escapeHtml(getSnippetPlainText(mark));
+        const url = escapeHtml(buildMatchUrl(mark));
+        return (
+          `<p>${index + 1}. "${snippet}"<br>` +
+          `<a href="${url}">لینک منبع</a></p>`
+        );
+      })
+      .join("");
+
+    const html =
+      `<p><strong>——— عنوان: ${escapeHtml(pageTitle)} ———</strong></p>` +
+      htmlBody;
+
+    const ok = await copyRichTextToClipboard(text, html);
 
     if (button) {
       button.textContent = ok ? "کپی شد!" : "خطا در کپی";
