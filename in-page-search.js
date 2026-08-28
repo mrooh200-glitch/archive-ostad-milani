@@ -31,13 +31,28 @@
   }
 
   // ---- Root-based (stemming) search --------------------------------
-  // Light rule-based stemmer for Persian + Arabic. Strips one leading
-  // prefix and up to two trailing suffixes from a word so that
-  // different inflected forms of (roughly) the same root can be
-  // matched together. Not a full morphological analyzer - just
-  // enough to connect common everyday forms (plurals, "-tar/-tarin",
-  // "mi-/nemi-" verb prefixes, Arabic-style "al-"/"wa-" prefixes,
-  // feminine/plural endings, etc).
+  // Two layers, applied in order:
+  //  1) Arabic root-and-pattern (وزن) extraction, a simplified version
+  //     of the classic ISRI algorithm: recognizes the most common
+  //     "augment letter" positions (سألتمونيه) in 4/5/6-letter words
+  //     and strips them to reach the 3-letter triliteral root. This
+  //     is what connects surface-different words like حادثه / حدوث /
+  //     حوادث / حادث, or کتاب / کاتب / مکتوب / الکتاب, which no
+  //     amount of prefix/suffix stripping alone can do.
+  //  2) A light Persian/Arabic affix stripper (prefixes می‌/نمی‌/بی‌/
+  //     ال, suffixes ها/ان/تر/ترین/...) for words the pattern step
+  //     doesn't fully resolve.
+  // Pattern extraction runs BEFORE the generic suffix stripper so that
+  // real root letters aren't cannibalized by an accidentally-matching
+  // generic suffix (e.g. "کریم" ends in "یم", which is also a common
+  // verb suffix - resolving the فعیل pattern first keeps the "م" that
+  // a naive suffix strip would have removed).
+  // Not a full morphological analyzer or dictionary lookup - it will
+  // still miss irregular/weak-letter verbs and occasionally produce a
+  // wrong or overly short root. Good enough for connecting the common
+  // derivational families in this archive; a dictionary-based
+  // approach (e.g. the Arramooz word/root database) would be the next
+  // step up in accuracy if ever needed.
 
   const STEM_MIN_ROOT_LENGTH = 2;
 
@@ -60,6 +75,14 @@
     "ی", "ه"
   ].sort((a, b) => b.length - a.length);
 
+  // "سألتمونيه" - the classic set of Arabic augment letters (with ي
+  // normalized to ی), used when deciding whether a leading/trailing
+  // letter on a long word is likely an augment rather than a root
+  // letter.
+  const AUGMENT_LETTERS = new Set(
+    ["ا", "و", "ی", "ت", "ن", "م", "س", "ه"]
+  );
+
   const WORD_PATTERN = /[\u0621-\u06FF]+(?:\u200c[\u0621-\u06FF]+)*/g;
 
   function stripDiacritics(text) {
@@ -75,32 +98,141 @@
     return normalize(stripDiacritics(word));
   }
 
-  function stemWord(word) {
-    let stemmed = cleanWord(word);
+  // Reduce a 4-letter word to its 3-letter root by removing one
+  // augment letter at the position where a known measure (وزن) puts
+  // it. Returns null if no recognized pattern applies.
+  function reduceFourLetter(word) {
+    const c0 = word[0];
+    const c1 = word[1];
+    const c2 = word[2];
+    const c3 = word[3];
 
-    for (const prefix of STEM_PREFIXES) {
-      if (
-        stemmed.startsWith(prefix) &&
-        stemmed.length - prefix.length >= STEM_MIN_ROOT_LENGTH
-      ) {
-        stemmed = stemmed.slice(prefix.length);
+    if (c1 === "ا") return c0 + c2 + c3; // فاعل  (حادث -> حدث)
+    if (c2 === "ا") return c0 + c1 + c3; // فِعال (کتاب -> کتب)
+    if (c2 === "و") return c0 + c1 + c3; // فعول  (حدوث -> حدث)
+    if (c2 === "ی") return c0 + c1 + c3; // فعیل  (کریم -> کرم)
+    if (c0 === "م") return c1 + c2 + c3; // مفعل  (مکتب -> کتب)
+    if (c0 === "ت") return c1 + c2 + c3; // تفعّل (تعلم -> علم)
+
+    return null;
+  }
+
+  // Reduce a 5-letter word to its 3-letter root by removing two
+  // augment letters at known measure positions.
+  function reduceFiveLetter(word) {
+    const c0 = word[0];
+    const c1 = word[1];
+    const c2 = word[2];
+    const c3 = word[3];
+    const c4 = word[4];
+
+    if (c1 === "و" && c2 === "ا") return c0 + c3 + c4; // فواعل (حوادث -> حدث)
+    if (c0 === "م" && c2 === "ا") return c1 + c3 + c4; // مفاعل (مساجد -> سجد)
+    if (c0 === "م" && c3 === "و") return c1 + c2 + c4; // مفعول (مکتوب -> کتب)
+    if (c0 === "ت" && c3 === "ی") return c1 + c2 + c4; // تفعیل (توحید -> وحد)
+    if (c1 === "ت" && c3 === "ا") return c0 + c2 + c4; // تفاعل-ish
+    if (c2 === "ا" && c3 === "ی") return c0 + c1 + c4; // فعائل (رسائل -> رسل)
+
+    return null;
+  }
+
+  // For 6+ letter words, fall back to peeling one plausible augment
+  // letter off either end and letting the loop in deaugmentToRoot()
+  // retry the shorter word.
+  function reduceLongWord(word) {
+    const first = word[0];
+
+    if (AUGMENT_LETTERS.has(first) && word.length - 1 >= 4) {
+      return word.slice(1);
+    }
+
+    const last = word[word.length - 1];
+
+    if (AUGMENT_LETTERS.has(last) && word.length - 1 >= 4) {
+      return word.slice(0, -1);
+    }
+
+    return null;
+  }
+
+  function deaugmentToRoot(word) {
+    let w = word;
+    let guard = 0;
+
+    while (w.length > 3 && guard < 4) {
+      guard += 1;
+
+      let reduced = null;
+
+      if (w.length === 4) {
+        reduced = reduceFourLetter(w);
+      } else if (w.length === 5) {
+        reduced = reduceFiveLetter(w);
+      } else if (w.length >= 6) {
+        reduced = reduceLongWord(w);
+      }
+
+      if (reduced === null || reduced.length >= w.length) {
         break;
       }
+
+      w = reduced;
     }
+
+    return w;
+  }
+
+  function stripOnePrefix(word) {
+    for (const prefix of STEM_PREFIXES) {
+      if (
+        word.startsWith(prefix) &&
+        word.length - prefix.length >= STEM_MIN_ROOT_LENGTH
+      ) {
+        return word.slice(prefix.length);
+      }
+    }
+
+    return word;
+  }
+
+  function stripSuffixes(word) {
+    let result = word;
 
     for (let pass = 0; pass < 2; pass++) {
       for (const suffix of STEM_SUFFIXES) {
         if (
-          stemmed.endsWith(suffix) &&
-          stemmed.length - suffix.length >= STEM_MIN_ROOT_LENGTH
+          result.endsWith(suffix) &&
+          result.length - suffix.length >= STEM_MIN_ROOT_LENGTH
         ) {
-          stemmed = stemmed.slice(0, -suffix.length);
+          result = result.slice(0, -suffix.length);
           break;
         }
       }
     }
 
-    return stemmed;
+    return result;
+  }
+
+  function stemWord(word) {
+    let w = stripOnePrefix(cleanWord(word));
+
+    if (w.length > 3) {
+      const patternResult = deaugmentToRoot(w);
+
+      if (patternResult.length === 3) {
+        return patternResult;
+      }
+
+      w = patternResult;
+    }
+
+    w = stripSuffixes(w);
+
+    if (w.length > 3) {
+      w = deaugmentToRoot(w);
+    }
+
+    return w;
   }
 
   function getQueryStems(query) {
