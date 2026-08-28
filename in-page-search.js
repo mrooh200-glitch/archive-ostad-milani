@@ -286,6 +286,41 @@
     return !!(toggle && toggle.checked);
   }
 
+  // The derivatives block is opt-in (separate from root-search itself)
+  // so that turning on root search alone doesn't automatically eat up
+  // screen space - the reader has to explicitly ask to see it.
+  function isDerivativesViewEnabled() {
+    const toggle = document.getElementById("inPageShowDerivatives");
+    return !!(toggle && toggle.checked);
+  }
+
+  // Only relevant while root search is on. Keeps the checkbox out of
+  // the way (and unchecked) the rest of the time.
+  function updateDerivativesToggleVisibility() {
+    const label = document.getElementById("inPageShowDerivativesLabel");
+
+    if (!label) {
+      return;
+    }
+
+    label.style.display = isRootSearchEnabled() ? "inline-flex" : "none";
+  }
+
+  // The derivatives block is sticky, stacked directly beneath the
+  // (also sticky) search box, so it doesn't scroll out of view. Its
+  // "top" has to match the search box's actual rendered height, which
+  // can change (title wrapping, narrow screens), so this is
+  // recalculated rather than hard-coded.
+  function updateDerivativesBlockPosition() {
+    const block = document.getElementById("inPageDerivativesBlock");
+
+    if (!block || !searchBoxElement) {
+      return;
+    }
+
+    block.style.top = searchBoxElement.offsetHeight + "px";
+  }
+
   const bookTitlesByFileName = {
     "Aghaye-Javadi-va-Hodous.htm": "آقای جوادی و حدوث",
     "Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm":
@@ -407,6 +442,15 @@
           جست‌وجوی ریشه‌ای
         </label>
 
+        <label
+          id="inPageShowDerivativesLabel"
+          class="in-page-search-derivatives-toggle-label"
+          for="inPageShowDerivatives"
+          style="display:none;">
+          <input id="inPageShowDerivatives" type="checkbox">
+          برای مشاهده مشتقات، این تیک را بزنید
+        </label>
+
         <button id="inPageArchiveToggle" type="button">
           آرشیو نتایج
         </button>
@@ -475,7 +519,8 @@
 
       .in-page-search-row {
         display: flex;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+        overflow-x: auto;
         align-items: center;
         gap: 8px;
         width: min(1100px, 100%);
@@ -488,9 +533,14 @@
         font-weight: bold;
       }
 
+      .in-page-search-row button,
+      .in-page-search-row > label {
+        flex-shrink: 0;
+      }
+
       #inPageSearchInput {
-        flex: 1 1 250px;
-        min-width: 180px;
+        flex: 1 1 220px;
+        min-width: 140px;
         padding: 8px 10px;
         border: 1px solid #94a3b8;
         border-radius: 7px;
@@ -566,6 +616,8 @@
         }
 
         .in-page-search-row {
+          flex-wrap: wrap;
+          overflow-x: visible;
           gap: 6px;
         }
 
@@ -732,11 +784,31 @@
       }
 
       #inPageDerivativesBlock {
+        position: sticky;
+        z-index: 9998;
         margin: 12px 0 0;
         padding: 10px 12px;
         background: #f8fafc;
         border: 1px solid #cbd5e1;
         border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
+      }
+
+      .in-page-search-derivatives-toggle-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #173b63;
+        font-size: 0.84rem;
+        font-weight: normal;
+        white-space: nowrap;
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .in-page-search-derivatives-toggle-label input {
+        margin: 0;
+        cursor: pointer;
       }
 
       .in-page-derivatives-title {
@@ -1438,7 +1510,7 @@
       return;
     }
 
-    if (!isRootSearchEnabled() || matches.length === 0) {
+    if (!isRootSearchEnabled() || !isDerivativesViewEnabled() || matches.length === 0) {
       block.innerHTML = "";
       block.style.display = "none";
       return;
@@ -1488,6 +1560,7 @@
       `</div>`;
 
     block.style.display = "block";
+    updateDerivativesBlockPosition();
 
     block.querySelectorAll(".in-page-derivatives-item").forEach(item => {
       const toggle = () => {
@@ -1842,10 +1915,7 @@
 
     matches = highlightMatches(query);
     renderResultsPanel();
-
-    if (isRootSearchEnabled()) {
-      renderDerivativesBlock();
-    }
+    renderDerivativesBlock();
 
     if (matches.length > 0) {
       showMatch(0);
@@ -1886,6 +1956,7 @@
 
     if (rootToggle && params.get("root") === "1") {
       rootToggle.checked = true;
+      updateDerivativesToggleVisibility();
     }
 
     performSearch();
@@ -1940,15 +2011,42 @@
     clearButton.addEventListener("click", clearSearch);
 
     const rootToggle = document.getElementById("inPageSearchRoot");
+    const showDerivativesToggle = document.getElementById("inPageShowDerivatives");
 
     rootToggle.addEventListener("change", () => {
       activeDerivativeKeys.clear();
+      updateDerivativesToggleVisibility();
+
+      if (!rootToggle.checked && showDerivativesToggle) {
+        showDerivativesToggle.checked = false;
+      }
+
       if (input.value.trim()) {
         performSearch();
       } else {
         renderResultsPanel();
+        renderDerivativesBlock();
       }
     });
+
+    if (showDerivativesToggle) {
+      showDerivativesToggle.addEventListener("change", () => {
+        if (!showDerivativesToggle.checked) {
+          activeDerivativeKeys.clear();
+          renderResultsPanel();
+        }
+
+        renderDerivativesBlock();
+      });
+    }
+
+    updateDerivativesToggleVisibility();
+
+    window.addEventListener("resize", updateDerivativesBlockPosition);
+
+    if (typeof ResizeObserver !== "undefined" && searchBoxElement) {
+      new ResizeObserver(updateDerivativesBlockPosition).observe(searchBoxElement);
+    }
 
     const archiveToggleButton = document.getElementById("inPageArchiveToggle");
     if (archiveToggleButton) {
