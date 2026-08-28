@@ -20,6 +20,35 @@
   let currentMatch = -1;
   let searchBoxElement = null;
   let resultsPanelElement = null;
+  const selectedMatchIndexes = new Set();
+
+  async function copyTextToClipboard(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (error) {
+      // fall through to the legacy fallback below
+    }
+
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+
+      const successful = document.execCommand("copy");
+      document.body.removeChild(textarea);
+
+      return successful;
+    } catch (error) {
+      return false;
+    }
+  }
 
   function normalize(text) {
     return (text || "")
@@ -278,6 +307,30 @@
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
+  // Character-variant equivalence classes - the same letter pairs
+  // normalize() treats as identical (ي/ی/ى, ك/ک, ة/ه/ۀ). Building the
+  // search regex with these classes (instead of the literal typed
+  // character) means a query typed with a Persian keyboard (ک) still
+  // matches - and highlights - the Arabic form (ك) wherever it occurs
+  // in the source text, and vice versa, without needing to rewrite
+  // the original text or remap character offsets.
+  const CHAR_VARIANTS = {
+    "ي": "يیى", "ی": "يیى", "ى": "يیى",
+    "ك": "كک", "ک": "كک",
+    "ة": "ةه", "ه": "ةهۀ", "ۀ": "ۀه"
+  };
+
+  function charClassFor(ch) {
+    const variants = CHAR_VARIANTS[ch];
+
+    if (variants) {
+      const unique = [...new Set(variants.split(""))];
+      return `[${unique.join("")}]`;
+    }
+
+    return escapeRegExp(ch);
+  }
+
   // Boundary used so normal (non-root) search only matches whole
   // words - e.g. searching "وجود" must not match inside "الوجود" or
   // "موجودات". \b doesn't work here since JS regex \w is ASCII-only
@@ -294,11 +347,14 @@
       return "";
     }
 
-    const escaped = escapeRegExp(collapsed).replace(/ /g, "\\s+");
+    const charPattern = collapsed
+      .split("")
+      .map(ch => (ch === " " ? "\\s+" : charClassFor(ch)))
+      .join("");
 
     return (
       `(?<![${WORD_BOUNDARY_CHARS}])` +
-      escaped +
+      charPattern +
       `(?![${WORD_BOUNDARY_CHARS}])`
     );
   }
@@ -511,6 +567,32 @@
         font-weight: bold;
       }
 
+      #inPageSearchResults .in-page-search-results-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .in-page-search-copy-button {
+        border: 1px solid #93c5fd;
+        border-radius: 6px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font: inherit;
+        font-size: 0.74rem;
+        padding: 4px 8px;
+        cursor: pointer;
+      }
+
+      .in-page-search-copy-button:hover:not(:disabled) {
+        background: #dbeafe;
+      }
+
+      .in-page-search-copy-button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
       #inPageSearchResults .in-page-search-results-close {
         border: none;
         background: transparent;
@@ -526,11 +608,29 @@
       }
 
       .in-page-search-result-item {
-        display: block;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
         width: 100%;
         padding: 9px 12px;
-        border: none;
         border-bottom: 1px solid #eef2f7;
+      }
+
+      .in-page-search-result-item:last-child {
+        border-bottom: none;
+      }
+
+      .in-page-result-checkbox {
+        margin: 5px 0 0;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+
+      .in-page-search-result-jump {
+        flex: 1;
+        min-width: 0;
+        padding: 0;
+        border: none;
         background: transparent;
         color: #334155;
         font: inherit;
@@ -541,12 +641,8 @@
         cursor: pointer;
       }
 
-      .in-page-search-result-item:last-child {
-        border-bottom: none;
-      }
-
-      .in-page-search-result-item:hover {
-        background: #eef2ff;
+      .in-page-search-result-jump:hover {
+        text-decoration: underline;
       }
 
       .in-page-search-result-item.active {
@@ -640,6 +736,7 @@
 
     matches = [];
     currentMatch = -1;
+    selectedMatchIndexes.clear();
   }
 
   function getSearchableTextNodes() {
@@ -873,7 +970,7 @@
     return range.toString().length;
   }
 
-  function buildSnippetHtml(mark) {
+  function getSnippetBounds(mark) {
     const container = getSnippetContainer(mark);
     const rawText = container.textContent;
     const startOffset = getTextOffsetBefore(container, mark);
@@ -904,6 +1001,14 @@
       sentenceEnd = Math.min(sentenceEnd, endOffset + half);
     }
 
+    return { rawText, startOffset, endOffset, sentenceStart, sentenceEnd };
+  }
+
+  function buildSnippetHtml(mark) {
+    const {
+      rawText, startOffset, endOffset, sentenceStart, sentenceEnd
+    } = getSnippetBounds(mark);
+
     const before = rawText
       .slice(sentenceStart, startOffset)
       .replace(/\s+/g, " ")
@@ -926,6 +1031,19 @@
     ).replace(/\s+/g, " ").trim();
   }
 
+  function getSnippetPlainText(mark) {
+    const { rawText, sentenceStart, sentenceEnd } = getSnippetBounds(mark);
+
+    const prefix = sentenceStart > 0 ? "…" : "";
+    const suffix = sentenceEnd < rawText.length ? "…" : "";
+
+    return (
+      prefix +
+      rawText.slice(sentenceStart, sentenceEnd).replace(/\s+/g, " ").trim() +
+      suffix
+    );
+  }
+
   function renderResultsPanel() {
     if (!resultsPanelElement) {
       return;
@@ -934,6 +1052,7 @@
     if (matches.length === 0) {
       resultsPanelElement.innerHTML = "";
       resultsPanelElement.classList.remove("has-results");
+      selectedMatchIndexes.clear();
       reserveScrollOffsetForStickyBox();
       return;
     }
@@ -942,11 +1061,15 @@
       .map((mark, index) => {
         const snippetHtml = buildSnippetHtml(mark);
         const activeClass = index === currentMatch ? " active" : "";
+        const checkedAttr = selectedMatchIndexes.has(index) ? "checked" : "";
 
         return (
-          `<button type="button" class="in-page-search-result-item${activeClass}" data-index="${index}">` +
-          snippetHtml +
-          `</button>`
+          `<div class="in-page-search-result-item${activeClass}" data-index="${index}">` +
+            `<input type="checkbox" class="in-page-result-checkbox" data-index="${index}" ${checkedAttr} aria-label="انتخاب این نتیجه">` +
+            `<button type="button" class="in-page-search-result-jump" data-index="${index}">` +
+              snippetHtml +
+            `</button>` +
+          `</div>`
         );
       })
       .join("");
@@ -954,7 +1077,12 @@
     resultsPanelElement.innerHTML = `
       <div class="in-page-search-results-header">
         <span>${matches.length} نتیجه</span>
-        <button type="button" class="in-page-search-results-close" aria-label="بستن فهرست نتایج">×</button>
+        <div class="in-page-search-results-actions">
+          <button type="button" id="inPageCopySelected" class="in-page-search-copy-button" disabled>
+            کپی انتخاب‌شده‌ها
+          </button>
+          <button type="button" class="in-page-search-results-close" aria-label="بستن فهرست نتایج">×</button>
+        </div>
       </div>
       ${items}
     `;
@@ -962,10 +1090,26 @@
     resultsPanelElement.classList.add("has-results");
 
     resultsPanelElement
-      .querySelectorAll(".in-page-search-result-item")
-      .forEach(item => {
-        item.addEventListener("click", () => {
-          showMatch(parseInt(item.dataset.index, 10));
+      .querySelectorAll(".in-page-search-result-jump")
+      .forEach(button => {
+        button.addEventListener("click", () => {
+          showMatch(parseInt(button.dataset.index, 10));
+        });
+      });
+
+    resultsPanelElement
+      .querySelectorAll(".in-page-result-checkbox")
+      .forEach(checkbox => {
+        checkbox.addEventListener("change", () => {
+          const index = parseInt(checkbox.dataset.index, 10);
+
+          if (checkbox.checked) {
+            selectedMatchIndexes.add(index);
+          } else {
+            selectedMatchIndexes.delete(index);
+          }
+
+          updateCopySelectedButton();
         });
       });
 
@@ -980,7 +1124,57 @@
       });
     }
 
+    const copyButton = resultsPanelElement.querySelector("#inPageCopySelected");
+
+    if (copyButton) {
+      copyButton.addEventListener("click", handleCopySelectedMatches);
+    }
+
+    updateCopySelectedButton();
     reserveScrollOffsetForStickyBox();
+  }
+
+  function updateCopySelectedButton() {
+    if (!resultsPanelElement) {
+      return;
+    }
+
+    const button = resultsPanelElement.querySelector("#inPageCopySelected");
+
+    if (!button) {
+      return;
+    }
+
+    const count = selectedMatchIndexes.size;
+
+    button.disabled = count === 0;
+    button.textContent = count > 0 ?
+      `کپی انتخاب‌شده‌ها (${count})` :
+      "کپی انتخاب‌شده‌ها";
+  }
+
+  async function handleCopySelectedMatches() {
+    const button = resultsPanelElement.querySelector("#inPageCopySelected");
+
+    const selected = [...selectedMatchIndexes]
+      .sort((a, b) => a - b)
+      .map(index => matches[index])
+      .filter(Boolean);
+
+    if (selected.length === 0) {
+      return;
+    }
+
+    const text = selected
+      .map(mark => `"${getSnippetPlainText(mark)}"`)
+      .join("\n\n");
+
+    const ok = await copyTextToClipboard(text);
+
+    if (button) {
+      button.textContent = ok ? "کپی شد!" : "خطا در کپی";
+      setTimeout(updateCopySelectedButton, 1500);
+    }
   }
 
   function updateResultsPanelActiveState() {
@@ -1062,6 +1256,30 @@
     renderResultsPanel();
   }
 
+  function applyIncomingQueryFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const incomingQuery = params.get("q");
+
+    if (!incomingQuery) {
+      return;
+    }
+
+    const input = document.getElementById("inPageSearchInput");
+    const rootToggle = document.getElementById("inPageSearchRoot");
+
+    if (!input) {
+      return;
+    }
+
+    input.value = incomingQuery;
+
+    if (rootToggle && params.get("root") === "1") {
+      rootToggle.checked = true;
+    }
+
+    performSearch();
+  }
+
   function initialize() {
     createSearchBox();
 
@@ -1124,6 +1342,8 @@
         input.select();
       }
     });
+
+    applyIncomingQueryFromUrl();
   }
 
   if (document.readyState === "loading") {
