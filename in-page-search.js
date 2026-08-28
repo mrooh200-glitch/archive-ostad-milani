@@ -18,6 +18,8 @@
 
   let matches = [];
   let currentMatch = -1;
+  let searchBoxElement = null;
+  let resultsPanelElement = null;
 
   function normalize(text) {
     return (text || "")
@@ -276,6 +278,15 @@
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
+  // Boundary used so normal (non-root) search only matches whole
+  // words - e.g. searching "وجود" must not match inside "الوجود" or
+  // "موجودات". \b doesn't work here since JS regex \w is ASCII-only
+  // and doesn't recognize Arabic/Persian letters, so this uses an
+  // explicit lookaround against the Arabic Unicode letter block
+  // (plus ZWNJ, so a half-spaced compound like "کتاب‌خانه" still
+  // counts as one word and isn't matched by "کتاب" alone).
+  const WORD_BOUNDARY_CHARS = "\\u0621-\\u06FF\\u200c";
+
   function buildQueryPattern(query) {
     const collapsed = query.trim().replace(/\s+/g, " ");
 
@@ -283,7 +294,13 @@
       return "";
     }
 
-    return escapeRegExp(collapsed).replace(/ /g, "\\s+");
+    const escaped = escapeRegExp(collapsed).replace(/ /g, "\\s+");
+
+    return (
+      `(?<![${WORD_BOUNDARY_CHARS}])` +
+      escaped +
+      `(?![${WORD_BOUNDARY_CHARS}])`
+    );
   }
 
   function createSearchBox() {
@@ -324,6 +341,13 @@
     `;
 
     document.body.insertBefore(box, document.body.firstChild);
+    searchBoxElement = box;
+
+    const resultsPanel = document.createElement("aside");
+    resultsPanel.id = "inPageSearchResults";
+    resultsPanel.setAttribute("aria-label", "نتایج جست‌وجو");
+    document.body.insertBefore(resultsPanel, box.nextSibling);
+    resultsPanelElement = resultsPanel;
 
     const style = document.createElement("style");
     style.textContent = `
@@ -458,26 +482,148 @@
           flex-basis: 100%;
         }
       }
+
+      #inPageSearchResults {
+        display: none;
+        box-sizing: border-box;
+        overflow-y: auto;
+        background: #ffffff;
+        font-family: Tahoma, Arial, sans-serif;
+        direction: rtl;
+        text-align: right;
+      }
+
+      #inPageSearchResults.has-results {
+        display: block;
+      }
+
+      #inPageSearchResults .in-page-search-results-header {
+        position: sticky;
+        top: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #173b63;
+        font-size: 0.82rem;
+        font-weight: bold;
+      }
+
+      #inPageSearchResults .in-page-search-results-close {
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-size: 1.05rem;
+        line-height: 1;
+        cursor: pointer;
+        padding: 2px 6px;
+      }
+
+      #inPageSearchResults .in-page-search-results-close:hover {
+        color: #1d4ed8;
+      }
+
+      .in-page-search-result-item {
+        display: block;
+        width: 100%;
+        padding: 9px 12px;
+        border: none;
+        border-bottom: 1px solid #eef2f7;
+        background: transparent;
+        color: #334155;
+        font: inherit;
+        font-size: 0.85rem;
+        line-height: 1.9;
+        text-align: right;
+        direction: rtl;
+        cursor: pointer;
+      }
+
+      .in-page-search-result-item:last-child {
+        border-bottom: none;
+      }
+
+      .in-page-search-result-item:hover {
+        background: #eef2ff;
+      }
+
+      .in-page-search-result-item.active {
+        background: #dbeafe;
+        border-right: 3px solid #2563eb;
+        padding-right: 9px;
+      }
+
+      .in-page-search-result-item mark {
+        padding: 1px 2px;
+        border-radius: 2px;
+        background: #fde68a;
+      }
+
+      @media (min-width: 861px) {
+        #inPageSearchResults {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 300px;
+          max-width: 90vw;
+          bottom: 0;
+          border-left: 1px solid #cbd5e1;
+          box-shadow: 3px 0 10px rgba(15, 23, 42, 0.08);
+        }
+      }
+
+      @media (max-width: 860px) {
+        #inPageSearchResults {
+          position: static;
+          width: 100%;
+          max-height: 320px;
+          border-top: 1px solid #cbd5e1;
+        }
+      }
     `;
 
     document.head.appendChild(style);
-
-    function reserveScrollOffsetForStickyBox() {
-      const boxHeight = box.offsetHeight;
-
-      document.documentElement.style.setProperty(
-        "scroll-padding-top",
-        boxHeight + "px"
-      );
-    }
 
     reserveScrollOffsetForStickyBox();
     window.addEventListener("resize", reserveScrollOffsetForStickyBox);
   }
 
+  function reserveScrollOffsetForStickyBox() {
+    if (!searchBoxElement) {
+      return;
+    }
+
+    const boxHeight = searchBoxElement.offsetHeight;
+    let totalHeight = boxHeight;
+
+    if (resultsPanelElement) {
+      // Has no effect when the panel is position:static (mobile),
+      // but keeps the fixed desktop side panel below the sticky bar
+      // instead of hidden behind it.
+      resultsPanelElement.style.top = boxHeight + "px";
+
+      if (
+        resultsPanelElement.classList.contains("has-results") &&
+        getComputedStyle(resultsPanelElement).position !== "fixed"
+      ) {
+        totalHeight += resultsPanelElement.offsetHeight;
+      }
+    }
+
+    document.documentElement.style.setProperty(
+      "scroll-padding-top",
+      totalHeight + "px"
+    );
+  }
+
   function isSearchInterface(node) {
     return node.parentElement &&
-      node.parentElement.closest("#inPageSearchBox");
+      (
+        node.parentElement.closest("#inPageSearchBox") ||
+        node.parentElement.closest("#inPageSearchResults")
+      );
   }
 
   function removeHighlights() {
@@ -687,6 +833,176 @@
       `نتیجهٔ ${currentMatch + 1} از ${matches.length}`;
   }
 
+  // ---- Results panel (Word-style "find" side list) -----------------
+
+  const SNIPPET_BLOCK_TAGS = new Set([
+    "P", "LI", "DIV", "TD", "TH", "BLOCKQUOTE",
+    "H1", "H2", "H3", "H4", "H5", "H6",
+    "DD", "DT", "FIGCAPTION", "SECTION", "ARTICLE"
+  ]);
+
+  const SNIPPET_SENTENCE_ENDERS = /[.!?؟۔]/;
+  const SNIPPET_MAX_LENGTH = 240;
+
+  function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function getSnippetContainer(mark) {
+    let el = mark.parentElement;
+
+    while (el && el !== document.body) {
+      if (SNIPPET_BLOCK_TAGS.has(el.tagName)) {
+        return el;
+      }
+
+      el = el.parentElement;
+    }
+
+    return mark.parentElement || document.body;
+  }
+
+  function getTextOffsetBefore(container, node) {
+    const range = document.createRange();
+
+    range.selectNodeContents(container);
+    range.setEndBefore(node);
+
+    return range.toString().length;
+  }
+
+  function buildSnippetHtml(mark) {
+    const container = getSnippetContainer(mark);
+    const rawText = container.textContent;
+    const startOffset = getTextOffsetBefore(container, mark);
+    const endOffset = startOffset + mark.textContent.length;
+
+    let sentenceStart = startOffset;
+
+    while (
+      sentenceStart > 0 &&
+      !SNIPPET_SENTENCE_ENDERS.test(rawText[sentenceStart - 1])
+    ) {
+      sentenceStart--;
+    }
+
+    let sentenceEnd = endOffset;
+
+    while (
+      sentenceEnd < rawText.length &&
+      !SNIPPET_SENTENCE_ENDERS.test(rawText[sentenceEnd - 1])
+    ) {
+      sentenceEnd++;
+    }
+
+    if (sentenceEnd - sentenceStart > SNIPPET_MAX_LENGTH) {
+      const half = Math.floor(SNIPPET_MAX_LENGTH / 2);
+
+      sentenceStart = Math.max(sentenceStart, startOffset - half);
+      sentenceEnd = Math.min(sentenceEnd, endOffset + half);
+    }
+
+    const before = rawText
+      .slice(sentenceStart, startOffset)
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const matchedText = rawText.slice(startOffset, endOffset);
+
+    const after = rawText
+      .slice(endOffset, sentenceEnd)
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const prefix = sentenceStart > 0 ? "…" : "";
+    const suffix = sentenceEnd < rawText.length ? "…" : "";
+
+    return (
+      `${prefix}${escapeHtml(before)} ` +
+      `<mark>${escapeHtml(matchedText)}</mark> ` +
+      `${escapeHtml(after)}${suffix}`
+    ).replace(/\s+/g, " ").trim();
+  }
+
+  function renderResultsPanel() {
+    if (!resultsPanelElement) {
+      return;
+    }
+
+    if (matches.length === 0) {
+      resultsPanelElement.innerHTML = "";
+      resultsPanelElement.classList.remove("has-results");
+      reserveScrollOffsetForStickyBox();
+      return;
+    }
+
+    const items = matches
+      .map((mark, index) => {
+        const snippetHtml = buildSnippetHtml(mark);
+        const activeClass = index === currentMatch ? " active" : "";
+
+        return (
+          `<button type="button" class="in-page-search-result-item${activeClass}" data-index="${index}">` +
+          snippetHtml +
+          `</button>`
+        );
+      })
+      .join("");
+
+    resultsPanelElement.innerHTML = `
+      <div class="in-page-search-results-header">
+        <span>${matches.length} نتیجه</span>
+        <button type="button" class="in-page-search-results-close" aria-label="بستن فهرست نتایج">×</button>
+      </div>
+      ${items}
+    `;
+
+    resultsPanelElement.classList.add("has-results");
+
+    resultsPanelElement
+      .querySelectorAll(".in-page-search-result-item")
+      .forEach(item => {
+        item.addEventListener("click", () => {
+          showMatch(parseInt(item.dataset.index, 10));
+        });
+      });
+
+    const closeButton = resultsPanelElement.querySelector(
+      ".in-page-search-results-close"
+    );
+
+    if (closeButton) {
+      closeButton.addEventListener("click", () => {
+        resultsPanelElement.classList.remove("has-results");
+        reserveScrollOffsetForStickyBox();
+      });
+    }
+
+    reserveScrollOffsetForStickyBox();
+  }
+
+  function updateResultsPanelActiveState() {
+    if (!resultsPanelElement) {
+      return;
+    }
+
+    resultsPanelElement
+      .querySelectorAll(".in-page-search-result-item")
+      .forEach((item, index) => {
+        item.classList.toggle("active", index === currentMatch);
+      });
+
+    const activeItem = resultsPanelElement.querySelector(
+      ".in-page-search-result-item.active"
+    );
+
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+
   function showMatch(index) {
     if (matches.length === 0) {
       return;
@@ -707,6 +1023,7 @@
       inline: "nearest"
     });
 
+    updateResultsPanelActiveState();
     updateStatus();
   }
 
@@ -719,10 +1036,12 @@
     if (!query) {
       updateButtons();
       updateStatus();
+      renderResultsPanel();
       return;
     }
 
     matches = highlightMatches(query);
+    renderResultsPanel();
 
     if (matches.length > 0) {
       showMatch(0);
@@ -740,6 +1059,7 @@
     removeHighlights();
     updateButtons();
     updateStatus();
+    renderResultsPanel();
   }
 
   function initialize() {
