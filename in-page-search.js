@@ -168,43 +168,6 @@
     });
   }
 
-  function positionSearchHistoryDropdown() {
-    const dropdown = document.getElementById("inPageSearchHistory");
-    const wrap = document.querySelector(".in-page-search-input-wrap");
-
-    if (!dropdown || !wrap || !dropdown.classList.contains("is-open")) {
-      return;
-    }
-
-    const GAP = 4; // matches the old "100% + 4px" offset
-    const EDGE_MARGIN = 8;
-    const MIN_USABLE = 150;
-
-    const rect = wrap.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom - GAP - EDGE_MARGIN;
-    const spaceAbove = rect.top - GAP - EDGE_MARGIN;
-
-    // Only 5 items max, so this is mostly a formality, but flip
-    // upward on the rare chance there truly isn't room below.
-    const openUpward = spaceBelow < MIN_USABLE && spaceAbove > spaceBelow;
-
-    // Since the dropdown is position:fixed, its coordinates are
-    // relative to the viewport, not to the input's offset parent,
-    // so they have to be set explicitly here.
-    dropdown.style.left = rect.left + "px";
-    dropdown.style.width = rect.width + "px";
-
-    if (openUpward) {
-      dropdown.style.top = "auto";
-      dropdown.style.bottom = (window.innerHeight - rect.top + GAP) + "px";
-    } else {
-      dropdown.style.top = (rect.bottom + GAP) + "px";
-      dropdown.style.bottom = "auto";
-    }
-  }
-
-  let searchHistoryReflowHandler = null;
-
   function openSearchHistoryDropdown() {
     const dropdown = document.getElementById("inPageSearchHistory");
     const input = document.getElementById("inPageSearchInput");
@@ -217,13 +180,6 @@
 
     if (dropdown.innerHTML.trim()) {
       dropdown.classList.add("is-open");
-      positionSearchHistoryDropdown();
-
-      if (!searchHistoryReflowHandler) {
-        searchHistoryReflowHandler = () => positionSearchHistoryDropdown();
-        window.addEventListener("resize", searchHistoryReflowHandler);
-        window.addEventListener("scroll", searchHistoryReflowHandler, true);
-      }
     }
   }
 
@@ -232,16 +188,6 @@
 
     if (dropdown) {
       dropdown.classList.remove("is-open");
-      dropdown.style.left = "";
-      dropdown.style.width = "";
-      dropdown.style.top = "";
-      dropdown.style.bottom = "";
-    }
-
-    if (searchHistoryReflowHandler) {
-      window.removeEventListener("resize", searchHistoryReflowHandler);
-      window.removeEventListener("scroll", searchHistoryReflowHandler, true);
-      searchHistoryReflowHandler = null;
     }
   }
 
@@ -864,15 +810,9 @@
 
       .in-page-search-history {
         display: none;
-        /* position:fixed for the same reason as the ⚙️ settings menu
-           (see positionSettingsMenu): .in-page-search-row sets
-           overflow-x:auto, which per spec forces its overflow-y to
-           auto too, clipping any absolutely-positioned descendant
-           down to the row's own one-line height. Exact left/width/
-           top/bottom are set in JS by positionSearchHistoryDropdown,
-           which runs synchronously before paint. */
-        position: fixed;
-        top: 0;
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
         left: 0;
         z-index: 10002;
         background: #ffffff;
@@ -3232,19 +3172,19 @@
         closeSearchHistoryDropdown();
       }
     });
+    // Item 1 (extended): تا اینجا فقط با زدن Enter در تاریخچه ذخیره
+    // می‌شد. اگر کاربر بعد از تایپ، بدون زدن Enter، فقط موس/فوکوس را
+    // جای دیگری ببرد (blur)، همان مقدار تایپ‌شده را هم به‌عنوان یک
+    // جست‌وجوی انجام‌شده در تاریخچه ذخیره می‌کنیم، تا در مراجعه بعدی
+    // در لیست «جست‌وجوهای اخیر» دیده شود.
     input.addEventListener("blur", () => {
-      // Item 1 continued: typing a query and simply moving on (never
-      // pressing Enter) was the normal, common flow - but until now
-      // pushSearchHistory only ran on Enter, voice input, or clicking
-      // a history item. That meant most everyday searches never made
-      // it into the list at all, so the dropdown had nothing to show
-      // even after the display/positioning bug was fixed. Recording
-      // on blur (leaving the field) covers that normal flow too.
+      closeSearchHistoryDropdown();
+
       if (input.value.trim()) {
+        clearTimeout(searchTimer);
+        performSearch();
         pushSearchHistory(input.value);
       }
-
-      closeSearchHistoryDropdown();
     });
 
     input.addEventListener("keydown", event => {
