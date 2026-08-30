@@ -334,21 +334,6 @@
     label.style.display = isRootSearchEnabled() ? "inline-flex" : "none";
   }
 
-  // The derivatives block is sticky, stacked directly beneath the
-  // (also sticky) search box, so it doesn't scroll out of view. Its
-  // "top" has to match the search box's actual rendered height, which
-  // can change (title wrapping, narrow screens), so this is
-  // recalculated rather than hard-coded.
-  function updateDerivativesBlockPosition() {
-    const block = document.getElementById("inPageDerivativesBlock");
-
-    if (!block || !searchBoxElement) {
-      return;
-    }
-
-    block.style.top = searchBoxElement.offsetHeight + "px";
-  }
-
   const bookTitlesByFileName = {
     "Aghaye-Javadi-va-Hodous.htm": "آقای جوادی و حدوث",
     "Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm":
@@ -488,7 +473,13 @@
         </button>
       </div>
 
-      <p id="inPageSearchStatus" aria-live="polite"></p>
+      <div class="in-page-status-row">
+        <p id="inPageSearchStatus" aria-live="polite"></p>
+        <div
+          id="inPageDerivativesBlock"
+          class="in-page-derivatives-inline"
+          aria-label="مشتقات یافت‌شده"></div>
+      </div>
     `;
 
     document.body.insertBefore(box, document.body.firstChild);
@@ -498,14 +489,7 @@
     resultsPanel.id = "inPageSearchResults";
     resultsPanel.setAttribute("aria-label", "نتایج جست‌وجو");
 
-    const derivativesBlock = document.createElement("div");
-    derivativesBlock.id = "inPageDerivativesBlock";
-    derivativesBlock.className = "in-page-derivatives-block";
-    derivativesBlock.setAttribute("aria-label", "مشتقات یافت‌شده");
-    derivativesBlock.style.display = "none";
-
-    document.body.insertBefore(derivativesBlock, box.nextSibling);
-    document.body.insertBefore(resultsPanel, derivativesBlock.nextSibling);
+    document.body.insertBefore(resultsPanel, box.nextSibling);
     resultsPanelElement = resultsPanel;
 
     const archiveOverlay = document.createElement("div");
@@ -622,20 +606,49 @@
         cursor: pointer;
       }
 
-      #inPageSearchStatus {
+      /* The status line ("نتیجهٔ ۱ از ۱") and the derivatives chips
+         share one row, using the empty space after the status text
+         instead of opening a separate full-width block underneath. */
+      .in-page-status-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
         width: min(1100px, 100%);
         margin: 0 auto;
+      }
+
+      /* Only reserve space for the row once it actually has content
+         (a status message and/or derivative chips). Empty (no
+         active search) collapses to zero height instead of leaving
+         blank space at the bottom of the white search bar. */
+      .in-page-status-row.has-content {
+        margin-top: 6px;
+        min-height: 20px;
+      }
+
+      #inPageSearchStatus {
+        margin: 0;
         color: #475569;
         font-size: 0.84rem;
       }
 
-      /* Only reserve space for the status line once it actually has
-         text (e.g. "عبارتی پیدا نشد."). Empty (no active search)
-         collapses to zero height instead of leaving blank space at
-         the bottom of the white search bar. */
-      #inPageSearchStatus:not(:empty) {
-        min-height: 20px;
-        margin-top: 6px;
+      .in-page-derivatives-inline {
+        display: none;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .in-page-derivatives-inline.is-visible {
+        display: flex;
+      }
+
+      .in-page-derivatives-inline-label {
+        color: #334155;
+        font-size: 0.84rem;
+        font-weight: 600;
+        white-space: nowrap;
       }
 
       mark.in-page-search-match {
@@ -863,17 +876,6 @@
         }
       }
 
-      #inPageDerivativesBlock {
-        position: sticky;
-        z-index: 9998;
-        margin: 12px 0 0;
-        padding: 10px 12px;
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        border-radius: 8px;
-        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
-      }
-
       .in-page-search-derivatives-toggle-label {
         display: inline-flex;
         align-items: center;
@@ -889,19 +891,6 @@
       .in-page-search-derivatives-toggle-label input {
         margin: 0;
         cursor: pointer;
-      }
-
-      .in-page-derivatives-title {
-        font-size: 0.9rem;
-        font-weight: 600;
-        color: #334155;
-        margin: 0 0 8px;
-      }
-
-      .in-page-derivatives-list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
       }
 
       .in-page-derivatives-empty {
@@ -1271,21 +1260,45 @@
     nextButton.disabled = !enabled;
   }
 
+  // The status row (status text + inline derivative chips) should
+  // only take up space when it actually has something to show -
+  // otherwise it collapses so it doesn't leave blank space at the
+  // bottom of the white search bar.
+  function updateStatusRowSpacing() {
+    const row = document.querySelector(".in-page-status-row");
+    const status = document.getElementById("inPageSearchStatus");
+    const derivatives = document.getElementById("inPageDerivativesBlock");
+
+    if (!row) {
+      return;
+    }
+
+    const hasContent = !!(
+      (status && status.textContent.trim()) ||
+      (derivatives && derivatives.innerHTML.trim())
+    );
+
+    row.classList.toggle("has-content", hasContent);
+  }
+
   function updateStatus() {
     const status = document.getElementById("inPageSearchStatus");
 
     if (!document.getElementById("inPageSearchInput").value.trim()) {
       status.textContent = "";
+      updateStatusRowSpacing();
       return;
     }
 
     if (matches.length === 0) {
       status.textContent = "عبارتی پیدا نشد.";
+      updateStatusRowSpacing();
       return;
     }
 
     status.textContent =
       `نتیجهٔ ${currentMatch + 1} از ${matches.length}`;
+    updateStatusRowSpacing();
   }
 
   // ---- Results panel (Word-style "find" side list) -----------------
@@ -1599,7 +1612,8 @@
 
     if (!isRootSearchEnabled() || !isDerivativesViewEnabled() || matches.length === 0) {
       block.innerHTML = "";
-      block.style.display = "none";
+      block.classList.remove("is-visible");
+      updateStatusRowSpacing();
       return;
     }
 
@@ -1625,7 +1639,8 @@
 
     if (grouped.size === 0) {
       block.innerHTML = "";
-      block.style.display = "none";
+      block.classList.remove("is-visible");
+      updateStatusRowSpacing();
       return;
     }
 
@@ -1634,20 +1649,18 @@
     );
 
     block.innerHTML =
-      `<div class="in-page-derivatives-title">مشتقات یافت‌شده (${derivatives.length})</div>` +
-      `<div class="in-page-derivatives-list">` +
-        derivatives.map(d => {
-          const active = activeDerivativeKeys.has(d.key) ? " is-active" : "";
-          return (
-            `<span class="in-page-derivatives-item${active}" data-deriv-key="${escapeHtml(d.key)}" role="button" tabindex="0">` +
-              `${escapeHtml(d.label)} <span class="deriv-count">(${d.count})</span>` +
-            `</span>`
-          );
-        }).join("") +
-      `</div>`;
+      `<span class="in-page-derivatives-inline-label">مشتقات یافت‌شده (${derivatives.length}):</span>` +
+      derivatives.map(d => {
+        const active = activeDerivativeKeys.has(d.key) ? " is-active" : "";
+        return (
+          `<span class="in-page-derivatives-item${active}" data-deriv-key="${escapeHtml(d.key)}" role="button" tabindex="0">` +
+            `${escapeHtml(d.label)} <span class="deriv-count">(${d.count})</span>` +
+          `</span>`
+        );
+      }).join("");
 
-    block.style.display = "block";
-    updateDerivativesBlockPosition();
+    block.classList.add("is-visible");
+    updateStatusRowSpacing();
 
     block.querySelectorAll(".in-page-derivatives-item").forEach(item => {
       const toggle = () => {
@@ -2319,12 +2332,6 @@
     }
 
     updateDerivativesToggleVisibility();
-
-    window.addEventListener("resize", updateDerivativesBlockPosition);
-
-    if (typeof ResizeObserver !== "undefined" && searchBoxElement) {
-      new ResizeObserver(updateDerivativesBlockPosition).observe(searchBoxElement);
-    }
 
     const archiveToggleButton = document.getElementById("inPageArchiveToggle");
     if (archiveToggleButton) {
