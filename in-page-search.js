@@ -2217,6 +2217,71 @@
     downloadTextFile(`${getPageTitle() || "نتایج-جستجو"}.txt`, text);
   }
 
+  // No docx library is loaded (same reasoning as the PDF export below:
+  // avoids an external CDN dependency for one feature) - instead this
+  // downloads a .doc file that is really just HTML, with the couple of
+  // Word-specific <!--[if gte mso 9]--> hints Word looks for before it
+  // will open a ".doc" HTML file natively. The link markup is the same
+  // short, clickable "لینک منبع" pattern handleCopySelectedMatches()
+  // already puts on the clipboard for Word's rich-paste, so the
+  // downloaded file and a pasted copy always match.
+  function exportSelectedAsWord() {
+    const selected = getSelectedMatchesInOrder();
+
+    if (selected.length === 0) {
+      return;
+    }
+
+    const pageTitle = escapeHtml(getPageTitle());
+
+    const itemsHtml = selected
+      .map((mark, index) => {
+        const snippet = escapeHtml(getSnippetPlainText(mark));
+        const url = escapeHtml(buildMatchUrl(mark));
+
+        return (
+          `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
+          `<strong>${index + 1}.</strong>\u00a0«${snippet}»</p>` +
+          `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:12px;text-align:right;">🔗 ` +
+          `<a href="${url}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+        );
+      })
+      .join("");
+
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <title>${pageTitle}</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:DoNotOptimizeForBrowser/>
+          </w:WordDocument>
+        </xml>
+        <![endif]-->
+      </head>
+      <body dir="rtl" style="font-family:Tahoma,Arial,sans-serif;">
+        <table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 12px;">
+          <tr>
+            <td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;
+              font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;
+              color:#173b63;text-align:right;">📘&nbsp;${pageTitle}</td>
+          </tr>
+        </table>
+        ${itemsHtml}
+      </body>
+    </html>`;
+
+    downloadTextFile(
+      `${getPageTitle() || "نتایج-جستجو"}.doc`,
+      doc,
+      "application/msword;charset=utf-8"
+    );
+  }
+
   // No PDF library is loaded (avoids an external CDN dependency for a
   // single feature) - instead this opens a nicely-styled, print-ready
   // page in a new tab and triggers the browser's own print dialog,
@@ -2387,15 +2452,23 @@
         type="button"
         class="in-page-settings-item"
         id="inPageMenuExportText"
-        title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی قابل ذخیره"
+        title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره"
         ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت متن</span>
+        <span>دریافت به‌صورت تکست (Text)</span>
+      </button>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuExportWord"
+        title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره، با لینک منبعِ کوتاه و قابل کلیک"
+        ${hasSelection ? "" : "disabled"}>
+        <span>دریافت به‌صورت ورد (Word)</span>
       </button>
       <button
         type="button"
         class="in-page-settings-item"
         id="inPageMenuExportPdf"
-        title="دریافت موارد انتخاب‌شده به‌صورت یک فایل PDF قابل ذخیره"
+        title="دریافت موارد انتخاب‌شده به‌صورت یک فایل PDF قابل ذخیره، با لینک منبعِ کوتاه و قابل کلیک"
         ${hasSelection ? "" : "disabled"}>
         <span>دریافت به‌صورت PDF</span>
       </button>
@@ -2465,6 +2538,10 @@
     });
     bind("inPageMenuExportText", () => {
       exportSelectedAsText();
+      closeSettingsMenu();
+    });
+    bind("inPageMenuExportWord", () => {
+      exportSelectedAsWord();
       closeSettingsMenu();
     });
     bind("inPageMenuExportPdf", () => {
