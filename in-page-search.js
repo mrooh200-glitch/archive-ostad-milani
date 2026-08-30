@@ -2034,6 +2034,182 @@
     return `${base}?${params.toString()}#:~:text=${encodeURIComponent(fragmentText)}`;
   }
 
+  // ---- Item 8: full paragraph for copy/export -------------------------
+  // The results panel only ever shows a short, sentence-scoped snippet
+  // (getSnippetPlainText above) - good for scanning many results at
+  // once. Copying/exporting is a different job though: for note-taking
+  // ("فیش‌برداری") a short fragment loses context, so the clipboard copy
+  // and the text/Word/PDF exports all use the FULL paragraph the match
+  // lives in instead - the results panel itself is untouched.
+  //
+  // "Full paragraph" reuses the exact same container that
+  // getSnippetContainer() finds for the short snippet (nearest P/LI/
+  // DIV/... ancestor).
+
+  // ~200-250 Persian/Arabic words. A hard cap so one huge, tag-less
+  // block of text (rare, but possible) can't produce an unreasonably
+  // long paste/export; when it's hit, the excerpt is trimmed evenly
+  // around the match(es) rather than around the start of the block.
+  const PARAGRAPH_EXPORT_MAX_LENGTH = 1500;
+
+  function getMatchOffsetsInContainer(mark, container) {
+    const start = getTextOffsetBefore(container, mark);
+    return { start, end: start + mark.textContent.length };
+  }
+
+  // Groups the given marks by their enclosing paragraph element,
+  // preserving each mark's own top-to-bottom order. Several selected
+  // occurrences that happen to live in the same paragraph collapse
+  // into ONE group - so that paragraph is produced (and highlighted)
+  // only once, instead of being pasted once per occurrence.
+  function groupMatchesByParagraph(selectedMarks) {
+    const groups = [];
+    const containerToGroup = new Map();
+
+    selectedMarks.forEach(mark => {
+      const container = getSnippetContainer(mark);
+      let group = containerToGroup.get(container);
+
+      if (!group) {
+        group = { container, marks: [] };
+        containerToGroup.set(container, group);
+        groups.push(group);
+      }
+
+      group.marks.push(mark);
+    });
+
+    return groups;
+  }
+
+  // Resolves a group's mark offsets into: the raw paragraph text, the
+  // (possibly trimmed) slice of it to actually use, and the merged
+  // highlight spans within that slice. Spans are merged first so
+  // overlapping/adjacent matches (e.g. from proximity search) can't
+  // produce broken/nested highlight markup.
+  function buildParagraphExcerpt(group) {
+    const { container, marks } = group;
+    const rawText = container.textContent || "";
+
+    const spans = marks
+      .map(mark => getMatchOffsetsInContainer(mark, container))
+      .sort((a, b) => a.start - b.start);
+
+    const mergedSpans = [];
+
+    spans.forEach(span => {
+      const last = mergedSpans[mergedSpans.length - 1];
+
+      if (last && span.start <= last.end) {
+        last.end = Math.max(last.end, span.end);
+      } else {
+        mergedSpans.push({ ...span });
+      }
+    });
+
+    let sliceStart = 0;
+    let sliceEnd = rawText.length;
+
+    if (rawText.length > PARAGRAPH_EXPORT_MAX_LENGTH) {
+      const spanStart = mergedSpans[0].start;
+      const spanEnd = mergedSpans[mergedSpans.length - 1].end;
+      const spanLength = spanEnd - spanStart;
+      const padding = Math.max(0, Math.floor((PARAGRAPH_EXPORT_MAX_LENGTH - spanLength) / 2));
+
+      sliceStart = Math.max(0, spanStart - padding);
+      sliceEnd = Math.min(rawText.length, spanEnd + padding);
+    }
+
+    return {
+      rawText,
+      sliceStart,
+      sliceEnd,
+      spans: mergedSpans,
+      truncatedBefore: sliceStart > 0,
+      truncatedAfter: sliceEnd < rawText.length
+    };
+  }
+
+  // Plain-text targets have no bold/color, so the matched term(s) are
+  // marked with a plain, unambiguous **term** wrapper instead - kept
+  // deliberately simple rather than markdown-flavored, since this is
+  // read as-is (a .txt file, a plain-text paste), not rendered.
+  function buildParagraphPlainText(excerpt) {
+    const { rawText, sliceStart, sliceEnd, spans, truncatedBefore, truncatedAfter } = excerpt;
+
+    let result = "";
+    let cursor = sliceStart;
+
+    spans.forEach(span => {
+      const start = Math.max(span.start, sliceStart);
+      const end = Math.min(span.end, sliceEnd);
+
+      if (end <= cursor || start >= sliceEnd) {
+        return;
+      }
+
+      result += rawText.slice(cursor, start);
+      result += `**${rawText.slice(start, end)}**`;
+      cursor = end;
+    });
+
+    result += rawText.slice(cursor, sliceEnd);
+
+    const prefix = truncatedBefore ? "…" : "";
+    const suffix = truncatedAfter ? "…" : "";
+
+    return (prefix + result + suffix).replace(/\s+/g, " ").trim();
+  }
+
+  // Rich/HTML targets (clipboard rich-paste, the Word export, the PDF
+  // export) get an actual <mark> highlight instead - the same element
+  // this tool already uses to highlight matches on the page itself, so
+  // the visual language stays consistent between "found on the page"
+  // and "found in what you copied/exported".
+  function buildParagraphHtml(excerpt) {
+    const { rawText, sliceStart, sliceEnd, spans, truncatedBefore, truncatedAfter } = excerpt;
+
+    let result = "";
+    let cursor = sliceStart;
+
+    spans.forEach(span => {
+      const start = Math.max(span.start, sliceStart);
+      const end = Math.min(span.end, sliceEnd);
+
+      if (end <= cursor || start >= sliceEnd) {
+        return;
+      }
+
+      result += escapeHtml(rawText.slice(cursor, start));
+      result +=
+        `<mark style="background:#fde047;color:inherit;padding:0 1px;">` +
+        `${escapeHtml(rawText.slice(start, end))}</mark>`;
+      cursor = end;
+    });
+
+    result += escapeHtml(rawText.slice(cursor, sliceEnd));
+
+    const prefix = truncatedBefore ? "…" : "";
+    const suffix = truncatedAfter ? "…" : "";
+
+    return (prefix + result + suffix).replace(/\s+/g, " ").trim();
+  }
+
+  // Single entry point every copy/export path below uses: one entry
+  // per unique paragraph (already deduplicated + highlighted), in the
+  // same top-to-bottom order the matches were found in.
+  function buildParagraphEntries(selectedMarks) {
+    return groupMatchesByParagraph(selectedMarks).map(group => {
+      const excerpt = buildParagraphExcerpt(group);
+
+      return {
+        plainText: buildParagraphPlainText(excerpt),
+        html: buildParagraphHtml(excerpt),
+        url: buildMatchUrl(group.marks[0])
+      };
+    });
+  }
+
   // ---- Results archive (item 7) -------------------------------------
   // Saved results persist in localStorage under one shared key so
   // items saved from any book page (and from the site-wide search on
@@ -2174,12 +2350,8 @@
     const divider = "─".repeat(32);
     const header = `📘 عنوان: ${pageTitle}\n${divider}`;
 
-    const body = selected
-      .map((mark, index) => {
-        const snippet = getSnippetPlainText(mark);
-        const url = buildMatchUrl(mark);
-        return `${index + 1}. «${snippet}»\n   🔗 لینک منبع: ${url}`;
-      })
+    const body = buildParagraphEntries(selected)
+      .map((entry, index) => `${index + 1}. «${entry.plainText}»\n   🔗 لینک منبع: ${entry.url}`)
       .join("\n\n");
 
     return `${header}\n\n${body}`;
@@ -2234,20 +2406,15 @@
 
     const pageTitle = escapeHtml(getPageTitle());
 
-    const itemsHtml = selected
-      .map((mark, index) => {
-        const snippet = escapeHtml(getSnippetPlainText(mark));
-        const url = escapeHtml(buildMatchUrl(mark));
-
-        return (
-          `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-          `<strong>${index + 1}.</strong>\u00a0«${snippet}»</p>` +
-          `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:12px;text-align:right;">🔗 ` +
-          `<a href="${url}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
-        );
-      })
+    const itemsHtml = buildParagraphEntries(selected)
+      .map((entry, index) => (
+        `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+        `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
+        `<strong>${index + 1}.</strong>\u00a0«${entry.html}»</p>` +
+        `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+        `font-size:12px;text-align:right;">🔗 ` +
+        `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+      ))
       .join("");
 
     const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -2296,18 +2463,13 @@
 
     const pageTitle = escapeHtml(getPageTitle());
 
-    const itemsHtml = selected
-      .map((mark, index) => {
-        const snippet = escapeHtml(getSnippetPlainText(mark));
-        const url = escapeHtml(buildMatchUrl(mark));
-
-        return `
-          <div class="export-item">
-            <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${snippet}»</p>
-            <p class="export-link">🔗 <a href="${url}">لینک منبع</a></p>
-          </div>
-        `;
-      })
+    const itemsHtml = buildParagraphEntries(selected)
+      .map((entry, index) => `
+        <div class="export-item">
+          <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${entry.html}»</p>
+          <p class="export-link">🔗 <a href="${escapeHtml(entry.url)}">لینک منبع</a></p>
+        </div>
+      `)
       .join("");
 
     const doc = `<!DOCTYPE html>
@@ -2454,7 +2616,7 @@
         id="inPageMenuExportText"
         title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره"
         ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت Text</span>
+        <span>دریافت به‌صورت تکست (Text)</span>
       </button>
       <button
         type="button"
@@ -2462,7 +2624,7 @@
         id="inPageMenuExportWord"
         title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره، با لینک منبعِ کوتاه و قابل کلیک"
         ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت Word</span>
+        <span>دریافت به‌صورت ورد (Word)</span>
       </button>
       <button
         type="button"
@@ -3039,19 +3201,16 @@
   async function handleCopySelectedMatches() {
     const button = document.getElementById("inPageMenuCopySelected");
 
-    const selected = [...selectedMatchIndexes]
-      .sort((a, b) => a - b)
-      .map(index => matches[index])
-      .filter(Boolean);
+    const selected = getSelectedMatchesInOrder();
 
     if (selected.length === 0) {
       return;
     }
 
     // Item 2: the file's own title is shown once, in a clearly
-    // separated header line, rather than repeated per snippet (all
+    // separated header line, rather than repeated per paragraph (all
     // selected matches necessarily come from this same page).
-    // Item 3: each snippet gets its own reference link right under
+    // Item 3: each paragraph gets its own reference link right under
     // it, so a pasted result can be traced back to its exact spot.
     // The link itself is kept short and clickable: in plain-text
     // targets the raw URL still appears (there's no way around that
@@ -3065,16 +3224,19 @@
     // <table> cell rather than a styled <div>, since Word's paste
     // filter keeps table backgrounds/borders far more reliably than
     // div/box CSS.
+    // Item 8: what's pasted is now the FULL paragraph each selected
+    // match lives in (deduplicated - several picks in one paragraph
+    // still paste that paragraph only once), with every matched term
+    // in it marked, rather than the short results-panel snippet - see
+    // buildParagraphEntries above.
     const pageTitle = getPageTitle();
     const divider = "─".repeat(32);
     const header = `📘 عنوان: ${pageTitle}\n${divider}`;
 
-    const textBody = selected
-      .map((mark, index) => {
-        const snippet = getSnippetPlainText(mark);
-        const url = buildMatchUrl(mark);
-        return `${index + 1}. «${snippet}»\n   🔗 لینک منبع: ${url}`;
-      })
+    const entries = buildParagraphEntries(selected);
+
+    const textBody = entries
+      .map((entry, index) => `${index + 1}. «${entry.plainText}»\n   🔗 لینک منبع: ${entry.url}`)
       .join("\n\n");
 
     const text = `${header}\n\n${textBody}`;
@@ -3090,20 +3252,16 @@
     // container's dir. Please double-check both destinations after
     // this change - Word's HTML-paste bidi handling is notoriously
     // inconsistent across versions.
-    const htmlBody = selected
-      .map((mark, index) => {
-        const snippet = escapeHtml(getSnippetPlainText(mark));
-        const url = escapeHtml(buildMatchUrl(mark));
-        return (
-          `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-          `<strong>${index + 1}.</strong>\u00a0«${snippet}»</p>` +
-          `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:12px;text-align:right;">🔗 ` +
-          `<a href="${url}" style="color:#1d4ed8;text-decoration:none;">` +
-          `لینک منبع</a></p>`
-        );
-      })
+    const htmlBody = entries
+      .map((entry, index) => (
+        `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+        `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
+        `<strong>${index + 1}.</strong>\u00a0«${entry.html}»</p>` +
+        `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+        `font-size:12px;text-align:right;">🔗 ` +
+        `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">` +
+        `لینک منبع</a></p>`
+      ))
       .join("");
 
     const html =
