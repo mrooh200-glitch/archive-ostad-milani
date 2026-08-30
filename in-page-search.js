@@ -32,8 +32,23 @@
   // Item ز: proximity search state. When enabled, the query's words
   // no longer need to be adjacent - they just need to occur within
   // proximityDistance words of each other (see highlightProximityMatches).
-  let proximitySearchEnabled = true;
+  let proximitySearchEnabled = false;
   let proximityDistance = 5;
+
+  // Item س: lets this page's search box talk to the same script
+  // running in OTHER open tabs (other books) so one query can be
+  // fired into all of them at once. Same channel name in every tab
+  // is all BroadcastChannel needs to link them up - no server involved.
+  const CROSS_BOOK_CHANNEL_NAME = "milaniBookSearchSync";
+  let crossBookChannel = null;
+
+  try {
+    if (typeof BroadcastChannel !== "undefined") {
+      crossBookChannel = new BroadcastChannel(CROSS_BOOK_CHANNEL_NAME);
+    }
+  } catch (error) {
+    crossBookChannel = null;
+  }
 
   async function copyTextToClipboard(text) {
     try {
@@ -872,18 +887,14 @@
 
       .in-page-settings-menu {
         display: none;
-        /* Item 3: position:fixed (anchored via JS in openSettingsMenu)
-           rather than position:absolute inside .in-page-search-row -
-           that row has overflow-x:auto, which per spec forces its
-           overflow-y to auto too, so an absolutely-positioned menu
-           nested inside it was being clipped to the row's own tiny
-           height (only ~1 item visible, rest needing an awkward
-           scroll). position:fixed escapes that ancestor clipping
-           entirely since it's placed relative to the viewport. */
-        position: fixed;
+        position: absolute;
+        top: calc(100% + 6px);
+        left: 0;
         z-index: 10002;
-        width: 260px;
+        width: max(240px, 100%);
         max-width: 88vw;
+        /* Fallback only, used before JS has a chance to measure the
+           real available space (see positionSettingsMenu). */
         max-height: 70vh;
         overflow-y: auto;
         background: #ffffff;
@@ -898,6 +909,13 @@
 
       .in-page-settings-menu.is-open {
         display: block;
+      }
+
+      /* Applied by positionSettingsMenu() when there isn't enough
+         room below the gear button but there is above it. */
+      .in-page-settings-menu.in-page-settings-menu--upward {
+        top: auto;
+        bottom: calc(100% + 6px);
       }
 
       .in-page-settings-menu button.in-page-settings-item {
@@ -2010,13 +2028,6 @@
   }
 
   // ---- Item 4-الف: direct file export ---------------------------------
-  // Item 8: shared title used for every exported file - text, Word and
-  // PDF alike - so all three consistently read e.g. «نتایج پژوهشی از
-  // کتاب «فراتر از عرفان»» rather than just the bare book title.
-  function buildExportFileTitle() {
-    return `نتایج پژوهشی از کتاب «${getPageTitle()}»`;
-  }
-
   // Reuses the exact same header + numbered-snippet text that
   // handleCopySelectedMatches builds for the clipboard, so the
   // downloaded file and the pasted text always agree.
@@ -2065,60 +2076,7 @@
     }
 
     const text = buildExportPlainText(selected);
-    downloadTextFile(`${buildExportFileTitle()}.txt`, text);
-  }
-
-  // ---- Item 6: Word-format export --------------------------------------
-  // A real Word-openable file rather than a copy/paste round-trip: this
-  // is saved with a .doc extension and an msword MIME type, containing
-  // an HTML document with the Word-namespace declarations Word's file
-  // importer expects. Uses the same dir="ltr" + text-align:left recipe
-  // as the clipboard copy (see handleCopySelectedMatches, item 2) so
-  // the quote/number ordering comes out right when opened in Word.
-  function exportSelectedAsDocx() {
-    const selected = getSelectedMatchesInOrder();
-
-    if (selected.length === 0) {
-      return;
-    }
-
-    const fileTitle = escapeHtml(buildExportFileTitle());
-    const pageTitle = escapeHtml(getPageTitle());
-
-    const itemsHtml = selected
-      .map((mark, index) => {
-        const snippet = escapeHtml(getSnippetPlainText(mark));
-        const url = escapeHtml(buildMatchUrl(mark));
-
-        return (
-          `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:14px;line-height:1.9;color:#1f2937;text-align:left;">` +
-          `<strong>${index + 1}.</strong>&nbsp;«${snippet}»</p>` +
-          `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:12px;text-align:left;">🔗 ` +
-          `<a href="${url}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
-        );
-      })
-      .join("");
-
-    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" ` +
-      `xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8">
-        <meta name="ProgId" content="Word.Document">
-        <title>${fileTitle}</title>
-      </head>
-      <body>
-        <table dir="ltr" style="width:100%;border-collapse:collapse;margin:0 0 12px;">
-          <tr><td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;` +
-          `font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;` +
-          `color:#173b63;text-align:left;">📘&nbsp;${pageTitle}</td></tr>
-        </table>
-        ${itemsHtml}
-      </body>
-      </html>`;
-
-    downloadTextFile(`${buildExportFileTitle()}.doc`, doc, "application/msword;charset=utf-8");
+    downloadTextFile(`${getPageTitle() || "نتایج-جستجو"}.txt`, text);
   }
 
   // No PDF library is loaded (avoids an external CDN dependency for a
@@ -2134,7 +2092,6 @@
     }
 
     const pageTitle = escapeHtml(getPageTitle());
-    const fileTitle = escapeHtml(buildExportFileTitle());
 
     const itemsHtml = selected
       .map((mark, index) => {
@@ -2150,15 +2107,11 @@
       })
       .join("");
 
-    // Item 8: the <title> tag becomes the suggested filename in the
-    // browser's "Save as PDF" dialog, so it carries the same
-    // buildExportFileTitle() text/Word/PDF exports share; the on-page
-    // header keeps just the plain book title for readability.
     const doc = `<!DOCTYPE html>
       <html lang="fa" dir="rtl">
       <head>
         <meta charset="utf-8">
-        <title>${fileTitle}</title>
+        <title>${pageTitle}</title>
         <style>
           body {
             font-family: Tahoma, Arial, sans-serif;
@@ -2220,6 +2173,56 @@
     printWindow.document.close();
   }
 
+  // ---- Item س: search other open books at once ------------------------
+  function broadcastQueryToOtherBooks() {
+    const input = document.getElementById("inPageSearchInput");
+    const query = input ? input.value.trim() : "";
+
+    if (!query || !crossBookChannel) {
+      return;
+    }
+
+    crossBookChannel.postMessage({
+      type: "milani-search",
+      query: query,
+      root: isRootSearchEnabled()
+    });
+
+    const button = document.getElementById("inPageSearchOtherBooks");
+
+    if (button) {
+      const originalText = button.textContent;
+      button.textContent = "به تب‌های دیگر فرستاده شد!";
+      setTimeout(() => { button.textContent = originalText; }, 1500);
+    }
+  }
+
+  if (crossBookChannel) {
+    crossBookChannel.addEventListener("message", event => {
+      const data = event.data;
+
+      if (!data || data.type !== "milani-search" || typeof data.query !== "string") {
+        return;
+      }
+
+      const input = document.getElementById("inPageSearchInput");
+      const rootToggle = document.getElementById("inPageSearchRoot");
+
+      if (!input) {
+        return;
+      }
+
+      input.value = data.query;
+
+      if (rootToggle) {
+        rootToggle.checked = !!data.root;
+        updateDerivativesToggleVisibility();
+      }
+
+      performSearch();
+    });
+  }
+
   // ---- Item 3/4: the ⚙️ settings menu ---------------------------------
   // Everything that used to be spread across the results-panel header
   // buttons plus the new item-4 tools now lives in one place, opened
@@ -2274,9 +2277,6 @@
       <button type="button" class="in-page-settings-item" id="inPageMenuExportPdf" ${hasSelection ? "" : "disabled"}>
         <span>دریافت به‌صورت PDF</span>
       </button>
-      <button type="button" class="in-page-settings-item" id="inPageMenuExportDocx" ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت Word</span>
-      </button>
 
       <div class="in-page-settings-separator"></div>
 
@@ -2305,6 +2305,14 @@
           value="${proximityDistance}">
         کلمه)
       </label>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageSearchOtherBooks"
+        ${crossBookChannel ? "" : "disabled"}
+        title="کوئری فعلی را برای سایر کتاب‌های باز در تب‌های دیگر می‌فرستد">
+        <span>جست‌وجو در سایر کتب باز</span>
+      </button>
     `;
 
     const bind = (id, handler) => {
@@ -2342,9 +2350,8 @@
       exportSelectedAsPdf();
       closeSettingsMenu();
     });
-    bind("inPageMenuExportDocx", () => {
-      exportSelectedAsDocx();
-      closeSettingsMenu();
+    bind("inPageSearchOtherBooks", () => {
+      broadcastQueryToOtherBooks();
     });
 
     menu.querySelectorAll('input[name="inPageSortMode"]').forEach(radio => {
@@ -2386,32 +2393,53 @@
         }
       });
     }
+
+    // Content just got rebuilt (badges/rows can appear or disappear),
+    // so if the menu is currently open, re-measure and reposition it
+    // rather than leaving a stale max-height/direction in place.
+    if (menu.classList.contains("is-open")) {
+      positionSettingsMenu();
+    }
   }
+
+  // Recomputed every time the menu is open and the viewport/scroll
+  // position might have changed, so the menu always fits the real
+  // space around the gear button instead of a fixed 70vh guess.
+  let settingsMenuReflowHandler = null;
 
   function positionSettingsMenu() {
     const menu = document.getElementById("inPageSettingsMenu");
     const gear = document.getElementById("inPageSettingsGear");
 
-    if (!menu || !gear) {
+    if (!menu || !gear || !menu.classList.contains("is-open")) {
       return;
     }
 
+    const GAP = 6; // matches the "100% + 6px" offset used in CSS
+    const EDGE_MARGIN = 8; // breathing room from the viewport edge
+    const MIN_HEIGHT = 120; // never shrink the menu into something unusable
+
+    // Measure the menu's real, unclamped content height first.
+    menu.classList.remove("in-page-settings-menu--upward");
+    menu.style.maxHeight = "none";
+    const contentHeight = menu.scrollHeight;
+
     const gearRect = gear.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - gearRect.bottom - GAP - EDGE_MARGIN;
+    const spaceAbove = gearRect.top - GAP - EDGE_MARGIN;
 
-    // Anchor the menu's top-right corner to the gear's bottom-right
-    // corner (right, not left, since the page is RTL) - using
-    // viewport-relative fixed coordinates so the row's own
-    // overflow-x:auto scrolling can never clip it. Clamped so it
-    // never runs off the left edge of small/mobile viewports.
-    const menuWidth = Math.min(260, window.innerWidth * 0.88);
-    let right = window.innerWidth - gearRect.right;
+    // Default to opening downward. Only flip upward when there isn't
+    // enough room below to fit the content AND opening upward would
+    // actually give more room.
+    const openUpward = spaceBelow < contentHeight && spaceAbove > spaceBelow;
 
-    if (window.innerWidth - right - menuWidth < 4) {
-      right = Math.max(4, window.innerWidth - menuWidth - 4);
-    }
+    menu.classList.toggle("in-page-settings-menu--upward", openUpward);
 
-    menu.style.top = `${gearRect.bottom + 6}px`;
-    menu.style.right = `${right}px`;
+    // The max-height is always the real space on the side the menu
+    // actually opens toward (the larger of the two once a side is
+    // chosen) — never a fixed percentage of the viewport.
+    const available = Math.max(openUpward ? spaceAbove : spaceBelow, MIN_HEIGHT);
+    menu.style.maxHeight = Math.min(contentHeight, available) + "px";
   }
 
   function openSettingsMenu() {
@@ -2423,11 +2451,17 @@
     }
 
     renderSettingsMenu();
-    positionSettingsMenu();
     menu.classList.add("is-open");
+    positionSettingsMenu();
 
     if (gear) {
       gear.setAttribute("aria-expanded", "true");
+    }
+
+    if (!settingsMenuReflowHandler) {
+      settingsMenuReflowHandler = () => positionSettingsMenu();
+      window.addEventListener("resize", settingsMenuReflowHandler);
+      window.addEventListener("scroll", settingsMenuReflowHandler, true);
     }
   }
 
@@ -2437,10 +2471,18 @@
 
     if (menu) {
       menu.classList.remove("is-open");
+      menu.classList.remove("in-page-settings-menu--upward");
+      menu.style.maxHeight = "";
     }
 
     if (gear) {
       gear.setAttribute("aria-expanded", "false");
+    }
+
+    if (settingsMenuReflowHandler) {
+      window.removeEventListener("resize", settingsMenuReflowHandler);
+      window.removeEventListener("scroll", settingsMenuReflowHandler, true);
+      settingsMenuReflowHandler = null;
     }
   }
 
@@ -2832,18 +2874,15 @@
     const text = `${header}\n\n${textBody}`;
 
     // Item 2: Word only gets the bidi ordering of the quotes/numbers
-    // right when the paragraph is BOTH dir="ltr" AND text-align:left.
-    // dir="ltr" alone (with text-align kept at "right") was the
-    // earlier attempt, but Word's paste filter still garbled the
-    // quote/number order in that combination (confirmed against real
-    // pasted output) - it only comes out correct with left alignment
-    // too. The Persian/Arabic text itself is strong-RTL, so it still
-    // reads right-to-left within each line regardless of the
-    // container's left alignment; only the block's own justification
-    // changes. Telegram is unaffected either way since its renderer
-    // follows the Unicode bidi algorithm rather than the paragraph
-    // mark. Please double-check both destinations after any further
-    // change here - Word's HTML bidi handling is notoriously
+    // right when the paragraph's own direction is LTR (its paste
+    // filter decides run order from the paragraph mark, not from the
+    // Unicode bidi algorithm the way Telegram's renderer does) - so
+    // every paragraph below carries dir="ltr" explicitly, while
+    // text-align:right keeps it visually right-aligned everywhere,
+    // Telegram included, since the actual text runs are still RTL
+    // Persian/Arabic and lay out right-to-left regardless of the
+    // container's dir. Please double-check both destinations after
+    // this change - Word's HTML-paste bidi handling is notoriously
     // inconsistent across versions.
     const htmlBody = selected
       .map((mark, index) => {
@@ -2851,10 +2890,10 @@
         const url = escapeHtml(buildMatchUrl(mark));
         return (
           `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:14px;line-height:1.9;color:#1f2937;text-align:left;">` +
+          `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
           `<strong>${index + 1}.</strong>\u00a0«${snippet}»</p>` +
           `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:12px;text-align:left;">🔗 ` +
+          `font-size:12px;text-align:right;">🔗 ` +
           `<a href="${url}" style="color:#1d4ed8;text-decoration:none;">` +
           `لینک منبع</a></p>`
         );
@@ -2865,7 +2904,7 @@
       `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;` +
       `margin:0 0 12px;"><tr><td style="padding:9px 14px;background:#eff6ff;` +
       `border-right:4px solid #2563eb;font-family:Tahoma,Arial,sans-serif;` +
-      `font-size:14px;font-weight:bold;color:#173b63;text-align:left;">` +
+      `font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
       `📘\u00a0${escapeHtml(pageTitle)}</td></tr></table>` +
       htmlBody;
 
@@ -3274,25 +3313,6 @@
         toggleSettingsMenu();
       });
     }
-
-    // Item 3: the menu's position is computed once (in px, relative to
-    // the viewport) when it opens, so if the layout shifts while it's
-    // open (window resize, or the page scrolling before #inPageSearchBox
-    // has stuck to the top) just close it rather than leaving it
-    // pointing at a stale spot.
-    window.addEventListener("resize", () => {
-      const menu = document.getElementById("inPageSettingsMenu");
-      if (menu && menu.classList.contains("is-open")) {
-        closeSettingsMenu();
-      }
-    });
-
-    window.addEventListener("scroll", () => {
-      const menu = document.getElementById("inPageSettingsMenu");
-      if (menu && menu.classList.contains("is-open")) {
-        closeSettingsMenu();
-      }
-    }, true);
 
     document.addEventListener("click", event => {
       const menu = document.getElementById("inPageSettingsMenu");
