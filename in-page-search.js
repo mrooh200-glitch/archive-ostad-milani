@@ -887,11 +887,21 @@
 
       .in-page-settings-menu {
         display: none;
-        position: absolute;
-        top: calc(100% + 6px);
+        /* position:fixed (not absolute) is required here: the
+           toolbar row above sets overflow-x:auto, and per the CSS
+           spec that forces its overflow-y to auto as well, which
+           clips ANY absolutely-positioned descendant (like this
+           menu used to be) down to the row's own one-line height —
+           no matter what max-height the menu itself has. Fixed
+           positioning escapes that clipping entirely. Exact
+           left/top/bottom/max-height are all set in JS by
+           positionSettingsMenu(), which runs synchronously before
+           paint, so these are just harmless pre-JS defaults. */
+        position: fixed;
+        top: 0;
         left: 0;
         z-index: 10002;
-        width: max(240px, 100%);
+        width: 240px;
         max-width: 88vw;
         /* Fallback only, used before JS has a chance to measure the
            real available space (see positionSettingsMenu). */
@@ -909,13 +919,6 @@
 
       .in-page-settings-menu.is-open {
         display: block;
-      }
-
-      /* Applied by positionSettingsMenu() when there isn't enough
-         room below the gear button but there is above it. */
-      .in-page-settings-menu.in-page-settings-menu--upward {
-        top: auto;
-        bottom: calc(100% + 6px);
       }
 
       .in-page-settings-menu button.in-page-settings-item {
@@ -2415,7 +2418,7 @@
       return;
     }
 
-    const GAP = 6; // matches the "100% + 6px" offset used in CSS
+    const GAP = 6; // matches the old "100% + 6px" offset
     const EDGE_MARGIN = 8; // breathing room from the viewport edge
     const MIN_USABLE = 200; // below this, "below" counts as not enough room
 
@@ -2428,7 +2431,18 @@
     // more room.
     const openUpward = spaceBelow < MIN_USABLE && spaceAbove > spaceBelow;
 
-    menu.classList.toggle("in-page-settings-menu--upward", openUpward);
+    // Since the menu is position:fixed, its coordinates are relative
+    // to the viewport, not to the gear's own offset parent, so they
+    // have to be set explicitly here rather than via a CSS anchor.
+    menu.style.left = gearRect.left + "px";
+
+    if (openUpward) {
+      menu.style.top = "auto";
+      menu.style.bottom = (window.innerHeight - gearRect.top + GAP) + "px";
+    } else {
+      menu.style.top = (gearRect.bottom + GAP) + "px";
+      menu.style.bottom = "auto";
+    }
 
     // Set max-height to the real space on the side the menu opens
     // toward — never a fixed percentage of the viewport. This is a
@@ -2438,6 +2452,7 @@
     const available = Math.max(openUpward ? spaceAbove : spaceBelow, MIN_USABLE);
     menu.style.maxHeight = available + "px";
   }
+
 
   function openSettingsMenu() {
     const menu = document.getElementById("inPageSettingsMenu");
@@ -2468,8 +2483,10 @@
 
     if (menu) {
       menu.classList.remove("is-open");
-      menu.classList.remove("in-page-settings-menu--upward");
       menu.style.maxHeight = "";
+      menu.style.left = "";
+      menu.style.top = "";
+      menu.style.bottom = "";
     }
 
     if (gear) {
