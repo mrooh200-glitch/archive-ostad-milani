@@ -676,14 +676,14 @@
       <div class="in-page-search-row">
         <span id="inPageSearchTitle">${getPageTitle()}</span>
 
-        <label for="inPageSearchInput">جست‌وجو:</label>
-
         <div class="in-page-search-input-wrap">
           <input
             id="inPageSearchInput"
             name="siteSearch"
             type="search"
-            placeholder="کلمه یا عبارت مورد نظر را بنویسید."
+            title="کادر جست‌وجو: عبارت مورد نظر را برای یافتن در متن این صفحه اینجا بنویسید"
+            placeholder="برای جست‌وجو، کلمه یا عبارت مورد نظر را بنویسید."
+            aria-label="جست‌وجو در متن این صفحه"
             autocomplete="off">
 
           <div id="inPageSearchHistory" class="in-page-search-history"></div>
@@ -693,8 +693,8 @@
           id="inPageSearchPrevious"
           type="button"
           disabled
-          title="قبلی"
-          aria-label="قبلی">
+          title="رفتن به نتیجه قبلی"
+          aria-label="رفتن به نتیجه قبلی">
           ▶
         </button>
 
@@ -702,8 +702,8 @@
           id="inPageSearchNext"
           type="button"
           disabled
-          title="بعدی"
-          aria-label="بعدی">
+          title="رفتن به نتیجه بعدی"
+          aria-label="رفتن به نتیجه بعدی">
           ◀
         </button>
 
@@ -711,12 +711,15 @@
           id="inPageVoiceInput"
           type="button"
           class="in-page-voice-input-button"
-          title="جست‌وجوی صوتی"
+          title="جست‌وجو با صدا (به‌جای تایپ، عبارت را با میکروفون بگویید)"
           aria-label="جست‌وجوی صوتی">
           🎤
         </button>
 
-        <label class="in-page-search-root-label" for="inPageSearchRoot">
+        <label
+          class="in-page-search-root-label"
+          for="inPageSearchRoot"
+          title="جست‌وجوی ریشه‌ای: کلمات هم‌خانواده و مشتقات همان ریشه را هم پیدا می‌کند، نه فقط عبارت دقیق تایپ‌شده">
           <input id="inPageSearchRoot" type="checkbox">
           ریشه‌ای
         </label>
@@ -725,6 +728,7 @@
           id="inPageShowDerivativesLabel"
           class="in-page-search-derivatives-toggle-label"
           for="inPageShowDerivatives"
+          title="نمایش فهرست کلمات مشتق‌شده‌ای که در جست‌وجوی ریشه‌ای پیدا شده‌اند"
           style="display:none;">
           <input id="inPageShowDerivatives" type="checkbox">
           مشاهده مشتقات
@@ -2323,23 +2327,47 @@
     const hasSelection = selectedCount > 0;
 
     menu.innerHTML = `
-      <button type="button" class="in-page-settings-item" id="inPageMenuSelectAll" ${hasMatches ? "" : "disabled"}>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuSelectAll"
+        title="انتخاب همه‌ی نتایج فعلی جست‌وجو، برای کپی/آرشیو/خروجی گرفتن گروهی از آن‌ها"
+        ${hasMatches ? "" : "disabled"}>
         <span>انتخاب همه</span>
       </button>
-      <button type="button" class="in-page-settings-item" id="inPageMenuClearSelection" ${hasSelection ? "" : "disabled"}>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuClearSelection"
+        title="برداشتن علامت انتخاب از تمام نتایجی که تاکنون انتخاب کرده‌اید"
+        ${hasSelection ? "" : "disabled"}>
         <span>حذف انتخاب</span>
       </button>
-      <button type="button" class="in-page-settings-item" id="inPageMenuRemoveSelected" ${hasSelection ? "" : "disabled"}>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuRemoveSelected"
+        title="پاک‌کردن موارد انتخاب‌شده از فهرست نتایج (فقط از این فهرست، نه از متن صفحه)"
+        ${hasSelection ? "" : "disabled"}>
         <span>حذف موارد انتخاب‌شده</span>
         ${hasSelection ? `<span class="in-page-settings-badge">${selectedCount}</span>` : ""}
       </button>
 
       <div class="in-page-settings-separator"></div>
 
-      <button type="button" class="in-page-settings-item" id="inPageMenuOpenArchive">
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuOpenArchive"
+        title="باز کردن آرشیوی که پیش‌تر نتایج جست‌وجو را در آن ذخیره کرده‌اید">
         <span>آرشیو</span>
       </button>
-      <button type="button" class="in-page-settings-item" id="inPageMenuAddToArchive" ${hasSelection ? "" : "disabled"}>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuAddToArchive"
+        title="افزودن موارد انتخاب‌شده به آرشیو، برای مراجعه و استفاده بعدی"
+        ${hasSelection ? "" : "disabled"}>
         <span>افزودن به آرشیو</span>
         ${hasSelection ? `<span class="in-page-settings-badge">${selectedCount}</span>` : ""}
       </button>
@@ -2350,26 +2378,40 @@
         type="button"
         class="in-page-settings-item"
         id="inPageMenuCopySelected"
-        title="با پیست‌کردن، لینک منبع هم همراه متن اضافه می‌شود"
+        title="کپی متن موارد انتخاب‌شده در حافظه؛ با پیست‌کردن، لینک منبع هم همراه متن اضافه می‌شود"
         ${hasSelection ? "" : "disabled"}>
         <span>کپی موارد انتخاب‌شده</span>
         ${hasSelection ? `<span class="in-page-settings-badge">${selectedCount}</span>` : ""}
       </button>
-      <button type="button" class="in-page-settings-item" id="inPageMenuExportText" ${hasSelection ? "" : "disabled"}>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuExportText"
+        title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی قابل ذخیره"
+        ${hasSelection ? "" : "disabled"}>
         <span>دریافت به‌صورت متن</span>
       </button>
-      <button type="button" class="in-page-settings-item" id="inPageMenuExportPdf" ${hasSelection ? "" : "disabled"}>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuExportPdf"
+        title="دریافت موارد انتخاب‌شده به‌صورت یک فایل PDF قابل ذخیره"
+        ${hasSelection ? "" : "disabled"}>
         <span>دریافت به‌صورت PDF</span>
       </button>
 
       <div class="in-page-settings-separator"></div>
 
       <div class="in-page-settings-section-label">مرتب‌سازی نتایج</div>
-      <label class="in-page-settings-radio">
+      <label
+        class="in-page-settings-radio"
+        title="نتایج را به همان ترتیبی که در متن صفحه از بالا به پایین ظاهر شده‌اند نشان بده">
         <input type="radio" name="inPageSortMode" value="position" ${resultsSortMode === "position" ? "checked" : ""}>
         بر اساس محل وقوع
       </label>
-      <label class="in-page-settings-radio">
+      <label
+        class="in-page-settings-radio"
+        title="نتایجی را که بیشتر تکرار شده‌اند اول نشان بده">
         <input type="radio" name="inPageSortMode" value="frequency" ${resultsSortMode === "frequency" ? "checked" : ""}>
         پرتکرارترین
       </label>
@@ -2377,7 +2419,9 @@
       <div class="in-page-settings-separator"></div>
 
       <div class="in-page-settings-section-label">جست‌وجوی پیشرفته</div>
-      <label class="in-page-settings-checkbox">
+      <label
+        class="in-page-settings-checkbox"
+        title="کلمات عبارت جست‌وجو لازم نیست کنار هم بیایند؛ کافی است در فاصله‌ی مشخص‌شده از هم قرار داشته باشند">
         <input type="checkbox" id="inPageMenuProximityToggle" ${proximitySearchEnabled ? "checked" : ""}>
         جست‌وجوی مجاورتی (حداکثر فاصله:
         <input
@@ -2386,6 +2430,7 @@
           class="in-page-settings-proximity-distance"
           min="1"
           max="30"
+          title="حداکثر تعداد کلمات مجاز بین کلمات عبارت جست‌وجو"
           value="${proximityDistance}">
         کلمه)
       </label>
