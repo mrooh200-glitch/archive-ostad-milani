@@ -3232,7 +3232,20 @@
         closeSearchHistoryDropdown();
       }
     });
-    input.addEventListener("blur", closeSearchHistoryDropdown);
+    input.addEventListener("blur", () => {
+      // Item 1 continued: typing a query and simply moving on (never
+      // pressing Enter) was the normal, common flow - but until now
+      // pushSearchHistory only ran on Enter, voice input, or clicking
+      // a history item. That meant most everyday searches never made
+      // it into the list at all, so the dropdown had nothing to show
+      // even after the display/positioning bug was fixed. Recording
+      // on blur (leaving the field) covers that normal flow too.
+      if (input.value.trim()) {
+        pushSearchHistory(input.value);
+      }
+
+      closeSearchHistoryDropdown();
+    });
 
     input.addEventListener("keydown", event => {
       if (event.key === "Enter") {
