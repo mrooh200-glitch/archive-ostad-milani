@@ -482,10 +482,11 @@
         <button id="inPageArchiveToggle" type="button">
           آرشیو
         </button>
+
+        <p id="inPageSearchStatus" aria-live="polite"></p>
       </div>
 
       <div class="in-page-status-row">
-        <p id="inPageSearchStatus" aria-live="polite"></p>
         <div
           id="inPageDerivativesBlock"
           class="in-page-derivatives-inline"
@@ -639,6 +640,8 @@
         margin: 0;
         color: #475569;
         font-size: 0.78rem;
+        white-space: nowrap;
+        flex-shrink: 0;
       }
 
       .in-page-derivatives-inline {
@@ -1268,23 +1271,19 @@
     nextButton.disabled = !enabled;
   }
 
-  // The status row (status text + inline derivative chips) should
+  // The derivatives row (inline chips of found derivatives) should
   // only take up space when it actually has something to show -
-  // otherwise it collapses so it doesn't leave blank space at the
-  // bottom of the white search bar.
+  // otherwise it collapses so it doesn't leave blank space under
+  // the search row.
   function updateStatusRowSpacing() {
     const row = document.querySelector(".in-page-status-row");
-    const status = document.getElementById("inPageSearchStatus");
     const derivatives = document.getElementById("inPageDerivativesBlock");
 
     if (!row) {
       return;
     }
 
-    const hasContent = !!(
-      (status && status.textContent.trim()) ||
-      (derivatives && derivatives.innerHTML.trim())
-    );
+    const hasContent = !!(derivatives && derivatives.innerHTML.trim());
 
     row.classList.toggle("has-content", hasContent);
   }
