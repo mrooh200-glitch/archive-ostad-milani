@@ -154,9 +154,44 @@
     const GAP = 4;
     const inputRect = input.getBoundingClientRect();
 
+    // Default: right under the input box itself, matching its width.
     dropdown.style.left = inputRect.left + "px";
     dropdown.style.top = (inputRect.bottom + GAP) + "px";
     dropdown.style.width = inputRect.width + "px";
+
+    if (historyFitsOnOneLine(dropdown)) {
+      return;
+    }
+
+    // Doesn't fit at the input's own (often narrow) width. Rather than
+    // splitting the label away from the pills, give the whole label+
+    // pills row much more room: move the WHOLE box to start under the
+    // book title (the toolbar row's own right/start edge) and span
+    // that row's full width, so the label and pills can stay together
+    // on one line there instead.
+    const row = searchBoxElement && searchBoxElement.querySelector(".in-page-search-row");
+
+    if (!row) {
+      return;
+    }
+
+    const rowRect = row.getBoundingClientRect();
+
+    dropdown.style.left = rowRect.left + "px";
+    dropdown.style.top = (rowRect.bottom + GAP) + "px";
+    dropdown.style.width = rowRect.width + "px";
+  }
+
+  // Real measurement (not a guess) of whether the label + all pills,
+  // together with the gaps between them, fit within the dropdown's
+  // current width without wrapping.
+  function historyFitsOnOneLine(dropdown) {
+    const COLUMN_GAP = 8; // must match the CSS "gap" column value
+    const children = Array.from(dropdown.children);
+    const neededWidth = children.reduce((sum, el) => sum + el.offsetWidth, 0)
+      + COLUMN_GAP * Math.max(children.length - 1, 0);
+
+    return neededWidth <= dropdown.clientWidth;
   }
 
   function renderSearchHistoryDropdown() {
@@ -916,7 +951,7 @@
         background: #f8fafc;
         color: #173b63;
         font: inherit;
-        font-size: 0.8rem;
+        font-size: 0.7rem;
         white-space: nowrap;
         cursor: pointer;
       }
