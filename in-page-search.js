@@ -657,7 +657,7 @@
 
       .in-page-derivatives-inline-label {
         color: #334155;
-        font-size: 0.84rem;
+        font-size: 0.72rem;
         font-weight: 600;
         white-space: nowrap;
       }
@@ -912,9 +912,9 @@
       .in-page-derivatives-item {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 5px 10px;
-        font-size: 0.9rem;
+        gap: 4px;
+        padding: 3px 8px;
+        font-size: 0.72rem;
         border: 1px solid #cbd5e1;
         border-radius: 9999px;
         background: #ffffff;
