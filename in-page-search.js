@@ -461,10 +461,6 @@
           بعدی
         </button>
 
-        <button id="inPageSearchClear" type="button" disabled>
-          پاک کردن
-        </button>
-
         <button
           id="inPageVoiceInput"
           type="button"
