@@ -133,6 +133,39 @@
 
   let searchHistoryReflowHandler = null;
 
+  // Item 1 (hover-intent): the dropdown is a few pixels below the
+  // input (position:fixed with a small GAP), so a mouse moving from
+  // the input straight down onto the dropdown briefly crosses that
+  // gap. Closing on the input's mouseleave immediately, or trusting
+  // relatedTarget to already point at the dropdown, both fire before
+  // the pointer actually lands on it. Instead, leaving the input (or
+  // the dropdown) only *schedules* a close a moment later; entering
+  // the other one cancels that pending close, so the two elements
+  // behave as one continuous hover target and the dropdown never
+  // flickers shut while the mouse is still travelling toward it.
+  let searchHistoryHoverCloseTimer = null;
+
+  function cancelSearchHistoryHoverClose() {
+    if (searchHistoryHoverCloseTimer) {
+      clearTimeout(searchHistoryHoverCloseTimer);
+      searchHistoryHoverCloseTimer = null;
+    }
+  }
+
+  function scheduleSearchHistoryHoverClose() {
+    cancelSearchHistoryHoverClose();
+
+    searchHistoryHoverCloseTimer = setTimeout(() => {
+      searchHistoryHoverCloseTimer = null;
+
+      const input = document.getElementById("inPageSearchInput");
+
+      if (document.activeElement !== input) {
+        closeSearchHistoryDropdown();
+      }
+    }, 200);
+  }
+
   // Positions #inPageSearchHistory in fixed (viewport) coordinates,
   // anchored under the input's own current on-screen rect. This has to
   // be position:fixed rather than the simpler position:absolute anchor
@@ -251,6 +284,7 @@
     // Typing a new character still closes it immediately (see the
     // "input" listener in initialize()).
     renderSearchHistoryDropdown();
+    cancelSearchHistoryHoverClose();
 
     if (dropdown.innerHTML.trim()) {
       dropdown.classList.add("is-open");
@@ -265,6 +299,8 @@
   }
 
   function closeSearchHistoryDropdown() {
+    cancelSearchHistoryHoverClose();
+
     const dropdown = document.getElementById("inPageSearchHistory");
 
     if (dropdown) {
@@ -3277,33 +3313,20 @@
     // own single-suggestion autocomplete.
     input.addEventListener("focus", openSearchHistoryDropdown);
     input.addEventListener("mouseenter", openSearchHistoryDropdown);
-    input.addEventListener("mouseleave", event => {
-      const dropdown = document.getElementById("inPageSearchHistory");
-      // relatedTarget is the element the mouse is entering. If that's
-      // the dropdown (or something inside it), the mouse is on its way
-      // there, not leaving the search UI - so don't close, or the box
-      // would hide the instant the user tried to move onto it.
-      const movingIntoDropdown =
-        dropdown && event.relatedTarget && dropdown.contains(event.relatedTarget);
-
-      if (document.activeElement !== input && !movingIntoDropdown) {
-        closeSearchHistoryDropdown();
-      }
-    });
+    input.addEventListener("mouseleave", scheduleSearchHistoryHoverClose);
 
     const historyDropdown = document.getElementById("inPageSearchHistory");
 
     if (historyDropdown) {
-      // Mirror image of the input's mouseleave check above: once the
-      // mouse is over the dropdown, only close it when the mouse leaves
-      // BOTH the dropdown and the input (and the input isn't focused).
-      historyDropdown.addEventListener("mouseleave", event => {
-        const movingIntoInput = event.relatedTarget === input;
-
-        if (document.activeElement !== input && !movingIntoInput) {
-          closeSearchHistoryDropdown();
-        }
-      });
+      // Same hover-intent pair as the input, so moving the mouse from
+      // the input onto the dropdown (or back) is treated as staying
+      // inside one combined hover area instead of leaving it. No focus
+      // or click on the input is required for any of this - hovering
+      // the input opens the list, and the mousedown handler on each
+      // item (see renderSearchHistoryDropdown) already lets it be
+      // picked straight from a hover state.
+      historyDropdown.addEventListener("mouseenter", cancelSearchHistoryHoverClose);
+      historyDropdown.addEventListener("mouseleave", scheduleSearchHistoryHoverClose);
     }
     // Item 1 (extended): تا اینجا فقط با زدن Enter در تاریخچه ذخیره
     // می‌شد. اگر کاربر بعد از تایپ، بدون زدن Enter، فقط موس/فوکوس را
