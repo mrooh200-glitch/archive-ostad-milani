@@ -430,7 +430,7 @@
       <h2 id="inPageSearchTitle">${getPageTitle()}</h2>
 
       <div class="in-page-search-row">
-        <label for="inPageSearchInput">جست‌وجو در همین متن</label>
+        <label for="inPageSearchInput">جست‌وجو:</label>
 
         <input
           id="inPageSearchInput"
@@ -438,25 +438,36 @@
           placeholder="کلمه یا عبارت مورد نظر را بنویسید."
           autocomplete="off">
 
-        <button id="inPageSearchPrevious" type="button" disabled>
-          قبلی
+        <button
+          id="inPageSearchPrevious"
+          type="button"
+          disabled
+          title="قبلی"
+          aria-label="قبلی">
+          ▶
         </button>
 
-        <button id="inPageSearchNext" type="button" disabled>
-          بعدی
+        <button
+          id="inPageSearchNext"
+          type="button"
+          disabled
+          title="بعدی"
+          aria-label="بعدی">
+          ◀
         </button>
 
         <button
           id="inPageVoiceInput"
           type="button"
           class="in-page-voice-input-button"
-          title="جست‌وجوی صوتی">
-          🎤 جست‌وجوی صوتی
+          title="جست‌وجوی صوتی"
+          aria-label="جست‌وجوی صوتی">
+          🎤
         </button>
 
         <label class="in-page-search-root-label" for="inPageSearchRoot">
           <input id="inPageSearchRoot" type="checkbox">
-          جست‌وجوی ریشه‌ای
+          ریشه‌ای
         </label>
 
         <label
@@ -465,11 +476,11 @@
           for="inPageShowDerivatives"
           style="display:none;">
           <input id="inPageShowDerivatives" type="checkbox">
-          برای مشاهده مشتقات، این تیک را بزنید
+          مشاهده مشتقات
         </label>
 
         <button id="inPageArchiveToggle" type="button">
-          آرشیو نتایج
+          آرشیو
         </button>
       </div>
 
@@ -511,7 +522,7 @@
         top: 0;
         z-index: 9999;
         box-sizing: border-box;
-        padding: 10px 14px;
+        padding: 8px 12px;
         border-bottom: 1px solid #cbd5e1;
         background: #ffffff;
         box-shadow: 0 3px 10px rgba(15, 23, 42, 0.10);
@@ -522,13 +533,13 @@
 
       #inPageSearchTitle {
         width: min(1100px, 100%);
-        margin: 0 auto 10px;
-        padding: 0 26px 8px;
+        margin: 0 auto 6px;
+        padding: 0 20px 6px;
         border-bottom: 3px solid #2563eb;
         color: #b45309;
         font-size: 1.05rem;
         font-weight: bold;
-        line-height: 1.6;
+        line-height: 1.5;
         direction: rtl !important;
         text-align: right !important;
       }
@@ -2040,7 +2051,8 @@
 
     if (!Ctor) {
       if (button) {
-        button.textContent = "🎤 پشتیبانی نمی‌شود";
+        button.title = "پشتیبانی نمی‌شود";
+        button.setAttribute("aria-label", "جست‌وجوی صوتی - پشتیبانی نمی‌شود");
       }
       return;
     }
@@ -2058,7 +2070,8 @@
     inPageVoiceRecognition.addEventListener("start", () => {
       if (button) {
         button.classList.add("is-listening");
-        button.textContent = "🎤 در حال شنیدن…";
+        button.title = "در حال شنیدن…";
+        button.setAttribute("aria-label", "در حال شنیدن…");
       }
     });
 
@@ -2071,7 +2084,8 @@
     inPageVoiceRecognition.addEventListener("end", () => {
       if (button) {
         button.classList.remove("is-listening");
-        button.textContent = "🎤 جست‌وجوی صوتی";
+        button.title = "جست‌وجوی صوتی";
+        button.setAttribute("aria-label", "جست‌وجوی صوتی");
       }
       inPageVoiceRecognition = null;
     });
