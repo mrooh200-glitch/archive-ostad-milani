@@ -131,6 +131,34 @@
     saveSearchHistory(existing.slice(0, SEARCH_HISTORY_MAX));
   }
 
+  let searchHistoryReflowHandler = null;
+
+  // Positions #inPageSearchHistory in fixed (viewport) coordinates,
+  // anchored under the input's own current on-screen rect. This has to
+  // be position:fixed rather than the simpler position:absolute anchor
+  // because the dropdown lives inside .in-page-search-row, which has
+  // overflow-x:auto - and per the CSS overflow spec, setting overflow-x
+  // to anything but visible forces overflow-y to effectively become
+  // auto too, so that row clips away anything poking out below it,
+  // including an absolutely-positioned dropdown. This is the exact
+  // issue #inPageSettingsMenu already had to work around; see
+  // positionSettingsMenu() below for the same pattern.
+  function positionSearchHistoryDropdown() {
+    const dropdown = document.getElementById("inPageSearchHistory");
+    const input = document.getElementById("inPageSearchInput");
+
+    if (!dropdown || !input || !dropdown.classList.contains("is-open")) {
+      return;
+    }
+
+    const GAP = 4;
+    const inputRect = input.getBoundingClientRect();
+
+    dropdown.style.left = inputRect.left + "px";
+    dropdown.style.top = (inputRect.bottom + GAP) + "px";
+    dropdown.style.width = inputRect.width + "px";
+  }
+
   function renderSearchHistoryDropdown() {
     const dropdown = document.getElementById("inPageSearchHistory");
 
@@ -143,6 +171,9 @@
     if (history.length === 0) {
       dropdown.innerHTML = "";
       dropdown.classList.remove("is-open");
+      dropdown.style.left = "";
+      dropdown.style.top = "";
+      dropdown.style.width = "";
       return;
     }
 
@@ -160,7 +191,7 @@
 
         const input = document.getElementById("inPageSearchInput");
         input.value = button.textContent;
-        dropdown.classList.remove("is-open");
+        closeSearchHistoryDropdown();
         performSearch();
         pushSearchHistory(button.textContent);
         renderSearchHistoryDropdown();
@@ -188,6 +219,13 @@
 
     if (dropdown.innerHTML.trim()) {
       dropdown.classList.add("is-open");
+      positionSearchHistoryDropdown();
+
+      if (!searchHistoryReflowHandler) {
+        searchHistoryReflowHandler = () => positionSearchHistoryDropdown();
+        window.addEventListener("resize", searchHistoryReflowHandler);
+        window.addEventListener("scroll", searchHistoryReflowHandler, true);
+      }
     }
   }
 
@@ -196,6 +234,15 @@
 
     if (dropdown) {
       dropdown.classList.remove("is-open");
+      dropdown.style.left = "";
+      dropdown.style.top = "";
+      dropdown.style.width = "";
+    }
+
+    if (searchHistoryReflowHandler) {
+      window.removeEventListener("resize", searchHistoryReflowHandler);
+      window.removeEventListener("scroll", searchHistoryReflowHandler, true);
+      searchHistoryReflowHandler = null;
     }
   }
 
@@ -818,9 +865,17 @@
 
       .in-page-search-history {
         display: none;
-        position: absolute;
-        top: calc(100% + 4px);
-        right: 0;
+        /* position:fixed (not absolute) is required here for the same
+           reason as .in-page-settings-menu below: the toolbar row
+           above sets overflow-x:auto, which per spec forces its
+           overflow-y to auto as well, clipping any absolutely-
+           positioned descendant that pokes out below the row - which
+           this dropdown always does. Fixed positioning escapes that
+           clipping. Exact left/top/width are set in JS by
+           positionSearchHistoryDropdown(); these are just harmless
+           pre-JS defaults. */
+        position: fixed;
+        top: 0;
         left: 0;
         z-index: 10002;
         background: #ffffff;
