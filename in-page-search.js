@@ -172,10 +172,18 @@
     const dropdown = document.getElementById("inPageSearchHistory");
     const input = document.getElementById("inPageSearchInput");
 
-    if (!dropdown || !input || input.value.trim()) {
+    if (!dropdown || !input) {
       return;
     }
 
+    // Note: deliberately NOT bailing out just because the box already
+    // has text in it. Unlike the site-wide search box on index.htm
+    // (which starts empty on every page load), this box keeps whatever
+    // was last typed for as long as the book page stays open, so
+    // requiring an empty box here would mean the history almost never
+    // shows on hover/focus after the first search of the session.
+    // Typing a new character still closes it immediately (see the
+    // "input" listener in initialize()).
     renderSearchHistoryDropdown();
 
     if (dropdown.innerHTML.trim()) {
