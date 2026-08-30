@@ -2454,7 +2454,7 @@
         id="inPageMenuExportText"
         title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره"
         ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت تکست (Text)</span>
+        <span>دریافت به‌صورت Text</span>
       </button>
       <button
         type="button"
@@ -2462,7 +2462,7 @@
         id="inPageMenuExportWord"
         title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره، با لینک منبعِ کوتاه و قابل کلیک"
         ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت ورد (Word)</span>
+        <span>دریافت به‌صورت Word</span>
       </button>
       <button
         type="button"
