@@ -460,6 +460,10 @@
         <button id="inPageSearchNext" type="button" disabled>
           بعدی
         </button>
+       
+        <button id="inPageSearchClear" type="button" disabled>
+          پاک کردن
+        </button>
 
         <button
           id="inPageVoiceInput"
