@@ -624,10 +624,18 @@
 
       #inPageSearchStatus {
         width: min(1100px, 100%);
-        min-height: 20px;
-        margin: 6px auto 0;
+        margin: 0 auto;
         color: #475569;
         font-size: 0.84rem;
+      }
+
+      /* Only reserve space for the status line once it actually has
+         text (e.g. "عبارتی پیدا نشد."). Empty (no active search)
+         collapses to zero height instead of leaving blank space at
+         the bottom of the white search bar. */
+      #inPageSearchStatus:not(:empty) {
+        min-height: 20px;
+        margin-top: 6px;
       }
 
       mark.in-page-search-match {
@@ -830,6 +838,19 @@
         body.in-page-search-results-open {
           margin-left: 220px;
           transition: margin-left 0.15s ease;
+        }
+
+        /* Exempt the sticky search bar itself from the push above:
+           cancel the shift so it stays full width and its settings
+           row doesn't need horizontal scrolling to reach the
+           derivatives-toggle / archive button at the end of the
+           row. Safe to extend back over that space because the
+           results panel already starts below the search bar's own
+           height (see reserveScrollOffsetForStickyBox), not at the
+           very top, so nothing ends up covered. */
+        body.in-page-search-results-open #inPageSearchBox {
+          margin-left: -220px;
+          width: calc(100% + 220px);
         }
       }
 
