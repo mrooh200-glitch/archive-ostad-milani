@@ -264,46 +264,7 @@
     }
   }
 
-  // Item 1 (extended): the dropdown can end up positioned away from
-  // the input itself (see positionSearchHistoryDropdown() - it may
-  // widen out to the full toolbar row), so a plain "mouseleave on the
-  // input" can no longer be trusted to mean "the user is done with
-  // this" - the cursor is very likely just crossing the gap on its way
-  // TO the dropdown. historyCloseTimer debounces closing so it only
-  // actually happens if the pointer isn't hovering the input, isn't
-  // hovering the dropdown, AND the input isn't focused, all checked
-  // together after a short delay.
-  let historyCloseTimer = null;
-
-  function cancelScheduledHistoryClose() {
-    if (historyCloseTimer) {
-      clearTimeout(historyCloseTimer);
-      historyCloseTimer = null;
-    }
-  }
-
-  function scheduleHistoryClose() {
-    cancelScheduledHistoryClose();
-
-    historyCloseTimer = setTimeout(() => {
-      historyCloseTimer = null;
-
-      const dropdown = document.getElementById("inPageSearchHistory");
-      const input = document.getElementById("inPageSearchInput");
-
-      const stillWanted =
-        (dropdown && dropdown.matches(":hover")) ||
-        (input && (input.matches(":hover") || document.activeElement === input));
-
-      if (!stillWanted) {
-        closeSearchHistoryDropdown();
-      }
-    }, 200);
-  }
-
   function closeSearchHistoryDropdown() {
-    cancelScheduledHistoryClose();
-
     const dropdown = document.getElementById("inPageSearchHistory");
 
     if (dropdown) {
@@ -976,7 +937,7 @@
       .in-page-search-history-label {
         flex: 0 0 auto;
         color: #94a3b8;
-        font-size: 0.62rem;
+        font-size: 0.7rem;
         font-weight: bold;
         white-space: nowrap;
       }
@@ -984,13 +945,13 @@
       .in-page-search-history-item {
         flex: 0 0 auto;
         box-sizing: border-box;
-        padding: 3px 8px;
+        padding: 4px 10px;
         border: 1px solid #cbd5e1;
         border-radius: 999px;
         background: #f8fafc;
         color: #173b63;
         font: inherit;
-        font-size: 0.62rem;
+        font-size: 0.7rem;
         white-space: nowrap;
         cursor: pointer;
       }
@@ -3314,27 +3275,36 @@
     // Item 1: previously-searched words, shown as a real dropdown
     // (last 5, from localStorage) instead of relying on the browser's
     // own single-suggestion autocomplete.
-    input.addEventListener("focus", () => {
-      cancelScheduledHistoryClose();
-      openSearchHistoryDropdown();
-    });
-    input.addEventListener("mouseenter", () => {
-      cancelScheduledHistoryClose();
-      openSearchHistoryDropdown();
-    });
-    input.addEventListener("mouseleave", scheduleHistoryClose);
+    input.addEventListener("focus", openSearchHistoryDropdown);
+    input.addEventListener("mouseenter", openSearchHistoryDropdown);
+    input.addEventListener("mouseleave", event => {
+      const dropdown = document.getElementById("inPageSearchHistory");
+      // relatedTarget is the element the mouse is entering. If that's
+      // the dropdown (or something inside it), the mouse is on its way
+      // there, not leaving the search UI - so don't close, or the box
+      // would hide the instant the user tried to move onto it.
+      const movingIntoDropdown =
+        dropdown && event.relatedTarget && dropdown.contains(event.relatedTarget);
 
-    // The dropdown itself may be positioned away from the input (see
-    // positionSearchHistoryDropdown()), so it needs its own hover
-    // tracking too: entering it cancels any pending close from the
-    // input's mouseleave, and leaving it re-schedules one.
+      if (document.activeElement !== input && !movingIntoDropdown) {
+        closeSearchHistoryDropdown();
+      }
+    });
+
     const historyDropdown = document.getElementById("inPageSearchHistory");
 
     if (historyDropdown) {
-      historyDropdown.addEventListener("mouseenter", cancelScheduledHistoryClose);
-      historyDropdown.addEventListener("mouseleave", scheduleHistoryClose);
-    }
+      // Mirror image of the input's mouseleave check above: once the
+      // mouse is over the dropdown, only close it when the mouse leaves
+      // BOTH the dropdown and the input (and the input isn't focused).
+      historyDropdown.addEventListener("mouseleave", event => {
+        const movingIntoInput = event.relatedTarget === input;
 
+        if (document.activeElement !== input && !movingIntoInput) {
+          closeSearchHistoryDropdown();
+        }
+      });
+    }
     // Item 1 (extended): تا اینجا فقط با زدن Enter در تاریخچه ذخیره
     // می‌شد. اگر کاربر بعد از تایپ، بدون زدن Enter، فقط موس/فوکوس را
     // جای دیگری ببرد (blur)، همان مقدار تایپ‌شده را هم در تاریخچه
