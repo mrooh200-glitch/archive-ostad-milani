@@ -1264,8 +1264,22 @@
         border-bottom: none;
       }
 
+      /* The number badge and the selection checkbox used to sit
+         side-by-side, each taking their own slice of horizontal
+         width away from the snippet text. Stacking them in one
+         narrow column (number on top, checkbox below) instead keeps
+         that combined width down to a single item's worth. */
+      .in-page-result-marker {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        flex-shrink: 0;
+        padding-top: 2px;
+      }
+
       .in-page-result-checkbox {
-        margin: 5px 0 0;
+        margin: 0;
         flex-shrink: 0;
         cursor: pointer;
       }
@@ -1273,7 +1287,6 @@
       /* Item 5: small ordinal badge next to each result. */
       .in-page-result-number {
         flex-shrink: 0;
-        margin-top: 3px;
         min-width: 18px;
         padding: 1px 5px;
         border-radius: 9999px;
@@ -2629,7 +2642,7 @@
         id="inPageMenuExportText"
         title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره"
         ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت تکست (Text)</span>
+        <span>دریافت به‌صورت Text</span>
       </button>
       <button
         type="button"
@@ -2637,7 +2650,7 @@
         id="inPageMenuExportWord"
         title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره، با لینک منبعِ کوتاه و قابل کلیک"
         ${hasSelection ? "" : "disabled"}>
-        <span>دریافت به‌صورت ورد (Word)</span>
+        <span>دریافت به‌صورت Word</span>
       </button>
       <button
         type="button"
@@ -3091,8 +3104,10 @@
 
         return (
           `<div class="in-page-search-result-item${activeClass}" data-index="${index}">` +
-            `<span class="in-page-result-number">${index + 1}</span>` +
-            `<input type="checkbox" class="in-page-result-checkbox" data-index="${index}" ${checkedAttr} aria-label="انتخاب این نتیجه">` +
+            `<div class="in-page-result-marker">` +
+              `<span class="in-page-result-number">${index + 1}</span>` +
+              `<input type="checkbox" class="in-page-result-checkbox" data-index="${index}" ${checkedAttr} aria-label="انتخاب این نتیجه">` +
+            `</div>` +
             `<button type="button" class="in-page-search-result-jump" data-index="${index}">` +
               snippetHtml +
             `</button>` +
