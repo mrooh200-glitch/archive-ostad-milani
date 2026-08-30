@@ -882,36 +882,48 @@
         border: 1px solid #cbd5e1;
         border-radius: 8px;
         box-shadow: 0 6px 18px rgba(15, 23, 42, 0.15);
-        overflow: hidden;
+        padding: 6px 8px;
       }
 
+      /* Horizontal, wrapping layout: the label and the (up to 5)
+         recent-search pills sit in one row, right after each other.
+         The container's width is pinned (in JS) to the search box's
+         own width, so once the pills no longer fit on one line, flex-
+         wrap moves the overflow onto a second line - and since the
+         label is the first flex item, it's what ends up alone at the
+         start of the first line while the pills wrap beneath it. */
       .in-page-search-history.is-open {
-        display: block;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 8px;
       }
 
       .in-page-search-history-label {
-        padding: 6px 10px 2px;
+        flex: 0 0 auto;
         color: #94a3b8;
         font-size: 0.7rem;
         font-weight: bold;
+        white-space: nowrap;
       }
 
       .in-page-search-history-item {
-        display: block;
-        width: 100%;
+        flex: 0 0 auto;
         box-sizing: border-box;
-        padding: 7px 10px;
-        border: none;
-        background: transparent;
+        padding: 4px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 999px;
+        background: #f8fafc;
         color: #173b63;
         font: inherit;
-        font-size: 0.85rem;
-        text-align: right;
+        font-size: 0.8rem;
+        white-space: nowrap;
         cursor: pointer;
       }
 
       .in-page-search-history-item:hover {
         background: #eff6ff;
+        border-color: #93c5fd;
       }
 
       .in-page-settings-wrap {
