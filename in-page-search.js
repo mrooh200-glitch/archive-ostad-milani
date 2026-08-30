@@ -35,21 +35,6 @@
   let proximitySearchEnabled = false;
   let proximityDistance = 5;
 
-  // Item س: lets this page's search box talk to the same script
-  // running in OTHER open tabs (other books) so one query can be
-  // fired into all of them at once. Same channel name in every tab
-  // is all BroadcastChannel needs to link them up - no server involved.
-  const CROSS_BOOK_CHANNEL_NAME = "milaniBookSearchSync";
-  let crossBookChannel = null;
-
-  try {
-    if (typeof BroadcastChannel !== "undefined") {
-      crossBookChannel = new BroadcastChannel(CROSS_BOOK_CHANNEL_NAME);
-    }
-  } catch (error) {
-    crossBookChannel = null;
-  }
-
   async function copyTextToClipboard(text) {
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -2176,56 +2161,6 @@
     printWindow.document.close();
   }
 
-  // ---- Item س: search other open books at once ------------------------
-  function broadcastQueryToOtherBooks() {
-    const input = document.getElementById("inPageSearchInput");
-    const query = input ? input.value.trim() : "";
-
-    if (!query || !crossBookChannel) {
-      return;
-    }
-
-    crossBookChannel.postMessage({
-      type: "milani-search",
-      query: query,
-      root: isRootSearchEnabled()
-    });
-
-    const button = document.getElementById("inPageSearchOtherBooks");
-
-    if (button) {
-      const originalText = button.textContent;
-      button.textContent = "به تب‌های دیگر فرستاده شد!";
-      setTimeout(() => { button.textContent = originalText; }, 1500);
-    }
-  }
-
-  if (crossBookChannel) {
-    crossBookChannel.addEventListener("message", event => {
-      const data = event.data;
-
-      if (!data || data.type !== "milani-search" || typeof data.query !== "string") {
-        return;
-      }
-
-      const input = document.getElementById("inPageSearchInput");
-      const rootToggle = document.getElementById("inPageSearchRoot");
-
-      if (!input) {
-        return;
-      }
-
-      input.value = data.query;
-
-      if (rootToggle) {
-        rootToggle.checked = !!data.root;
-        updateDerivativesToggleVisibility();
-      }
-
-      performSearch();
-    });
-  }
-
   // ---- Item 3/4: the ⚙️ settings menu ---------------------------------
   // Everything that used to be spread across the results-panel header
   // buttons plus the new item-4 tools now lives in one place, opened
@@ -2308,14 +2243,6 @@
           value="${proximityDistance}">
         کلمه)
       </label>
-      <button
-        type="button"
-        class="in-page-settings-item"
-        id="inPageSearchOtherBooks"
-        ${crossBookChannel ? "" : "disabled"}
-        title="کوئری فعلی را برای سایر کتاب‌های باز در تب‌های دیگر می‌فرستد">
-        <span>جست‌وجو در سایر کتب باز</span>
-      </button>
     `;
 
     const bind = (id, handler) => {
@@ -2352,9 +2279,6 @@
     bind("inPageMenuExportPdf", () => {
       exportSelectedAsPdf();
       closeSettingsMenu();
-    });
-    bind("inPageSearchOtherBooks", () => {
-      broadcastQueryToOtherBooks();
     });
 
     menu.querySelectorAll('input[name="inPageSortMode"]').forEach(radio => {
