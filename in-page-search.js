@@ -460,10 +460,6 @@
         <button id="inPageSearchNext" type="button" disabled>
           بعدی
         </button>
-       
-        <button id="inPageSearchClear" type="button" disabled>
-          پاک کردن
-        </button>
 
         <button
           id="inPageVoiceInput"
@@ -1247,14 +1243,11 @@
   function updateButtons() {
     const previousButton = document.getElementById("inPageSearchPrevious");
     const nextButton = document.getElementById("inPageSearchNext");
-    const clearButton = document.getElementById("inPageSearchClear");
 
     const enabled = matches.length > 0;
 
     previousButton.disabled = !enabled;
     nextButton.disabled = !enabled;
-    clearButton.disabled = matches.length === 0 &&
-      !document.getElementById("inPageSearchInput").value;
   }
 
   function updateStatus() {
@@ -2236,7 +2229,6 @@
     const input = document.getElementById("inPageSearchInput");
     const previousButton = document.getElementById("inPageSearchPrevious");
     const nextButton = document.getElementById("inPageSearchNext");
-    const clearButton = document.getElementById("inPageSearchClear");
 
     let searchTimer;
 
@@ -2269,8 +2261,6 @@
     nextButton.addEventListener("click", () => {
       showMatch(currentMatch + 1);
     });
-
-    clearButton.addEventListener("click", clearSearch);
 
     const voiceButton = document.getElementById("inPageVoiceInput");
     if (voiceButton) {
