@@ -2162,10 +2162,18 @@
   }
 
   // Rich/HTML targets (clipboard rich-paste, the Word export, the PDF
-  // export) get an actual <mark> highlight instead - the same element
-  // this tool already uses to highlight matches on the page itself, so
-  // the visual language stays consistent between "found on the page"
-  // and "found in what you copied/exported".
+  // export) get an actual colored highlight instead - visually the
+  // same idea as the <mark> this tool uses to highlight matches on the
+  // page itself, but built as a <span> with an explicit
+  // background-color rather than a real <mark> element: Word's HTML
+  // importer doesn't reliably keep styling on an unrecognized HTML5
+  // tag like <mark>, so it can silently drop the color. mso-highlight
+  // is Word's own "text highlight" property (what Word itself writes
+  // when you use its highlighter), included alongside background-color
+  // so Word picks it up as a native highlight rather than plain
+  // shading. -webkit-print-color-adjust/print-color-adjust is for the
+  // PDF path: browsers skip background colors when printing/"Save as
+  // PDF" by default unless a rule forces them to keep it.
   function buildParagraphHtml(excerpt) {
     const { rawText, sliceStart, sliceEnd, spans, truncatedBefore, truncatedAfter } = excerpt;
 
@@ -2182,8 +2190,9 @@
 
       result += escapeHtml(rawText.slice(cursor, start));
       result +=
-        `<mark style="background:#fde047;color:inherit;padding:0 1px;">` +
-        `${escapeHtml(rawText.slice(start, end))}</mark>`;
+        `<span style="background-color:#fde047;mso-highlight:yellow;color:#111827;` +
+        `padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">` +
+        `${escapeHtml(rawText.slice(start, end))}</span>`;
       cursor = end;
     });
 
@@ -2478,6 +2487,10 @@
         <meta charset="utf-8">
         <title>${pageTitle}</title>
         <style>
+          * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
           body {
             font-family: Tahoma, Arial, sans-serif;
             direction: rtl;
