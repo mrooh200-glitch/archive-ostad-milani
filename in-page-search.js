@@ -427,9 +427,9 @@
 
     box.id = "inPageSearchBox";
     box.innerHTML = `
-      <h2 id="inPageSearchTitle">${getPageTitle()}</h2>
-
       <div class="in-page-search-row">
+        <span id="inPageSearchTitle">${getPageTitle()}</span>
+
         <label for="inPageSearchInput">جست‌وجو:</label>
 
         <input
@@ -522,7 +522,7 @@
         top: 0;
         z-index: 9999;
         box-sizing: border-box;
-        padding: 8px 12px;
+        padding: 6px 12px;
         border-bottom: 1px solid #cbd5e1;
         background: #ffffff;
         box-shadow: 0 3px 10px rgba(15, 23, 42, 0.10);
@@ -532,16 +532,13 @@
       }
 
       #inPageSearchTitle {
-        width: min(1100px, 100%);
-        margin: 0 auto 6px;
-        padding: 0 20px 6px;
-        border-bottom: 3px solid #2563eb;
         color: #b45309;
-        font-size: 1.05rem;
+        font-size: 0.95rem;
         font-weight: bold;
-        line-height: 1.5;
-        direction: rtl !important;
-        text-align: right !important;
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding-inline-end: 8px;
+        border-inline-end: 2px solid #2563eb;
       }
 
       .in-page-search-row {
@@ -568,7 +565,7 @@
       #inPageSearchInput {
         flex: 1 1 220px;
         min-width: 140px;
-        padding: 8px 10px;
+        padding: 6px 10px;
         border: 1px solid #94a3b8;
         border-radius: 7px;
         outline: none;
@@ -581,7 +578,7 @@
       }
 
       #inPageSearchBox button {
-        padding: 7px 11px;
+        padding: 5px 10px;
         border: 1px solid #93c5fd;
         border-radius: 7px;
         background: #eff6ff;
@@ -634,14 +631,14 @@
          active search) collapses to zero height instead of leaving
          blank space at the bottom of the white search bar. */
       .in-page-status-row.has-content {
-        margin-top: 6px;
-        min-height: 20px;
+        margin-top: 4px;
+        min-height: 16px;
       }
 
       #inPageSearchStatus {
         margin: 0;
         color: #475569;
-        font-size: 0.84rem;
+        font-size: 0.78rem;
       }
 
       .in-page-derivatives-inline {
@@ -676,7 +673,7 @@
 
       @media (max-width: 600px) {
         #inPageSearchBox {
-          padding: 8px 10px;
+          padding: 6px 10px;
         }
 
         .in-page-search-row {
@@ -695,7 +692,7 @@
       }
 
       .in-page-voice-input-button {
-        padding: 8px 12px;
+        padding: 5px 10px;
         border: 1px solid #93c5fd;
         border-radius: 8px;
         background: #eff6ff;
