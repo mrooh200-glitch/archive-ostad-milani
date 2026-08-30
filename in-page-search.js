@@ -2417,29 +2417,26 @@
 
     const GAP = 6; // matches the "100% + 6px" offset used in CSS
     const EDGE_MARGIN = 8; // breathing room from the viewport edge
-    const MIN_HEIGHT = 120; // never shrink the menu into something unusable
-
-    // Measure the menu's real, unclamped content height first.
-    menu.classList.remove("in-page-settings-menu--upward");
-    menu.style.maxHeight = "none";
-    const contentHeight = menu.scrollHeight;
+    const MIN_USABLE = 200; // below this, "below" counts as not enough room
 
     const gearRect = gear.getBoundingClientRect();
     const spaceBelow = window.innerHeight - gearRect.bottom - GAP - EDGE_MARGIN;
     const spaceAbove = gearRect.top - GAP - EDGE_MARGIN;
 
     // Default to opening downward. Only flip upward when there isn't
-    // enough room below to fit the content AND opening upward would
-    // actually give more room.
-    const openUpward = spaceBelow < contentHeight && spaceAbove > spaceBelow;
+    // reasonable room below AND opening upward would actually give
+    // more room.
+    const openUpward = spaceBelow < MIN_USABLE && spaceAbove > spaceBelow;
 
     menu.classList.toggle("in-page-settings-menu--upward", openUpward);
 
-    // The max-height is always the real space on the side the menu
-    // actually opens toward (the larger of the two once a side is
-    // chosen) — never a fixed percentage of the viewport.
-    const available = Math.max(openUpward ? spaceAbove : spaceBelow, MIN_HEIGHT);
-    menu.style.maxHeight = Math.min(contentHeight, available) + "px";
+    // Set max-height to the real space on the side the menu opens
+    // toward — never a fixed percentage of the viewport. This is a
+    // ceiling only: overflow-y:auto means the menu still shrinks to
+    // fit its actual content whenever that's shorter than this, so
+    // it never adds artificial scrolling on a normal-size screen.
+    const available = Math.max(openUpward ? spaceAbove : spaceBelow, MIN_USABLE);
+    menu.style.maxHeight = available + "px";
   }
 
   function openSettingsMenu() {
