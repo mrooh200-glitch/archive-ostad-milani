@@ -31,20 +31,11 @@
   // selection anywhere on the page or a batch of selected search
   // results. "selection" mode stores the exact selected text pending
   // save; "matches" mode saves one bookmark per currently
-  // selectedMatchIndexes entry. bookmarkFilterTags narrows the
-  // bookmarks panel list (Item ۲): any tag in the set may be active at
-  // once (OR filter) - an empty set means "show all" - so the user can
-  // click several tag chips together and see the union of their
-  // bookmarks, instead of being limited to one tag at a time.
+  // selectedMatchIndexes entry. bookmarkFilterTag narrows the
+  // bookmarks panel list to one tag at a time (null = show all).
   let pendingBookmarkMode = null;
   let pendingSelectionText = "";
-  // Item ۳/۱: which occurrence (top-to-bottom, 1-based) of
-  // pendingSelectionText on the page the live selection was, captured
-  // while the selection is still fresh (see handleDocumentSelectionChange)
-  // so it can be saved alongside the bookmark and later used to find the
-  // exact same spot again (findRangeForBookmarkText).
-  let pendingSelectionOccurrenceIndex = 1;
-  const bookmarkFilterTags = new Set();
+  let bookmarkFilterTag = null;
 
   // Item ب: results-panel ordering. "position" keeps the original
   // top-to-bottom document order; "frequency" puts the most-repeated
@@ -1557,10 +1548,12 @@
         font-weight: bold;
       }
 
-      #inPageArchivePanel .archive-header-actions {
+      #inPageArchivePanel .archive-header-actions,
+      #inPageBookmarksPanel .archive-header-actions {
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-wrap: wrap;
       }
 
       .archive-item {
@@ -1593,7 +1586,8 @@
 
       .archive-item-actions a,
       .archive-item-actions button,
-      #inPageArchivePanel .archive-header-actions button {
+      #inPageArchivePanel .archive-header-actions button,
+      #inPageBookmarksPanel .archive-header-actions button {
         border: 1px solid #93c5fd;
         border-radius: 6px;
         background: #eff6ff;
@@ -1606,9 +1600,16 @@
       }
 
       .archive-item-actions a:hover,
-      .archive-item-actions button:hover,
-      #inPageArchivePanel .archive-header-actions button:hover {
+      .archive-item-actions button:hover:not(:disabled),
+      #inPageArchivePanel .archive-header-actions button:hover:not(:disabled),
+      #inPageBookmarksPanel .archive-header-actions button:hover:not(:disabled) {
         background: #dbeafe;
+      }
+
+      #inPageArchivePanel .archive-header-actions button:disabled,
+      #inPageBookmarksPanel .archive-header-actions button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
       }
 
       .archive-empty {
@@ -1676,36 +1677,6 @@
         background: #6d28d9;
         border-color: #6d28d9;
         color: #ffffff;
-      }
-
-      /* Item ۱: subtle in-text marker placed right after a bookmarked
-         passage. Deliberately small/low-opacity so it doesn't compete
-         with the surrounding text for attention; a click removes the
-         bookmark and the marker itself. */
-      .in-page-bookmark-marker {
-        display: inline-block;
-        font-size: 0.68em;
-        opacity: 0.45;
-        margin: 0 2px;
-        cursor: pointer;
-        vertical-align: super;
-        line-height: 1;
-        user-select: none;
-      }
-
-      .in-page-bookmark-marker:hover {
-        opacity: 0.9;
-      }
-
-      /* Item ۳: brief highlight flash used when "بازکردن" jumps to a
-         bookmark already present on the current page. */
-      .in-page-bookmark-flash {
-        background: #fef08a;
-        transition: background 1.2s ease;
-      }
-
-      .in-page-bookmark-flash.is-fading {
-        background: transparent;
       }
 
       /* Item ط (چینش کتاب/برچسب): سرتیترهای گروه‌بندی سلسله‌مراتبی -
@@ -2744,7 +2715,7 @@
     return `${base}#:~:text=${encodeURIComponent(fragment)}`;
   }
 
-  function addBookmark({ text, url, tags, occurrenceIndex }) {
+  function addBookmark({ text, url, tags }) {
     const trimmedText = (text || "").trim();
 
     if (!trimmedText) {
@@ -2759,329 +2730,22 @@
       text: trimmedText,
       url: url || (location.origin + location.pathname),
       tags: Array.isArray(tags) ? tags : [],
-      // Item ۱/۳: which occurrence of this text on the page this
-      // particular bookmark refers to, so it can be found again later
-      // (in-text marker, same-page "بازکردن") even if the text repeats
-      // elsewhere on the page.
-      occurrenceIndex: occurrenceIndex > 0 ? occurrenceIndex : 1,
       savedAt: new Date().toISOString()
     });
 
     saveBookmarks(bookmarks);
     renderBookmarksPanel();
-    markBookmarksOnCurrentPage();
   }
 
   function removeBookmark(id) {
     saveBookmarks(loadBookmarks().filter(item => item.id !== id));
-    removeBookmarkMarker(id);
     renderBookmarksPanel();
   }
 
   function clearBookmarks() {
     saveBookmarks([]);
-    bookmarkFilterTags.clear();
-    document.querySelectorAll(".in-page-bookmark-marker").forEach(marker => marker.remove());
+    bookmarkFilterTag = null;
     renderBookmarksPanel();
-  }
-
-  // ---- Item ۱ و ۳: locating a bookmark's text back in the live DOM ----
-  // Bookmarks only store raw text (plus which occurrence of it), not a
-  // reference to a node - so re-finding them (to draw the subtle in-text
-  // marker, or to jump "بازکردن" to the right spot without a full page
-  // reload) means searching the page's own text the same way the search
-  // feature already normalizes/matches, but generalized to ANY text,
-  // not just the current query's <mark> elements.
-
-  // Walks the same visible-text nodes the search box itself would look
-  // at, minus the app's own UI chrome (settings/results/overlays/
-  // popovers) - reusing isWithinAppInterface so a bookmark can never be
-  // "found" inside the search UI itself.
-  function getAllBodyTextNodesForLookup() {
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode(node) {
-          const parent = node.parentElement;
-
-          if (
-            !parent ||
-            ignoredTags.has(parent.tagName) ||
-            isWithinAppInterface(parent) ||
-            !node.nodeValue
-          ) {
-            return NodeFilter.FILTER_REJECT;
-          }
-
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
-    );
-
-    const nodes = [];
-
-    while (walker.nextNode()) {
-      nodes.push(walker.currentNode);
-    }
-
-    return nodes;
-  }
-
-  // Builds one normalize()-equivalent string across the WHOLE page
-  // (spanning node boundaries), character-by-character, while keeping a
-  // parallel array mapping each output character back to the exact
-  // (node, offset) it came from - the only way to turn a plain
-  // substring match back into a real DOM Range afterwards.
-  const BOOKMARK_CHAR_MAP = { "ي": "ی", "ى": "ی", "ك": "ک", "ۀ": "ه", "ة": "ه" };
-  const BOOKMARK_DIACRITICS_RE = /[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/;
-
-  function buildBodyNormalizedTextMap() {
-    const nodes = getAllBodyTextNodesForLookup();
-    let normalized = "";
-    const positions = [];
-    let lastWasSpace = true;
-
-    nodes.forEach(node => {
-      const text = node.nodeValue;
-
-      for (let i = 0; i < text.length; i++) {
-        let ch = text[i];
-
-        if (BOOKMARK_DIACRITICS_RE.test(ch)) {
-          continue;
-        }
-
-        ch = ch.toLowerCase();
-        ch = BOOKMARK_CHAR_MAP[ch] || ch;
-
-        if (/\s/.test(ch)) {
-          if (lastWasSpace) {
-            continue;
-          }
-
-          normalized += " ";
-          positions.push({ node, offset: i });
-          lastWasSpace = true;
-        } else {
-          normalized += ch;
-          positions.push({ node, offset: i });
-          lastWasSpace = false;
-        }
-      }
-    });
-
-    return { normalized, positions };
-  }
-
-  // Finds the nth (1-based) occurrence of rawText anywhere in the
-  // page's own text and returns it as a DOM Range, or null if it can no
-  // longer be found (page content changed since the bookmark was
-  // saved). Falls back to the first occurrence if the requested one no
-  // longer exists, rather than failing outright.
-  function findRangeForBookmarkText(rawText, occurrenceIndex) {
-    const target = normalize(rawText);
-
-    if (!target) {
-      return null;
-    }
-
-    const { normalized, positions } = buildBodyNormalizedTextMap();
-    const wanted = occurrenceIndex > 0 ? occurrenceIndex : 1;
-
-    let fromIndex = 0;
-    let foundStart = -1;
-    let count = 0;
-
-    while (true) {
-      const idx = normalized.indexOf(target, fromIndex);
-
-      if (idx === -1) {
-        break;
-      }
-
-      count++;
-
-      if (count === wanted) {
-        foundStart = idx;
-        break;
-      }
-
-      fromIndex = idx + 1;
-    }
-
-    if (foundStart === -1) {
-      foundStart = normalized.indexOf(target);
-
-      if (foundStart === -1) {
-        return null;
-      }
-    }
-
-    const endIndex = foundStart + target.length - 1;
-    const startPos = positions[foundStart];
-    const endPos = positions[endIndex];
-
-    if (!startPos || !endPos) {
-      return null;
-    }
-
-    const range = document.createRange();
-
-    try {
-      range.setStart(startPos.node, startPos.offset);
-      range.setEnd(endPos.node, endPos.offset + 1);
-    } catch (error) {
-      return null;
-    }
-
-    return range;
-  }
-
-  // Counts how many earlier occurrences of normalize(rawText) exist
-  // before a given (node, offset) anchor point, so a freshly-made
-  // bookmark can record which specific occurrence it is (mirrors
-  // computeMatchOccurrenceIndex, but works for ANY anchor point on the
-  // page, not just a <mark> produced by the current search).
-  function computeTextOccurrenceIndexAtNode(anchorNode, anchorOffset, rawText) {
-    const target = normalize(rawText);
-
-    if (!target) {
-      return 1;
-    }
-
-    const { normalized, positions } = buildBodyNormalizedTextMap();
-
-    // anchorNode is usually the exact text node a live selection
-    // started in (offset matters). It can also be an element (e.g. the
-    // snippet's paragraph container for a "matches" bookmark) - in
-    // that case, anchor at the first text position inside it instead.
-    let anchorPos = anchorNode.nodeType === Node.TEXT_NODE ?
-      positions.findIndex(pos => pos.node === anchorNode && pos.offset >= anchorOffset) :
-      positions.findIndex(pos => anchorNode.contains(pos.node));
-
-    if (anchorPos === -1) {
-      anchorPos = normalized.length;
-    }
-
-    let count = 0;
-    let fromIndex = 0;
-
-    while (true) {
-      const idx = normalized.indexOf(target, fromIndex);
-
-      if (idx === -1 || idx > anchorPos) {
-        break;
-      }
-
-      count++;
-      fromIndex = idx + 1;
-    }
-
-    return count > 0 ? count : 1;
-  }
-
-  // Item ۱: draws the small, low-opacity marker right after a
-  // bookmarked passage (see .in-page-bookmark-marker), and wires it so
-  // clicking it removes the bookmark - the "با اختیار کاربر می‌تونه حذف
-  // بشه" requirement. Silently does nothing if the text can no longer
-  // be found (e.g. content changed) or is already marked.
-  function insertBookmarkMarker(range, bookmarkId) {
-    if (document.querySelector(`.in-page-bookmark-marker[data-bookmark-id="${bookmarkId}"]`)) {
-      return;
-    }
-
-    const marker = document.createElement("span");
-    marker.className = "in-page-bookmark-marker";
-    marker.dataset.bookmarkId = bookmarkId;
-    marker.title = "این نشانه حذف شود؟ (کلیک کنید)";
-    marker.textContent = "🔖";
-
-    marker.addEventListener("click", event => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      if (window.confirm("این نشانه حذف شود؟")) {
-        removeBookmark(bookmarkId);
-      }
-    });
-
-    const insertionPoint = range.cloneRange();
-    insertionPoint.collapse(false);
-
-    try {
-      insertionPoint.insertNode(marker);
-    } catch (error) {
-      // Range couldn't host a new node here (rare edge case) - the
-      // bookmark itself is still saved, it just won't get an in-text
-      // marker this time.
-    }
-  }
-
-  function removeBookmarkMarker(bookmarkId) {
-    document.querySelectorAll(`.in-page-bookmark-marker[data-bookmark-id="${bookmarkId}"]`)
-      .forEach(marker => marker.remove());
-  }
-
-  // Re-scans every bookmark that belongs to THIS page (by title) and
-  // marks any that aren't marked yet. Safe to call repeatedly (e.g.
-  // once at page load, and again right after saving a new bookmark) -
-  // insertBookmarkMarker skips anything already marked.
-  function markBookmarksOnCurrentPage() {
-    const currentTitle = getPageTitle();
-
-    loadBookmarks()
-      .filter(item => (item.title || "") === currentTitle)
-      .forEach(item => {
-        const range = findRangeForBookmarkText(item.text, item.occurrenceIndex || 1);
-
-        if (range) {
-          insertBookmarkMarker(range, item.id);
-        }
-      });
-  }
-
-  // Item ۳: scrolls to a same-page bookmark and briefly flashes it, as
-  // a substitute for the browser's native #:~:text= scrolling - which
-  // only fires on an actual (cross-document) navigation and silently
-  // does nothing on a same-page hash change, which is exactly what
-  // clicking a same-page "بازکردن" link would otherwise be.
-  function scrollToRangeAndFlash(range) {
-    const anchorElement = range.startContainer.nodeType === Node.TEXT_NODE ?
-      range.startContainer.parentElement :
-      range.startContainer;
-
-    if (anchorElement && typeof anchorElement.scrollIntoView === "function") {
-      anchorElement.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
-
-    try {
-      const flash = document.createElement("span");
-      flash.className = "in-page-bookmark-flash";
-      range.surroundContents(flash);
-
-      setTimeout(() => {
-        flash.classList.add("is-fading");
-
-        setTimeout(() => {
-          const parent = flash.parentNode;
-
-          if (!parent) {
-            return;
-          }
-
-          while (flash.firstChild) {
-            parent.insertBefore(flash.firstChild, flash);
-          }
-
-          parent.removeChild(flash);
-          parent.normalize();
-        }, 1200);
-      }, 300);
-    } catch (error) {
-      // Range crosses element boundaries - surroundContents can't wrap
-      // it. The scroll above still got the user to the right spot.
-    }
   }
 
   // Item ط (چینش کتاب/برچسب): چون نشانه‌های چند کتاب/فایل مختلف در یک
@@ -3098,14 +2762,11 @@
 
   // یک نشانه‌ی چندبرچسبی زیر هر یک از برچسب‌هایش تکرار می‌شود؛ نشانه‌ی
   // بدون برچسب زیر زیرگروه BOOKMARK_NO_TAG_LABEL می‌رود. وقتی فیلتر
-  // برچسبیِ بالای پنل فعال است (restrictTags، Item ۲: می‌تواند شامل چند
-  // برچسب هم‌زمان باشد)، هر نشانه فقط زیر همان برچسب‌هایی قرار می‌گیرد
-  // که هم در تگ‌های خودش و هم در مجموعه‌ی انتخاب‌شده باشند - نه زیر بقیه‌ی
-  // برچسب‌های احتمالی‌اش - چون کاربر صریحاً نمایش را به آن برچسب‌ها
-  // محدود کرده است.
-  function buildBookmarkGroups(items, restrictTags) {
+  // برچسبیِ بالای پنل فعال است (restrictTag)، هر نشانه فقط زیر همان
+  // یک برچسب انتخابی قرار می‌گیرد - نه زیر بقیه‌ی برچسب‌های احتمالی‌اش -
+  // چون کاربر صریحاً نمایش را به یک برچسب محدود کرده است.
+  function buildBookmarkGroups(items, restrictTag) {
     const bookMap = new Map();
-    const hasRestriction = restrictTags && restrictTags.size > 0;
 
     items.forEach(item => {
       const bookTitle = item.title || "";
@@ -3115,8 +2776,8 @@
       }
 
       const tagMap = bookMap.get(bookTitle);
-      const tagsForGrouping = hasRestriction ?
-        (item.tags || []).filter(tag => restrictTags.has(tag)) :
+      const tagsForGrouping = restrictTag ?
+        [restrictTag] :
         ((item.tags && item.tags.length) ? item.tags : [BOOKMARK_NO_TAG_LABEL]);
 
       tagsForGrouping.forEach(tag => {
@@ -3142,6 +2803,48 @@
     return hasNoTagGroup ? named.concat([BOOKMARK_NO_TAG_LABEL]) : named;
   }
 
+  // Resolves buildBookmarkGroups()'s Map-of-Maps into a plain, already-
+  // numbered array: [{ mainNumber, bookTitle, tagGroups: [{ subNumber,
+  // tagLabel, items }] }]. This is the SAME hierarchical کتاب→برچسب
+  // ordering renderBookmarksPanel used to build inline; it now lives
+  // here once so the notebook export (below) walks the exact same
+  // order/numbering the panel shows - they can never drift apart.
+  function resolveBookmarkExportGroups(items, restrictTag) {
+    const groups = buildBookmarkGroups(items, restrictTag);
+    const bookTitles = Array.from(groups.keys()).sort(compareFa);
+
+    return bookTitles.map((bookTitle, bookIndex) => {
+      const mainNumber = bookIndex + 1;
+      const tagMap = groups.get(bookTitle);
+      const tagKeys = sortedBookmarkTagKeys(tagMap);
+
+      const tagGroups = tagKeys.map((tagLabel, tagIndex) => ({
+        subNumber: `${mainNumber}.${tagIndex + 1}`,
+        tagLabel,
+        items: tagMap.get(tagLabel)
+      }));
+
+      return { mainNumber, bookTitle: bookTitle || "بدون عنوان", tagGroups };
+    });
+  }
+
+  // The list currently on screen (respecting bookmarkFilterTag), with
+  // the same "stale filter" fallback renderBookmarksPanel already
+  // applied inline. Shared by the panel and by the notebook export so
+  // "دریافت..." always exports exactly what the panel is showing.
+  function getVisibleBookmarks() {
+    const all = loadBookmarks().slice().reverse();
+    const allTags = getAllBookmarkTags(all);
+
+    if (bookmarkFilterTag && !allTags.includes(bookmarkFilterTag)) {
+      bookmarkFilterTag = null;
+    }
+
+    return bookmarkFilterTag ?
+      all.filter(item => (item.tags || []).includes(bookmarkFilterTag)) :
+      all;
+  }
+
   function renderBookmarksPanel() {
     const panel = document.getElementById("inPageBookmarksPanel");
 
@@ -3149,32 +2852,16 @@
       return;
     }
 
-    const all = loadBookmarks().slice().reverse();
+    const items = getVisibleBookmarks();
+    const all = loadBookmarks();
     const allTags = getAllBookmarkTags(all);
-
-    // Stale filter entries (their tag got removed along with the last
-    // bookmark that had it) - drop just those, keep the rest of the
-    // active selection.
-    Array.from(bookmarkFilterTags).forEach(tag => {
-      if (!allTags.includes(tag)) {
-        bookmarkFilterTags.delete(tag);
-      }
-    });
-
-    // Item ۲: clicking several tag chips shows the UNION of their
-    // bookmarks (any selected tag matches), so the user can see
-    // multiple subgroups together instead of being limited to one tag
-    // at a time.
-    const items = bookmarkFilterTags.size > 0 ?
-      all.filter(item => (item.tags || []).some(tag => bookmarkFilterTags.has(tag))) :
-      all;
 
     const tagChipsHtml = allTags.length === 0 ? "" : `
       <div class="bookmark-tag-filter">
         ${allTags.map(tag => `
           <button
             type="button"
-            class="bookmark-tag-chip${bookmarkFilterTags.has(tag) ? " is-active" : ""}"
+            class="bookmark-tag-chip${tag === bookmarkFilterTag ? " is-active" : ""}"
             data-bookmark-filter-tag="${escapeHtml(tag)}">
             ${escapeHtml(tag)}
           </button>
@@ -3187,26 +2874,19 @@
     // ۱، ۲...) و داخل هر کتاب بر اساس برچسب (الفبایی، شماره‌ی فرعی
     // ۱.۱، ۱.۲...) گروه‌بندی می‌شوند - مستقل از ترتیب/زمان ذخیره‌شدن
     // نشانه‌ها توسط کاربر.
-    const groups = buildBookmarkGroups(items, bookmarkFilterTags);
-    const bookTitles = Array.from(groups.keys()).sort(compareFa);
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
 
     const listHtml = items.length === 0 ?
       `<p class="archive-empty">${
-        bookmarkFilterTags.size > 0 ? "نشانه‌ای با این برچسب‌ها یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
+        bookmarkFilterTag ? "نشانه‌ای با این برچسب یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
       }</p>` :
-      bookTitles.map((bookTitle, bookIndex) => {
-        const mainNumber = bookIndex + 1;
-        const tagMap = groups.get(bookTitle);
-        const tagKeys = sortedBookmarkTagKeys(tagMap);
-
-        const tagsHtml = tagKeys.map((tagLabel, tagIndex) => {
-          const subNumber = `${mainNumber}.${tagIndex + 1}`;
-
-          const itemsHtml = tagMap.get(tagLabel).map(item => `
+      groups.map(book => {
+        const tagsHtml = book.tagGroups.map(tagGroup => {
+          const itemsHtml = tagGroup.items.map(item => `
             <div class="archive-item">
               <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
               <div class="archive-item-actions">
-                <a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">
+                <a href="${escapeHtml(item.url || "#")}">
                   بازکردن
                 </a>
                 <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
@@ -3217,13 +2897,13 @@
           `).join("");
 
           return `
-            <div class="bookmark-group-tag">${subNumber} - ${escapeHtml(tagLabel)}</div>
+            <div class="bookmark-group-tag">${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</div>
             ${itemsHtml}
           `;
         }).join("");
 
         return `
-          <div class="bookmark-group-book">${mainNumber} - ${escapeHtml(bookTitle || "بدون عنوان")}</div>
+          <div class="bookmark-group-book">${book.mainNumber} - ${escapeHtml(book.bookTitle)}</div>
           ${tagsHtml}
         `;
       }).join("");
@@ -3232,6 +2912,27 @@
       <div class="archive-header">
         <span>نشانه‌ها (${all.length})</span>
         <div class="archive-header-actions">
+          <button
+            type="button"
+            id="inPageBookmarksExportText"
+            title="دریافت این فهرست نشانه‌ها به‌صورت یک فایل متنی ساده (txt.)"
+            ${items.length === 0 ? "disabled" : ""}>
+            Text
+          </button>
+          <button
+            type="button"
+            id="inPageBookmarksExportWord"
+            title="دریافت این فهرست نشانه‌ها به‌صورت یک فایل ورد (doc.)، با لینک منبعِ کوتاه و قابل کلیک"
+            ${items.length === 0 ? "disabled" : ""}>
+            Word
+          </button>
+          <button
+            type="button"
+            id="inPageBookmarksExportPdf"
+            title="دریافت این فهرست نشانه‌ها به‌صورت یک فایل PDF، با لینک منبعِ کوتاه و قابل کلیک"
+            ${items.length === 0 ? "disabled" : ""}>
+            PDF
+          </button>
           <button type="button" id="inPageBookmarksClear">پاک‌کردن همه</button>
           <button type="button" id="inPageBookmarksClose">بستن</button>
         </div>
@@ -3250,69 +2951,267 @@
       closeButton.addEventListener("click", closeBookmarksPanel);
     }
 
+    const exportTextButton = panel.querySelector("#inPageBookmarksExportText");
+    if (exportTextButton) {
+      exportTextButton.addEventListener("click", exportBookmarksAsText);
+    }
+
+    const exportWordButton = panel.querySelector("#inPageBookmarksExportWord");
+    if (exportWordButton) {
+      exportWordButton.addEventListener("click", exportBookmarksAsWord);
+    }
+
+    const exportPdfButton = panel.querySelector("#inPageBookmarksExportPdf");
+    if (exportPdfButton) {
+      exportPdfButton.addEventListener("click", exportBookmarksAsPdf);
+    }
+
     panel.querySelectorAll("[data-bookmark-id]").forEach(button => {
       button.addEventListener("click", () => {
         removeBookmark(button.dataset.bookmarkId);
       });
     });
 
-    // Item ۲: each chip toggles independently in the set, instead of
-    // one chip's selection clearing another's - so several can be
-    // active together.
     panel.querySelectorAll("[data-bookmark-filter-tag]").forEach(chip => {
       chip.addEventListener("click", () => {
         const tag = chip.dataset.bookmarkFilterTag;
-
-        if (bookmarkFilterTags.has(tag)) {
-          bookmarkFilterTags.delete(tag);
-        } else {
-          bookmarkFilterTags.add(tag);
-        }
-
+        bookmarkFilterTag = bookmarkFilterTag === tag ? null : tag;
         renderBookmarksPanel();
       });
     });
+  }
 
-    // Item ۳: if this bookmark's saved URL points at THIS same file,
-    // jump straight to it in the live DOM instead of relying on the
-    // href - a same-page hash-only navigation never triggers the
-    // browser's native #:~:text= scrolling, so the link would
-    // otherwise silently do nothing.
-    panel.querySelectorAll("[data-bookmark-open]").forEach(link => {
-      link.addEventListener("click", event => {
-        const id = link.dataset.bookmarkOpen;
-        const item = loadBookmarks().find(bookmark => bookmark.id === id);
+  // ---- Item ی: bookmarks notebook export (Text/Word/PDF) ---------------
+  // Rather than a second, separate "دفترچه یادداشت" panel duplicating
+  // what the bookmarks panel already does (free-form text + tags,
+  // organized by book/برچسب), this gives the EXISTING bookmarks list a
+  // one-click export - "notebook" as an output format of the bookmarks,
+  // not a parallel feature to maintain. Structure mirrors
+  // buildExportPlainText/exportSelectedAsWord/exportSelectedAsPdf above
+  // (same divider/header conventions, same "🔗 لینک منبع" link label as
+  // the archive export - not the plain "بازکردن" link the bookmarks
+  // panel itself uses) so a notebook export and a search-results export
+  // read as one consistent family of documents.
+  const BOOKMARKS_EXPORT_DIVIDER = "─".repeat(32);
 
-        if (!item) {
-          return;
-        }
+  function getBookmarksNotebookTitle(restrictTag) {
+    return restrictTag ? `دفترچه نشانه‌ها — برچسب «${restrictTag}»` : "دفترچه نشانه‌ها";
+  }
 
-        let itemUrl;
+  function buildBookmarksExportPlainText(groups, restrictTag) {
+    const header = `📑 ${getBookmarksNotebookTitle(restrictTag)}\n${BOOKMARKS_EXPORT_DIVIDER}`;
 
-        try {
-          itemUrl = new URL(item.url, location.href);
-        } catch (error) {
-          return;
-        }
+    const body = groups.map(book => {
+      const bookHeader = `${book.mainNumber} - ${book.bookTitle}`;
 
-        const isSamePage = itemUrl.origin === location.origin &&
-          itemUrl.pathname === location.pathname;
+      const tagsText = book.tagGroups.map(tagGroup => {
+        const tagHeader = `${tagGroup.subNumber} - ${tagGroup.tagLabel}`;
+        const itemsText = tagGroup.items
+          .map(item => `«${item.text || ""}»\n🔗 لینک منبع: ${item.url || ""}`)
+          .join("\n\n");
 
-        if (!isSamePage) {
-          return;
-        }
+        return `${tagHeader}\n${itemsText}`;
+      }).join("\n\n");
 
-        const range = findRangeForBookmarkText(item.text, item.occurrenceIndex || 1);
+      return `${bookHeader}\n\n${tagsText}`;
+    }).join(`\n\n${BOOKMARKS_EXPORT_DIVIDER}\n\n`);
 
-        if (!range) {
-          return;
-        }
+    return `${header}\n\n${body}`;
+  }
 
-        event.preventDefault();
-        closeBookmarksPanel();
-        scrollToRangeAndFlash(range);
-      });
-    });
+  function exportBookmarksAsText() {
+    const items = getVisibleBookmarks();
+
+    if (items.length === 0) {
+      return;
+    }
+
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
+    const text = buildBookmarksExportPlainText(groups, bookmarkFilterTag);
+
+    downloadTextFile(`${getBookmarksNotebookTitle(bookmarkFilterTag)}.txt`, text);
+  }
+
+  function exportBookmarksAsWord() {
+    const items = getVisibleBookmarks();
+
+    if (items.length === 0) {
+      return;
+    }
+
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
+    const title = escapeHtml(getBookmarksNotebookTitle(bookmarkFilterTag));
+
+    const bodyHtml = groups.map(book => {
+      const tagsHtml = book.tagGroups.map(tagGroup => {
+        const itemsHtml = tagGroup.items.map(item => (
+          `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
+          `«${escapeHtml(item.text || "")}»</p>` +
+          `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:12px;text-align:right;">🔗 ` +
+          `<a href="${escapeHtml(item.url || "#")}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+        )).join("");
+
+        return (
+          `<p dir="ltr" style="margin:8px 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:13px;font-weight:bold;color:#6d28d9;text-align:right;">` +
+          `${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</p>${itemsHtml}`
+        );
+      }).join("");
+
+      return (
+        `<p dir="ltr" style="margin:14px 0 6px;padding-bottom:4px;border-bottom:2px solid #173b63;` +
+        `font-family:Tahoma,Arial,sans-serif;font-size:15px;font-weight:bold;color:#173b63;` +
+        `text-align:right;">${book.mainNumber} - ${escapeHtml(book.bookTitle)}</p>${tagsHtml}`
+      );
+    }).join("");
+
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <title>${title}</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:DoNotOptimizeForBrowser/>
+          </w:WordDocument>
+        </xml>
+        <![endif]-->
+      </head>
+      <body dir="rtl" style="font-family:Tahoma,Arial,sans-serif;">
+        <table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 12px;">
+          <tr>
+            <td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;
+              font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;
+              color:#173b63;text-align:right;">📑&nbsp;${title}</td>
+          </tr>
+        </table>
+        ${bodyHtml}
+      </body>
+    </html>`;
+
+    downloadTextFile(
+      `${getBookmarksNotebookTitle(bookmarkFilterTag)}.doc`,
+      doc,
+      "application/msword;charset=utf-8"
+    );
+  }
+
+  function exportBookmarksAsPdf() {
+    const items = getVisibleBookmarks();
+
+    if (items.length === 0) {
+      return;
+    }
+
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
+    const title = escapeHtml(getBookmarksNotebookTitle(bookmarkFilterTag));
+
+    const bodyHtml = groups.map(book => {
+      const tagsHtml = book.tagGroups.map(tagGroup => {
+        const itemsHtml = tagGroup.items.map(item => `
+          <div class="export-item">
+            <p class="export-snippet">«${escapeHtml(item.text || "")}»</p>
+            <p class="export-link">🔗 <a href="${escapeHtml(item.url || "#")}">لینک منبع</a></p>
+          </div>
+        `).join("");
+
+        return `
+          <div class="export-tag-header">${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</div>
+          ${itemsHtml}
+        `;
+      }).join("");
+
+      return `
+        <div class="export-book-header">${book.mainNumber} - ${escapeHtml(book.bookTitle)}</div>
+        ${tagsHtml}
+      `;
+    }).join("");
+
+    const doc = `<!DOCTYPE html>
+      <html lang="fa" dir="rtl">
+      <head>
+        <meta charset="utf-8">
+        <title>${title}</title>
+        <style>
+          * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body {
+            font-family: Tahoma, Arial, sans-serif;
+            direction: rtl;
+            text-align: right;
+            color: #1f2937;
+            margin: 24px;
+          }
+          .export-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            margin-bottom: 18px;
+            background: #eff6ff;
+            border-right: 5px solid #2563eb;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #173b63;
+          }
+          .export-book-header {
+            margin: 18px 0 6px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid #173b63;
+            font-size: 16px;
+            font-weight: bold;
+            color: #173b63;
+          }
+          .export-tag-header {
+            margin: 10px 0 6px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #6d28d9;
+          }
+          .export-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .export-snippet {
+            margin: 0 0 4px;
+            font-size: 15px;
+            line-height: 2;
+          }
+          .export-link {
+            margin: 0;
+            font-size: 12px;
+          }
+          .export-link a {
+            color: #1d4ed8;
+            text-decoration: none;
+          }
+          @media print {
+            body { margin: 10mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="export-header">📑 ${title}</div>
+        ${bodyHtml}
+        <script>window.onload = () => window.print();<\/script>
+      </body>
+      </html>`;
+
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(doc);
+    printWindow.document.close();
   }
 
   function openBookmarksPanel() {
@@ -3473,8 +3372,7 @@
       addBookmark({
         text: pendingSelectionText,
         url: buildSelectionBookmarkUrl(pendingSelectionText),
-        tags,
-        occurrenceIndex: pendingSelectionOccurrenceIndex
+        tags
       });
     } else if (pendingBookmarkMode === "matches") {
       [...selectedMatchIndexes]
@@ -3482,16 +3380,10 @@
         .map(index => matches[index])
         .filter(Boolean)
         .forEach(mark => {
-          const snippetText = getSnippetPlainText(mark);
-          const container = getSnippetContainer(mark);
-
           addBookmark({
-            text: snippetText,
+            text: getSnippetPlainText(mark),
             url: buildMatchUrl(mark),
-            tags,
-            occurrenceIndex: container ?
-              computeTextOccurrenceIndexAtNode(container, 0, snippetText) :
-              1
+            tags
           });
         });
     }
@@ -3532,17 +3424,6 @@
     pendingSelectionText = selectedText;
 
     const range = selection.getRangeAt(0);
-
-    // Item ۱/۳: capture which occurrence of this text the live
-    // selection is, while the Range is still valid - by the time the
-    // popover is saved, focusing its input has usually already cleared
-    // the page's own selection.
-    pendingSelectionOccurrenceIndex = computeTextOccurrenceIndexAtNode(
-      range.startContainer,
-      range.startOffset,
-      selectedText
-    );
-
     showSelectionBookmarkButton(range.getBoundingClientRect());
   }
 
@@ -5056,19 +4937,8 @@
     });
 
     document.addEventListener("keydown", event => {
-      // Item ۴: Esc closes these overlays the same way moving the
-      // mouse away from them already does, instead of only reacting to
-      // clicks outside or an explicit "بستن" button.
       if (event.key === "Escape") {
         closeSettingsMenu();
-
-        if (archiveOverlayElement && archiveOverlayElement.classList.contains("open")) {
-          closeArchivePanel();
-        }
-
-        if (bookmarksOverlayElement && bookmarksOverlayElement.classList.contains("open")) {
-          closeBookmarksPanel();
-        }
       }
     });
 
@@ -5086,11 +4956,6 @@
     });
 
     applyIncomingQueryFromUrl();
-
-    // Item ۱: mark any bookmarks that belong to this page right in the
-    // text, so a returning reader can see at a glance where they left
-    // one, without having to open the bookmarks panel first.
-    markBookmarksOnCurrentPage();
   }
 
   if (document.readyState === "loading") {
