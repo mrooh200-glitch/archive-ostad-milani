@@ -1313,7 +1313,7 @@
         top: 0;
         display: flex;
         align-items: center;
-        justify-content: space-between;
+        justify-content: flex-end;
         gap: 8px;
         flex-wrap: wrap;
         padding: 8px 12px;
@@ -5142,16 +5142,12 @@
       })
       .join("");
 
-    const filteredNote = activeDerivativeKeys.size > 0
-      ? ` (${visibleMatches.length} از ${matches.length})`
-      : "";
-
-    // Item 3: this header used to carry six action buttons - now it's
-    // just the count and a close button; every action lives in the
-    // ⚙️ menu in the main top bar instead (see renderSettingsMenu).
+    // Item جدید: شمارهٔ نتایج از این هدر حذف شد - #inPageSearchStatus
+    // که بعد از ⚙️ در ردیف اصلی کادر جست‌وجو قرار دارد، همین اطلاعات
+    // را از قبل نشان می‌دهد و تکرارش اینجا لازم نیست. فقط دکمهٔ بستن
+    // باقی می‌ماند.
     resultsPanelElement.innerHTML = `
       <div class="in-page-search-results-header">
-        <span>${matches.length} نتیجه${filteredNote}</span>
         <button type="button" class="in-page-search-results-close" aria-label="بستن فهرست نتایج">×</button>
       </div>
       ${items}
