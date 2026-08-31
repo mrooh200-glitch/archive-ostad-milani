@@ -3875,6 +3875,13 @@
     const hasMatches = matches.length > 0;
     const hasSelection = selectedCount > 0;
 
+    // Item ط/۴-الف (شمارنده): تعداد فعلی محتویات آرشیو و نشانه‌ها،
+    // کنار عنوان همان دو گزینه در منو - مستقل از انتخاب فعلی کاربر در
+    // نتایج جست‌وجو (همان چیزی که hasSelection/selectedCount بالا
+    // نشان می‌دهند).
+    const archiveCount = loadArchive().length;
+    const bookmarksCount = loadBookmarks().length;
+
     menu.innerHTML = `
       <button
         type="button"
@@ -3910,6 +3917,7 @@
         id="inPageMenuOpenArchive"
         title="باز کردن آرشیوی که پیش‌تر نتایج جست‌وجو را در آن ذخیره کرده‌اید">
         <span>آرشیو</span>
+        ${archiveCount > 0 ? `<span class="in-page-settings-badge">${archiveCount}</span>` : ""}
       </button>
       <button
         type="button"
@@ -3926,6 +3934,7 @@
         id="inPageMenuOpenBookmarks"
         title="باز کردن نشانه‌هایی که تاکنون در متن یا نتایج جست‌وجو ذخیره کرده‌اید">
         <span>نشانه‌ها</span>
+        ${bookmarksCount > 0 ? `<span class="in-page-settings-badge">${bookmarksCount}</span>` : ""}
       </button>
       <button
         type="button"
