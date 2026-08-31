@@ -38,6 +38,12 @@
   // bookmarks, instead of being limited to one tag at a time.
   let pendingBookmarkMode = null;
   let pendingSelectionText = "";
+  // Item جدید (آدرس‌های داخل متن/پاورقی): هر <a href> که انتخاب زنده‌ی
+  // کاربر آن را در بر می‌گیرد، همین‌جا و همان لحظه (پیش از آنکه با باز
+  // شدن پاپ‌آور تگ، انتخاب صفحه از بین برود) ذخیره می‌شود، تا در وقت
+  // ذخیره‌ی نشانه به addBookmark پاس داده شود (رجوع کنید به
+  // handleDocumentSelectionChange و collectLinksInRange).
+  let pendingSelectionLinks = [];
   // Item ۳/۱: which occurrence (top-to-bottom, 1-based) of
   // pendingSelectionText on the page the live selection was, captured
   // while the selection is still fresh (see handleDocumentSelectionChange)
@@ -2405,6 +2411,154 @@
     return `${base}?${params.toString()}#:~:text=${encodeURIComponent(fragmentText)}`;
   }
 
+  // ---- Item جدید (آدرس‌های داخل متن/پاورقی) ---------------------------
+  // A matched/selected paragraph - especially a footnote paragraph
+  // (class="MsoFootnoteText") - can itself contain real <a href> links
+  // (e.g. a source address cited inside the footnote). Every copy/export
+  // path below only ever worked off of plain container.textContent,
+  // which silently drops those href attributes - the visible link text
+  // survives but the actual address it pointed to does not. These
+  // helpers pull such links back out so every export path can carry
+  // them along explicitly, instead of just the tool's own generated
+  // "لینک منبع" back-reference to the page.
+
+  // Fragment-only hrefs ("#ftn1"-style footnote back-references) aren't
+  // real external addresses worth exporting - they just jump around the
+  // same page - so they're filtered out here rather than at every call
+  // site.
+  function resolveExportableHref(rawHref) {
+    const trimmed = (rawHref || "").trim();
+
+    if (!trimmed || trimmed.startsWith("#")) {
+      return null;
+    }
+
+    try {
+      return new URL(trimmed, location.href).href;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Collects every distinct real link inside `container` whose text
+  // falls (even partially) within [start, end) of that container's own
+  // textContent - i.e. within whatever slice is actually being
+  // copied/exported, not the whole surrounding element.
+  function collectLinksInContainerRange(container, start, end) {
+    if (!container || typeof container.querySelectorAll !== "function") {
+      return [];
+    }
+
+    const seen = new Set();
+    const links = [];
+
+    container.querySelectorAll("a[href]").forEach(anchor => {
+      const href = resolveExportableHref(anchor.getAttribute("href"));
+
+      if (!href || seen.has(href)) {
+        return;
+      }
+
+      const anchorStart = getTextOffsetBefore(container, anchor);
+      const anchorEnd = anchorStart + anchor.textContent.length;
+
+      if (anchorEnd <= start || anchorStart >= end) {
+        return;
+      }
+
+      seen.add(href);
+
+      const label = anchor.textContent.replace(/\s+/g, " ").trim();
+      links.push({ label: label || href, href });
+    });
+
+    return links;
+  }
+
+  // Same idea, but for a live Selection Range that's about to be lost
+  // (e.g. once the tag popover steals focus) rather than for a
+  // paragraph container still attached to the page - cloneContents()
+  // keeps any <a> the selection crossed into, in either direction.
+  function collectLinksInRange(range) {
+    if (!range) {
+      return [];
+    }
+
+    let fragment;
+
+    try {
+      fragment = range.cloneContents();
+    } catch (error) {
+      return [];
+    }
+
+    const seen = new Set();
+    const links = [];
+
+    fragment.querySelectorAll("a[href]").forEach(anchor => {
+      const href = resolveExportableHref(anchor.getAttribute("href"));
+
+      if (!href || seen.has(href)) {
+        return;
+      }
+
+      seen.add(href);
+
+      const label = anchor.textContent.replace(/\s+/g, " ").trim();
+      links.push({ label: label || href, href });
+    });
+
+    return links;
+  }
+
+  // Plain-text targets have no clickable links, so any link the
+  // matched/bookmarked text carried is appended as its own labeled
+  // line right under the "🔗 لینک منبع" line, address spelled out in
+  // full since there's no way to make it clickable in plain text.
+  function buildLinksPlainTextSuffix(links, indent) {
+    if (!links || links.length === 0) {
+      return "";
+    }
+
+    return links
+      .map(link => `\n${indent}🔗 آدرس داخل متن/پاورقی «${link.label}»: ${link.href}`)
+      .join("");
+  }
+
+  // Rich/HTML targets (clipboard rich-paste, Word export, PDF export)
+  // get an actual clickable link instead, one per line, right under the
+  // paragraph and its own "لینک منبع" line - reusing the exact same
+  // "<p dir=rtl>...</p>" shape those already use so the two blend in.
+  function buildLinksHtmlSuffix(links) {
+    if (!links || links.length === 0) {
+      return "";
+    }
+
+    return links
+      .map(link => (
+        `<p dir="rtl" style="margin:0 0 10px;font-family:Tahoma,Arial,sans-serif;` +
+        `font-size:12px;text-align:right;color:#4b5563;">🔗 آدرس داخل متن/پاورقی: ` +
+        `<a href="${escapeHtml(link.href)}" style="color:#1d4ed8;text-decoration:none;">` +
+        `${escapeHtml(link.label)}</a></p>`
+      ))
+      .join("");
+  }
+
+  // Same as buildLinksHtmlSuffix, but using the PDF export's own
+  // ".export-link" class instead of inline styles.
+  function buildLinksPdfSuffix(links) {
+    if (!links || links.length === 0) {
+      return "";
+    }
+
+    return links
+      .map(link => (
+        `<p class="export-link">🔗 آدرس داخل متن/پاورقی: ` +
+        `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></p>`
+      ))
+      .join("");
+  }
+
   // ---- Item 8: full paragraph for copy/export -------------------------
   // The results panel only ever shows a short, sentence-scoped snippet
   // (getSnippetPlainText above) - good for scanning many results at
@@ -2497,7 +2651,8 @@
       sliceEnd,
       spans: mergedSpans,
       truncatedBefore: sliceStart > 0,
-      truncatedAfter: sliceEnd < rawText.length
+      truncatedAfter: sliceEnd < rawText.length,
+      links: collectLinksInContainerRange(container, sliceStart, sliceEnd)
     };
   }
 
@@ -2585,7 +2740,8 @@
       return {
         plainText: buildParagraphPlainText(excerpt),
         html: buildParagraphHtml(excerpt),
-        url: buildMatchUrl(group.marks[0])
+        url: buildMatchUrl(group.marks[0]),
+        links: excerpt.links
       };
     });
   }
@@ -2790,7 +2946,7 @@
     return `${base}#:~:text=${encodeURIComponent(fragment)}`;
   }
 
-  function addBookmark({ text, url, tags, occurrenceIndex }) {
+  function addBookmark({ text, url, tags, occurrenceIndex, links }) {
     const trimmedText = (text || "").trim();
 
     if (!trimmedText) {
@@ -2805,6 +2961,10 @@
       text: trimmedText,
       url: url || (location.origin + location.pathname),
       tags: Array.isArray(tags) ? tags : [],
+      // Item جدید (آدرس‌های داخل متن/پاورقی): آدرس‌های واقعی‌ای که خودِ
+      // متن ذخیره‌شده (مثلا یک پاورقی) در بر داشت - جدا از url بالا که
+      // فقط لینک بازگشت به همین جای صفحه است.
+      links: Array.isArray(links) ? links : [],
       // Item ۱/۳: which occurrence of this text on the page this
       // particular bookmark refers to, so it can be found again later
       // (in-text marker, same-page "بازکردن") even if the text repeats
@@ -3184,7 +3344,8 @@
 
           return (
             `   ${index + 1}. «${item.text}»${tagsLine}\n` +
-            `      🔗 لینک: ${item.url}`
+            `      🔗 لینک: ${item.url}` +
+            buildLinksPlainTextSuffix(item.links, "      ")
           );
         }).join("\n\n");
 
@@ -3225,7 +3386,8 @@
             itemTagsHtml +
             `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:12px;text-align:right;">🔗 ` +
-            `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+            `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>` +
+            buildLinksHtmlSuffix(item.links)
           );
         }).join("");
 
@@ -3289,6 +3451,7 @@
                 ""
             }
             <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
+            ${buildLinksPdfSuffix(item.links)}
           </div>
         `).join("");
 
@@ -3890,6 +4053,7 @@
 
     pendingBookmarkMode = null;
     pendingSelectionText = "";
+    pendingSelectionLinks = [];
 
     if (window.getSelection) {
       window.getSelection().removeAllRanges();
@@ -3905,7 +4069,8 @@
         text: pendingSelectionText,
         url: buildSelectionBookmarkUrl(pendingSelectionText),
         tags,
-        occurrenceIndex: pendingSelectionOccurrenceIndex
+        occurrenceIndex: pendingSelectionOccurrenceIndex,
+        links: pendingSelectionLinks
       });
     } else if (pendingBookmarkMode === "matches") {
       [...selectedMatchIndexes]
@@ -3915,6 +4080,7 @@
         .forEach(mark => {
           const snippetText = getSnippetPlainText(mark);
           const container = getSnippetContainer(mark);
+          const { sentenceStart, sentenceEnd } = getSnippetBounds(mark);
 
           addBookmark({
             text: snippetText,
@@ -3922,7 +4088,10 @@
             tags,
             occurrenceIndex: container ?
               computeTextOccurrenceIndexAtNode(container, 0, snippetText) :
-              1
+              1,
+            links: container ?
+              collectLinksInContainerRange(container, sentenceStart, sentenceEnd) :
+              []
           });
         });
     }
@@ -3957,6 +4126,7 @@
     ) {
       hideSelectionBookmarkButton();
       pendingSelectionText = "";
+      pendingSelectionLinks = [];
       return;
     }
 
@@ -3973,6 +4143,11 @@
       range.startOffset,
       selectedText
     );
+
+    // Item جدید (آدرس‌های داخل متن/پاورقی): همین‌جا هم، به همان دلیل -
+    // پیش از آنکه انتخاب صفحه از بین برود - هر لینک واقعی داخل بازه‌ی
+    // انتخاب‌شده (مثلا یک آدرس منبع داخل خودِ پاورقی) گرفته می‌شود.
+    pendingSelectionLinks = collectLinksInRange(range);
 
     showSelectionBookmarkButton(range.getBoundingClientRect());
   }
@@ -4025,7 +4200,10 @@
     const header = `📘 عنوان: ${pageTitle}\n${divider}`;
 
     const body = buildParagraphEntries(selected)
-      .map((entry, index) => `${index + 1}. «${entry.plainText}»\n   🔗 لینک منبع: ${entry.url}`)
+      .map((entry, index) => (
+        `${index + 1}. «${entry.plainText}»\n   🔗 لینک منبع: ${entry.url}` +
+        buildLinksPlainTextSuffix(entry.links, "   ")
+      ))
       .join("\n\n");
 
     return `${header}\n\n${body}`;
@@ -4093,7 +4271,8 @@
         `<strong>${index + 1}.</strong>\u00a0«${entry.html}»</p>` +
         `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:12px;text-align:right;">🔗 ` +
-        `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+        `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>` +
+        buildLinksHtmlSuffix(entry.links)
       ))
       .join("");
 
@@ -4148,6 +4327,7 @@
         <div class="export-item">
           <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${entry.html}»</p>
           <p class="export-link">🔗 <a href="${escapeHtml(entry.url)}">لینک منبع</a></p>
+          ${buildLinksPdfSuffix(entry.links)}
         </div>
       `)
       .join("");
@@ -5004,7 +5184,10 @@
     const entries = buildParagraphEntries(selected);
 
     const textBody = entries
-      .map((entry, index) => `${index + 1}. «${entry.plainText}»\n   🔗 لینک منبع: ${entry.url}`)
+      .map((entry, index) => (
+        `${index + 1}. «${entry.plainText}»\n   🔗 لینک منبع: ${entry.url}` +
+        buildLinksPlainTextSuffix(entry.links, "   ")
+      ))
       .join("\n\n");
 
     const text = `${header}\n\n${textBody}`;
@@ -5027,7 +5210,8 @@
         `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:12px;text-align:right;">🔗 ` +
         `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">` +
-        `لینک منبع</a></p>`
+        `لینک منبع</a></p>` +
+        buildLinksHtmlSuffix(entry.links)
       ))
       .join("");
 
