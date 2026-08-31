@@ -2607,6 +2607,7 @@
 
     saveArchive(archive);
     renderArchivePanel();
+    renderSettingsMenu();
 
     const button = document.getElementById("inPageMenuAddToArchive");
 
@@ -2620,11 +2621,13 @@
   function removeFromArchive(id) {
     saveArchive(loadArchive().filter(item => item.id !== id));
     renderArchivePanel();
+    renderSettingsMenu();
   }
 
   function clearArchive() {
     saveArchive([]);
     renderArchivePanel();
+    renderSettingsMenu();
   }
 
   function renderArchivePanel() {
@@ -2782,12 +2785,14 @@
     saveBookmarks(bookmarks);
     renderBookmarksPanel();
     markBookmarksOnCurrentPage();
+    renderSettingsMenu();
   }
 
   function removeBookmark(id) {
     saveBookmarks(loadBookmarks().filter(item => item.id !== id));
     removeBookmarkMarker(id);
     renderBookmarksPanel();
+    renderSettingsMenu();
   }
 
   function clearBookmarks() {
@@ -2795,6 +2800,7 @@
     bookmarkFilterTags.clear();
     document.querySelectorAll(".in-page-bookmark-marker").forEach(marker => marker.remove());
     renderBookmarksPanel();
+    renderSettingsMenu();
   }
 
   // ---- Item ۱ و ۳: locating a bookmark's text back in the live DOM ----
@@ -4036,6 +4042,11 @@
     const selectedCount = selectedMatchIndexes.size;
     const hasMatches = matches.length > 0;
     const hasSelection = selectedCount > 0;
+    // Item جدید: تعداد کل موارد موجود در آرشیو/نشانه‌ها (نه فقط تعداد
+    // انتخاب‌شده‌های فعلی)، تا کاربر بدون باز کردن هرکدام بداند از قبل
+    // چند مورد در آن ذخیره شده است.
+    const archiveCount = loadArchive().length;
+    const bookmarksCount = loadBookmarks().length;
 
     menu.innerHTML = `
       <button
@@ -4072,6 +4083,7 @@
         id="inPageMenuOpenArchive"
         title="باز کردن آرشیوی که پیش‌تر نتایج جست‌وجو را در آن ذخیره کرده‌اید">
         <span>آرشیو</span>
+        ${archiveCount > 0 ? `<span class="in-page-settings-badge">${archiveCount}</span>` : ""}
       </button>
       <button
         type="button"
@@ -4088,6 +4100,7 @@
         id="inPageMenuOpenBookmarks"
         title="باز کردن نشانه‌هایی که تاکنون در متن یا نتایج جست‌وجو ذخیره کرده‌اید">
         <span>نشانه‌ها</span>
+        ${bookmarksCount > 0 ? `<span class="in-page-settings-badge">${bookmarksCount}</span>` : ""}
       </button>
       <button
         type="button"
