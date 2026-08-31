@@ -1669,20 +1669,28 @@
         color: #ffffff;
       }
 
-      .bookmark-item-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
-        margin: 0 0 6px;
+      /* Item ط (چینش کتاب/برچسب): سرتیترهای گروه‌بندی سلسله‌مراتبی -
+         عنوان کتاب با شماره‌ی اصلی (۱، ۲...) و زیرش عنوان برچسب با
+         شماره‌ی فرعی (۱.۱، ۱.۲...) - که جای تکرار عنوان/برچسب روی تک‌تک
+         نشانه‌ها را می‌گیرند (رجوع کنید به buildBookmarkGroups). */
+      .bookmark-group-book {
+        margin: 14px 16px 6px;
+        padding-bottom: 4px;
+        border-bottom: 2px solid #173b63;
+        color: #173b63;
+        font-size: 0.9rem;
+        font-weight: bold;
       }
 
-      .bookmark-tag-pill {
-        border: 1px solid #c4b5fd;
-        border-radius: 999px;
-        background: #f5f3ff;
+      .bookmark-group-book:first-child {
+        margin-top: 4px;
+      }
+
+      .bookmark-group-tag {
+        margin: 8px 16px 4px;
         color: #6d28d9;
-        font-size: 0.7rem;
-        padding: 1px 8px;
+        font-size: 0.8rem;
+        font-weight: bold;
       }
 
       /* Item ط: floating "add bookmark" affordance for an arbitrary
@@ -2730,6 +2738,61 @@
     renderBookmarksPanel();
   }
 
+  // Item ط (چینش کتاب/برچسب): چون نشانه‌های چند کتاب/فایل مختلف در یک
+  // localStorage مشترک ذخیره می‌شوند، بدون گروه‌بندی با هم قاطی
+  // می‌شدند. اینجا نشانه‌ها اول زیر عنوان کتابشان (سطح ۱) و داخل هر
+  // کتاب زیر عنوان برچسبشان (سطح ۲) دسته می‌شوند تا در renderBookmarksPanel
+  // با شماره‌ی سلسله‌مراتبی «۱» / «۱.۱» نمایش داده شوند - صرف‌نظر از
+  // ترتیب واقعی‌ای که کاربر نشانه‌ها را ذخیره کرده.
+  const BOOKMARK_NO_TAG_LABEL = "بدون برچسب";
+
+  function compareFa(a, b) {
+    return (a || "").localeCompare(b || "", "fa");
+  }
+
+  // یک نشانه‌ی چندبرچسبی زیر هر یک از برچسب‌هایش تکرار می‌شود؛ نشانه‌ی
+  // بدون برچسب زیر زیرگروه BOOKMARK_NO_TAG_LABEL می‌رود. وقتی فیلتر
+  // برچسبیِ بالای پنل فعال است (restrictTag)، هر نشانه فقط زیر همان
+  // یک برچسب انتخابی قرار می‌گیرد - نه زیر بقیه‌ی برچسب‌های احتمالی‌اش -
+  // چون کاربر صریحاً نمایش را به یک برچسب محدود کرده است.
+  function buildBookmarkGroups(items, restrictTag) {
+    const bookMap = new Map();
+
+    items.forEach(item => {
+      const bookTitle = item.title || "";
+
+      if (!bookMap.has(bookTitle)) {
+        bookMap.set(bookTitle, new Map());
+      }
+
+      const tagMap = bookMap.get(bookTitle);
+      const tagsForGrouping = restrictTag ?
+        [restrictTag] :
+        ((item.tags && item.tags.length) ? item.tags : [BOOKMARK_NO_TAG_LABEL]);
+
+      tagsForGrouping.forEach(tag => {
+        if (!tagMap.has(tag)) {
+          tagMap.set(tag, []);
+        }
+
+        tagMap.get(tag).push(item);
+      });
+    });
+
+    return bookMap;
+  }
+
+  // ترتیب برچسب‌ها داخل یک کتاب: الفبایی، با این استثنا که زیرگروه
+  // «بدون برچسب» همیشه آخرین زیرگروه همان کتاب می‌ماند (فارغ از جایگاه
+  // الفبایی‌اش).
+  function sortedBookmarkTagKeys(tagMap) {
+    const keys = Array.from(tagMap.keys());
+    const hasNoTagGroup = keys.includes(BOOKMARK_NO_TAG_LABEL);
+    const named = keys.filter(key => key !== BOOKMARK_NO_TAG_LABEL).sort(compareFa);
+
+    return hasNoTagGroup ? named.concat([BOOKMARK_NO_TAG_LABEL]) : named;
+  }
+
   function renderBookmarksPanel() {
     const panel = document.getElementById("inPageBookmarksPanel");
 
@@ -2764,29 +2827,51 @@
       </div>
     `;
 
+    // Item ط (چینش کتاب/برچسب): به‌جای تکرار عنوان کتاب و برچسب روی
+    // تک‌تک نشانه‌ها، اول بر اساس عنوان کتاب (الفبایی، شماره‌ی اصلی
+    // ۱، ۲...) و داخل هر کتاب بر اساس برچسب (الفبایی، شماره‌ی فرعی
+    // ۱.۱، ۱.۲...) گروه‌بندی می‌شوند - مستقل از ترتیب/زمان ذخیره‌شدن
+    // نشانه‌ها توسط کاربر.
+    const groups = buildBookmarkGroups(items, bookmarkFilterTag);
+    const bookTitles = Array.from(groups.keys()).sort(compareFa);
+
     const listHtml = items.length === 0 ?
       `<p class="archive-empty">${
         bookmarkFilterTag ? "نشانه‌ای با این برچسب یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
       }</p>` :
-      items.map(item => `
-        <div class="archive-item">
-          <div class="archive-item-title">${escapeHtml(item.title || "")}</div>
-          <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
-          ${(item.tags && item.tags.length) ? `
-            <div class="bookmark-item-tags">
-              ${item.tags.map(tag => `<span class="bookmark-tag-pill">${escapeHtml(tag)}</span>`).join("")}
+      bookTitles.map((bookTitle, bookIndex) => {
+        const mainNumber = bookIndex + 1;
+        const tagMap = groups.get(bookTitle);
+        const tagKeys = sortedBookmarkTagKeys(tagMap);
+
+        const tagsHtml = tagKeys.map((tagLabel, tagIndex) => {
+          const subNumber = `${mainNumber}.${tagIndex + 1}`;
+
+          const itemsHtml = tagMap.get(tagLabel).map(item => `
+            <div class="archive-item">
+              <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
+              <div class="archive-item-actions">
+                <a href="${escapeHtml(item.url || "#")}">
+                  بازکردن
+                </a>
+                <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
+                  حذف
+                </button>
+              </div>
             </div>
-          ` : ""}
-          <div class="archive-item-actions">
-            <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
-              بازکردن
-            </a>
-            <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
-              حذف
-            </button>
-          </div>
-        </div>
-      `).join("");
+          `).join("");
+
+          return `
+            <div class="bookmark-group-tag">${subNumber} - ${escapeHtml(tagLabel)}</div>
+            ${itemsHtml}
+          `;
+        }).join("");
+
+        return `
+          <div class="bookmark-group-book">${mainNumber} - ${escapeHtml(bookTitle || "بدون عنوان")}</div>
+          ${tagsHtml}
+        `;
+      }).join("");
 
     panel.innerHTML = `
       <div class="archive-header">
