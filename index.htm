@@ -1,0 +1,3741 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #f4f7fb;
+      color: #1f2937;
+      font-family: Tahoma, Arial, sans-serif;
+      line-height: 1.9;
+    }
+
+    .container {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 42px 0 64px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #173b63;
+      font-size: clamp(1.55rem, 4vw, 2.35rem);
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: #64748b;
+      font-size: 0.98rem;
+    }
+
+    .search-box-wrap {
+      position: relative;
+    }
+
+    .search-box {
+      display: block;
+      width: 100%;
+      margin: 22px 0 8px;
+      padding: 14px 18px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      outline: none;
+      background: #fff;
+      color: #1f2937;
+      font: inherit;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+
+    .search-box:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    /* Item 1: last-5 recent searches, shown on hover/focus while the
+       box is empty. Shares localStorage (SEARCH_HISTORY_KEY) with the
+       in-page book search, so a term searched on either surface shows
+       up in both. */
+    .search-history-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% - 4px);
+      right: 0;
+      left: 0;
+      z-index: 40;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.15);
+      overflow: hidden;
+    }
+
+    .search-history-dropdown.is-open {
+      display: block;
+    }
+
+    .search-history-label {
+      padding: 7px 14px 3px;
+      color: #94a3b8;
+      font-size: 0.74rem;
+      font-weight: bold;
+    }
+
+    .search-history-item {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 9px 14px;
+      border: none;
+      background: transparent;
+      color: #173b63;
+      font: inherit;
+      font-size: 0.92rem;
+      text-align: right;
+      cursor: pointer;
+    }
+
+    .search-history-item:hover {
+      background: #eff6ff;
+    }
+
+    .search-layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .search-controls {
+      position: sticky;
+      top: 20px;
+    }
+
+    /* Item 3: floating results block - same idea as
+       .browse-floating-panel above (sticky panel + contained inner
+       scroll), with .results-toolbar pinned at the top of that inner
+       scroll so the result count and the action buttons (انتخاب همه/
+       کپی/آرشیو/...) stay put while the result cards beneath it
+       scroll. */
+    .search-results-column {
+      min-width: 0;
+      position: sticky;
+      top: 20px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    @media (max-width: 760px) {
+      .search-layout {
+        display: block;
+      }
+
+      .search-controls {
+        position: static;
+        margin-bottom: 8px;
+      }
+
+      /* The two-column grid collapses to a single stacked column at
+         this width, with search-controls above the results - keeping
+         the results block pinned+scrolling on its own here would trap
+         it awkwardly mid-page, so it reverts to a normal, fully
+         page-scrolled block like everything else. */
+      .search-results-column {
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+      }
+
+      .results-toolbar {
+        position: static;
+      }
+    }
+
+    .results-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 10px;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #ffffff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 3px 8px rgba(15, 23, 42, 0.05);
+    }
+
+    .copy-selected-button {
+      padding: 7px 12px;
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+
+    .copy-selected-button:hover:not(:disabled) {
+      background: #dbeafe;
+    }
+
+    .copy-selected-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .result-header-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .result-checkbox {
+      margin-top: 4px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .root-search-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 2px 14px;
+      color: #475569;
+      font-size: 0.88rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .root-search-label input {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .voice-input-button {
+      padding: 8px 12px;
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.84rem;
+      white-space: nowrap;
+    }
+
+    .voice-input-button:hover:not(:disabled) {
+      background: #dbeafe;
+    }
+
+    .voice-input-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .voice-input-button.is-listening {
+      background: #fee2e2;
+      border-color: #fca5a5;
+      color: #b91c1c;
+    }
+
+    /* منوی تنظیمات ⚙️ (بعینه از بلوک جست‌وجوی داخل صفحه گرفته شده) */
+    .derivatives-toggle-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 2px 14px;
+      color: #475569;
+      font-size: 0.86rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .derivatives-toggle-label input {
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .settings-wrap {
+      position: relative;
+      display: inline-block;
+      flex-shrink: 0;
+      margin: 0 2px 14px;
+      vertical-align: middle;
+    }
+
+    .settings-gear {
+      padding: 7px 12px;
+      border: 1px solid #93c5fd;
+      border-radius: 8px;
+      background: #eff6ff;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .settings-gear:hover {
+      background: #dbeafe;
+    }
+
+    .settings-menu {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 10002;
+      width: 260px;
+      max-width: 88vw;
+      max-height: 70vh;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.20);
+      padding: 6px;
+      font-family: Tahoma, Arial, sans-serif;
+      direction: rtl;
+      text-align: right;
+    }
+
+    .settings-menu.is-open {
+      display: block;
+    }
+
+    .settings-separator {
+      height: 1px;
+      margin: 5px 2px;
+      background: #e2e8f0;
+    }
+
+    .settings-section-label {
+      padding: 6px 9px 2px;
+      color: #94a3b8;
+      font-size: 0.68rem;
+      font-weight: bold;
+    }
+
+    .settings-menu label.settings-radio,
+    .settings-menu label.settings-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 9px;
+      font-size: 0.82rem;
+      color: #1f2937;
+      cursor: pointer;
+    }
+
+    .settings-proximity-distance {
+      width: 42px;
+      margin-inline-start: 4px;
+      padding: 2px 4px;
+      border: 1px solid #cbd5e1;
+      border-radius: 5px;
+      font: inherit;
+    }
+
+    /* دامنهٔ جست‌وجو در کتاب‌ها */
+    .book-scope-actions {
+      display: flex;
+      gap: 8px;
+      margin: 14px 0 8px;
+    }
+
+    .book-scope-action-button {
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #f8fafc;
+      color: #334155;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.8rem;
+    }
+
+    .book-scope-action-button:hover {
+      background: #eef2f7;
+    }
+
+    .book-scope-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 260px;
+      overflow-y: auto;
+      padding: 10px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .book-scope-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #334155;
+      font-size: 0.84rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .book-scope-item input {
+      margin: 0;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Item 4: root-search derivatives overview block */
+    .derivatives-block {
+      margin: 0 0 14px;
+      padding: 12px 14px;
+      border: 1px solid #dbe3ee;
+      border-radius: 11px;
+      background: #f8fafc;
+    }
+
+    .derivatives-block-title {
+      margin: 0 0 8px;
+      color: #173b63;
+      font-size: 0.86rem;
+      font-weight: bold;
+    }
+
+    .derivatives-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .derivative-chip {
+      padding: 5px 12px;
+      border: 1px solid #93c5fd;
+      border-radius: 999px;
+      background: #fff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.84rem;
+    }
+
+    .derivative-chip:hover {
+      background: #eff6ff;
+    }
+
+    .derivative-chip.active-chip {
+      background: #1d4ed8;
+      border-color: #1d4ed8;
+      color: #fff;
+    }
+
+    /* Item 7: results archive */
+    .archive-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .archive-overlay.open {
+      display: flex;
+    }
+
+    #archivePanel {
+      width: min(560px, 100%);
+      max-height: 80vh;
+      overflow-y: auto;
+      background: #ffffff;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+    }
+
+    #archivePanel .archive-header {
+      position: sticky;
+      top: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #173b63;
+      font-weight: bold;
+    }
+
+    #archivePanel .archive-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .archive-item {
+      padding: 10px 16px;
+      border-bottom: 1px solid #eef2f7;
+    }
+
+    .archive-item:last-child {
+      border-bottom: none;
+    }
+
+    .archive-item-title {
+      color: #b45309;
+      font-size: 0.78rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .archive-item-text {
+      margin: 0 0 6px;
+      color: #334155;
+      font-size: 0.86rem;
+      line-height: 1.8;
+    }
+
+    .archive-item-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .archive-item-actions a,
+    .archive-item-actions button,
+    #archivePanel .archive-header-actions button {
+      border: 1px solid #93c5fd;
+      border-radius: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font: inherit;
+      font-size: 0.74rem;
+      padding: 4px 8px;
+      cursor: pointer;
+      text-decoration: none;
+    }
+
+    .archive-item-actions a:hover,
+    .archive-item-actions button:hover,
+    #archivePanel .archive-header-actions button:hover {
+      background: #dbeafe;
+    }
+
+    .archive-empty {
+      padding: 26px 16px;
+      color: #64748b;
+      text-align: center;
+      font-size: 0.86rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 0 0 20px;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 13px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: #fff;
+      color: #475569;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1rem;
+      font-weight: bold;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .tab-button:hover {
+      background: #eff6ff;
+    }
+
+    .tab-button.active-tab {
+      border-color: #1d4ed8;
+      background: #1d4ed8;
+      color: #fff;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active-panel {
+      display: block;
+    }
+
+    .tree {
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+      margin-top: 20px;
+    }
+
+    /* Item 3: floating book-list block. The panel itself sticks near
+       the top of the viewport and scrolls its own content once that
+       content is taller than the available space, instead of the
+       whole page scrolling underneath it. overscroll-behavior:contain
+       stops that inner scroll from "spilling over" into a page-level
+       scroll once it hits the top/bottom edge. The title-filter box
+       is pinned at the top of that inner scroll (its own
+       position:sticky, top:0) so it stays visible - only the
+       book list beneath it moves - the same pattern already used for
+       the results toolbar below and for the in-page search results
+       panel in in-page-search.js. */
+    .browse-floating-panel {
+      position: sticky;
+      top: 20px;
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .title-search-tree {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      margin-bottom: 20px;
+    }
+
+    .title-search-content {
+      padding: 18px 20px;
+    }
+
+    .title-search-input {
+      margin: 0;
+    }
+
+    details {
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    details:last-child {
+      border-bottom: 0;
+    }
+
+    summary {
+      padding: 17px 20px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: bold;
+      color: #173b63;
+      user-select: none;
+    }
+
+    summary::-webkit-details-marker {
+      display: none;
+    }
+
+    summary::before {
+      content: "＋";
+      display: inline-block;
+      width: 28px;
+      color: #2563eb;
+      font-size: 1.25rem;
+      vertical-align: middle;
+    }
+
+    details[open] > summary::before {
+      content: "−";
+    }
+
+    .branch-content {
+      padding: 0 20px 20px;
+    }
+
+    .book-list {
+      margin: 0;
+      padding: 0 20px 14px 0;
+      list-style: none;
+    }
+
+    .book-list li {
+      border-top: 1px solid #edf2f7;
+    }
+
+    .book-list a {
+      display: block;
+      padding: 11px 10px;
+      color: #1d4ed8;
+      text-decoration: none;
+      border-radius: 7px;
+    }
+
+    .book-list a:hover {
+      background: #eff6ff;
+      text-decoration: underline;
+    }
+
+    .html-link::before {
+      content: "HTML";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 0.72rem;
+      font-weight: bold;
+      direction: ltr;
+    }
+
+    .pdf-link::before {
+      content: "PDF";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-size: 0.72rem;
+      font-weight: bold;
+      direction: ltr;
+    }
+
+    .text-search-results {
+      margin-top: 22px;
+    }
+
+    .result-count {
+      margin: 0 0 10px;
+      color: #475569;
+      font-size: 0.92rem;
+    }
+
+    .text-search-result {
+      margin-top: 12px;
+      padding: 15px;
+      border: 1px solid #dbe3ee;
+      border-radius: 11px;
+      background: #fff;
+    }
+
+    .result-title {
+      display: block;
+      color: #1d4ed8;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .result-title:hover {
+      text-decoration: underline;
+    }
+
+    .text-search-result p {
+      margin: 10px 0 0;
+      color: #475569;
+      font-size: 0.93rem;
+      line-height: 2;
+    }
+
+    .found-word-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: #1d4ed8;
+      font-size: 0.9rem;
+      font-weight: bold;
+      text-decoration: none;
+    }
+
+    .found-word-link:hover {
+      text-decoration: underline;
+    }
+
+    mark {
+      padding: 1px 3px;
+      border-radius: 3px;
+      background: #fde68a;
+      color: inherit;
+    }
+
+    .pagination {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      margin: 24px 0 0;
+      direction: rtl;
+    }
+
+    .page-button {
+      min-width: 38px;
+      padding: 7px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #1d4ed8;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.9rem;
+    }
+
+    .page-button:hover:not(:disabled) {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+
+    .page-button.current-page {
+      border-color: #1d4ed8;
+      background: #1d4ed8;
+      color: #fff;
+      cursor: default;
+    }
+
+    .page-button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .page-dots {
+      display: inline-flex;
+      align-items: center;
+      padding: 0 5px;
+      color: #64748b;
+    }
+
+    #noResults {
+      display: none;
+      margin: 18px 0 0;
+      padding: 13px 15px;
+      border-radius: 10px;
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    @media (max-width: 520px) {
+      .container {
+        width: min(100% - 22px, 960px);
+        padding-top: 28px;
+      }
+
+      .branch-content {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      .page-button {
+        min-width: 34px;
+        padding: 6px 8px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <header>
+      <h1>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</h1>
+      <p class="subtitle">دسترسی و جست‌وجو در عنوان‌ها و متن دروس آرشیو</p>
+    </header>
+
+    <nav class="tabs" aria-label="بخش‌های صفحه">
+      <button
+        id="browseTabButton"
+        class="tab-button active-tab"
+        type="button"
+        role="tab"
+        aria-selected="true"
+        aria-controls="browsePanel">
+        مطالعهٔ کتاب‌ها
+      </button>
+
+      <button
+        id="searchTabButton"
+        class="tab-button"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="searchPanel">
+        جست‌وجو
+      </button>
+    </nav>
+
+    <div id="browsePanel" class="tab-panel active-panel">
+      <div class="browse-floating-panel">
+      <section class="tree title-search-tree" aria-label="جست‌وجو در عنوان کتاب‌ها">
+        <div class="branch-content title-search-content">
+          <input
+            id="titleSearch"
+            class="search-box title-search-input"
+            type="search"
+            placeholder="جست‌وجو در عنوان کتاب‌ها…"
+            aria-label="جست‌وجو در عنوان کتاب‌ها">
+
+          <p id="titleNoResults" style="display:none; margin: 10px 0 0; color:#9a3412;">
+            عنوانی پیدا نشد.
+          </p>
+        </div>
+      </section>
+
+      <section class="tree" aria-label="فهرست منابع">
+
+      <details class="main-branch" open>
+        <summary></summary>
+
+        <div class="branch-content">
+          <ul class="book-list">
+
+            <li
+              class="searchable-item"
+              data-title="آقای جوادی و حدوث"
+              data-url="Aghaye-Javadi-va-Hodous.htm">
+              <a
+                class="html-link"
+                href="Aghaye-Javadi-va-Hodous.htm"
+                target="_blank"
+                rel="noopener">
+                آقای جوادی و حدوث
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="اثبات توحید و بطلان وحدت وجود"
+              data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
+              <a
+                class="html-link"
+                href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
+                target="_blank"
+                rel="noopener">
+                اثبات توحید و بطلان وحدت وجود
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="اصول المعارف الالهیة"
+              data-url="Osoul-al-Maaref-al-Elahiyya.htm">
+              <a
+                class="html-link"
+                href="Osoul-al-Maaref-al-Elahiyya.htm"
+                target="_blank"
+                rel="noopener">
+                اصول المعارف الالهیة
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="الإعلان عن اسرار الفلسفة والعرفان"
+              data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
+              <a
+                class="html-link"
+                href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                الإعلان عن اسرار الفلسفة والعرفان
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="فراتر از عرفان"
+              data-url="Faratar-az-Erfan.htm">
+              <a
+                class="html-link"
+                href="Faratar-az-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                فراتر از عرفان
+              </a>
+            </li>
+
+            <li
+              class="searchable-item"
+              data-title="متن درس معرفة الله محشی"
+              data-url="marefatollah-mohashsha.htm">
+              <a
+                class="html-link"
+                href="marefatollah-mohashsha.htm"
+                target="_blank"
+                rel="noopener">
+                متن درس معرفة الله (محشّی)
+              </a>
+            </li>
+
+          </ul>
+        </div>
+      </details>
+
+      <details class="main-branch" open>
+        <summary>نسخه‌های PDF</summary>
+
+        <div class="branch-content">
+          <ul class="book-list">
+            <li
+              class="searchable-item"
+              data-title="معرفت الله تعالی"
+              data-url="Marefat-Taala-Allah-bellah.pdf"
+              data-pdf="true">
+              <a
+                class="pdf-link"
+                href="pdf-viewer.html?file=Marefat-Taala-Allah-bellah.pdf&title=معرفت الله تعالی"
+                target="_blank"
+                rel="noopener">
+                معرفت الله تعالی
+              </a>
+            </li>
+          </ul>
+        </div>
+      </details>
+
+    </section>
+    </div>
+    </div>
+
+    <div id="searchPanel" class="tab-panel">
+      <div class="search-layout">
+        <div class="search-controls">
+          <div class="search-box-wrap">
+            <input
+              id="siteSearch"
+              name="siteSearch"
+              class="search-box"
+              type="search"
+              autocomplete="off"
+              placeholder="کلمه یا عبارت مورد نظر را بنویسید."
+              aria-label="جست‌وجو در منابع و متن دروس">
+
+            <div id="siteSearchHistory" class="search-history-dropdown"></div>
+          </div>
+
+          <label class="root-search-label" for="siteSearchRoot">
+            <input id="siteSearchRoot" type="checkbox">
+            جست‌وجوی ریشه‌ای (تطبیق با اشکال مختلف کلمه)
+          </label>
+
+          <label
+            id="showDerivativesLabel"
+            class="derivatives-toggle-label"
+            for="showDerivativesToggle"
+            title="نمایش فهرست مشتقات یافت‌شده برای جست‌وجوی ریشه‌ای"
+            style="display:none;">
+            <input id="showDerivativesToggle" type="checkbox">
+            مشاهده مشتقات
+          </label>
+
+          <div class="settings-wrap">
+            <button
+              id="settingsGear"
+              type="button"
+              class="settings-gear"
+              title="تنظیمات جست‌وجو"
+              aria-label="تنظیمات جست‌وجو"
+              aria-haspopup="true"
+              aria-expanded="false">
+              ⚙️
+            </button>
+
+            <div id="settingsMenu" class="settings-menu" role="menu"></div>
+          </div>
+
+          <button
+            id="siteVoiceInput"
+            type="button"
+            class="voice-input-button"
+            title="جست‌وجوی صوتی">
+            🎤 جست‌وجوی صوتی
+          </button>
+
+          <button
+            id="siteArchiveToggle"
+            type="button"
+            class="voice-input-button">
+            آرشیو نتایج
+          </button>
+
+          <div class="book-scope-actions">
+            <button
+              id="bookScopeSelectAll"
+              type="button"
+              class="book-scope-action-button">
+              انتخاب همه
+            </button>
+
+            <button
+              id="bookScopeDeselectAll"
+              type="button"
+              class="book-scope-action-button">
+              لغو انتخاب
+            </button>
+          </div>
+
+          <div
+            id="bookScopeList"
+            class="book-scope-list"
+            role="group"
+            aria-label="دامنهٔ جست‌وجو در کتاب‌ها">
+          </div>
+        </div>
+
+        <div class="search-results-column">
+          <div id="derivativesBlock" class="derivatives-block" style="display:none;"></div>
+
+          <section
+            id="searchResults"
+            class="text-search-results"
+            aria-live="polite">
+          </section>
+
+          <nav
+            id="pagination"
+            class="pagination"
+            aria-label="صفحه‌های نتایج جست‌وجو">
+          </nav>
+
+          <p id="noResults">
+            نتیجه‌ای در عنوان‌ها یا متن درس‌ها پیدا نشد.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div id="archiveOverlay" class="archive-overlay">
+      <div id="archivePanel" role="dialog" aria-label="آرشیو نتایج"></div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+
+    const searchInput = document.getElementById("siteSearch");
+    const searchResults = document.getElementById("searchResults");
+    const pagination = document.getElementById("pagination");
+    const noResults = document.getElementById("noResults");
+    const DEFAULT_NO_RESULTS_TEXT = noResults.textContent;
+    const searchableItems = [...document.querySelectorAll(".searchable-item")];
+
+    const titleSearchInput = document.getElementById("titleSearch");
+    const titleNoResults = document.getElementById("titleNoResults");
+    const allBookListItems = [...document.querySelectorAll(".book-list li")];
+
+    const browseTabButton = document.getElementById("browseTabButton");
+    const searchTabButton = document.getElementById("searchTabButton");
+    const browsePanel = document.getElementById("browsePanel");
+    const searchPanel = document.getElementById("searchPanel");
+
+    function activateTab(tabName) {
+      const showSearch = tabName === "search";
+
+      browseTabButton.classList.toggle("active-tab", !showSearch);
+      searchTabButton.classList.toggle("active-tab", showSearch);
+      browseTabButton.setAttribute("aria-selected", String(!showSearch));
+      searchTabButton.setAttribute("aria-selected", String(showSearch));
+      browsePanel.classList.toggle("active-panel", !showSearch);
+      searchPanel.classList.toggle("active-panel", showSearch);
+
+      if (showSearch) {
+        searchInput.focus();
+      }
+    }
+
+    browseTabButton.addEventListener("click", () => activateTab("browse"));
+    searchTabButton.addEventListener("click", () => activateTab("search"));
+
+
+    const documents = [];
+    const resultsPerPage = 8;
+
+    let currentResults = [];
+    let currentQuery = "";
+    let currentPage = 1;
+    let currentRootMode = false;
+    let currentProximityMode = false;
+    let currentProximityWords = [];
+    // Item 4: for root-mode searches, rootBaseResults holds every
+    // matching paragraph (each tagged with the exact derivative
+    // words found in it); currentResults becomes a filtered view of
+    // this list when the user clicks one derivative chip.
+    let rootBaseResults = [];
+    let activeDerivativeKeys = new Set();
+
+    // ---- منوی تنظیمات ⚙️ (بعینه از بلوک جست‌وجوی داخل صفحه) --------------
+    // مرتب‌سازی: "position" ترتیب طبیعی متن، "frequency" پرتکرارترین اول.
+    let resultsSortMode = "position";
+
+    // جست‌وجوی مجاورتی: کلمات عبارت لازم نیست کنار هم بیایند، کافی است
+    // در فاصله‌ی حداکثر proximityDistance کلمه از هم باشند.
+    let proximitySearchEnabled = false;
+    let proximityDistance = 5;
+
+    // دامنه‌ی متن/پاورقی: هر دو پیش‌فرض روشن‌اند و هیچ‌وقت هر دو با هم
+    // خاموش نمی‌شوند (همان قاعده‌ی بلوک جست‌وجوی داخل صفحه).
+    let searchInMainText = true;
+    let searchInFootnotes = true;
+
+    // نمایش مشتقات، اختیاری و جدا از خودِ جست‌وجوی ریشه‌ای است.
+    let showDerivatives = false;
+    const selectedResultIndexes = new Set();
+
+    async function copyTextToClipboard(text) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          return true;
+        }
+      } catch (error) {
+        // fall through to the legacy fallback below
+      }
+
+      try {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textarea);
+
+        return successful;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    // Copy rich text so the pasted result shows a short, clickable
+    // "لینک منبع" hyperlink with the long URL hidden behind it
+    // (works in Gmail, Word, WhatsApp web, etc.). Falls back to a
+    // plain-text/markdown version where rich paste isn't available.
+    async function copyRichText(plainText, html) {
+      try {
+        if (
+          navigator.clipboard &&
+          window.isSecureContext &&
+          window.ClipboardItem
+        ) {
+          const item = new ClipboardItem({
+            "text/html": new Blob([html], { type: "text/html" }),
+            "text/plain": new Blob([plainText], { type: "text/plain" })
+          });
+          await navigator.clipboard.write([item]);
+          return true;
+        }
+      } catch (error) {
+        // fall through to the legacy selection-based copy below
+      }
+
+      try {
+        const container = document.createElement("div");
+        container.innerHTML = html;
+        container.style.position = "fixed";
+        container.style.opacity = "0";
+        container.style.direction = "rtl";
+        document.body.appendChild(container);
+
+        const range = document.createRange();
+        range.selectNodeContents(container);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        const successful = document.execCommand("copy");
+        selection.removeAllRanges();
+        document.body.removeChild(container);
+
+        return successful;
+      } catch (error) {
+        return await copyTextToClipboard(plainText);
+      }
+    }
+
+    function updateCopyButtonState() {
+      const button = document.getElementById("copySelectedButton");
+      const archiveButton = document.getElementById("addToArchiveButton");
+
+      if (!button) {
+        return;
+      }
+
+      const count = selectedResultIndexes.size;
+
+      button.disabled = count === 0;
+      button.textContent = count > 0 ?
+        `کپی موارد انتخاب‌شده (${count})` :
+        "کپی موارد انتخاب‌شده";
+
+      if (archiveButton) {
+        archiveButton.disabled = count === 0;
+        archiveButton.textContent = count > 0 ?
+          `افزودن به آرشیو (${count})` :
+          "افزودن به آرشیو";
+      }
+    }
+
+    async function handleCopySelectedResults() {
+      const button = document.getElementById("copySelectedButton");
+
+      const selected = [...selectedResultIndexes]
+        .sort((a, b) => a - b)
+        .map(index => currentResults[index])
+        .filter(Boolean);
+
+      if (selected.length === 0) {
+        return;
+      }
+
+      // Item 2: file title shown separately, in its own clearly
+      // marked header line, above/apart from the quoted text.
+      // Item 3: each result's own reference link goes right under it.
+      // Item 4: replaced the old "——— عنوان: X ———" (title pinned
+      // between two triple-dash runs) with a book icon + full-width
+      // divider for plain text, and an actual colored/bordered
+      // <table> header for rich targets like Word - table cells
+      // survive Word's paste filter far better than div/box CSS.
+      const divider = "─".repeat(32);
+
+      const plainText = selected
+        .map(result => (
+          `📘 عنوان: ${result.title}\n${divider}\n` +
+          `«${result.snippet}»\n` +
+          `🔗 لینک منبع: ${result.url}`
+        ))
+        .join("\n\n");
+
+      // Item 2: Word only gets the bidi ordering of quotes/numbers right
+      // when the paragraph's own direction is LTR (its paste filter
+      // decides run order from the paragraph mark, not from the Unicode
+      // bidi algorithm the way Telegram's renderer does) - text-align:
+      // right keeps it visually right-aligned everywhere, Telegram
+      // included, since the actual text runs stay RTL regardless of the
+      // container's dir. Please double-check both destinations after
+      // this change.
+      const html = selected
+        .map(result => {
+          const title = escapeHtml(result.title);
+          const snippet = escapeHtml(result.snippet);
+          const url = escapeHtml(result.url);
+          return (
+            `<div dir="ltr" style="margin:0 0 16px;text-align:right;">` +
+              `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;` +
+              `margin:0 0 8px;"><tr><td style="padding:9px 14px;background:#eff6ff;` +
+              `border-right:4px solid #2563eb;font-family:Tahoma,Arial,sans-serif;` +
+              `font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
+              `📘\u00a0${title}</td></tr></table>` +
+              `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+              `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">«${snippet}»</p>` +
+              `<p dir="ltr" style="margin:0;font-family:Tahoma,Arial,sans-serif;font-size:12px;text-align:right;">` +
+              `🔗 <a href="${url}" style="color:#1d4ed8;text-decoration:none;">` +
+              `لینک منبع</a></p>` +
+            `</div>`
+          );
+        })
+        .join("");
+
+      const ok = await copyRichText(plainText, html);
+
+      if (button) {
+        button.textContent = ok ? "کپی شد!" : "خطا در کپی";
+        setTimeout(updateCopyButtonState, 1500);
+      }
+    }
+
+    // ---- Results archive (item 7) --------------------------------------
+    // Shared localStorage key with in-page-search.js, so results saved
+    // from any book page and from this site-wide search show up
+    // together in one archive.
+    const ARCHIVE_STORAGE_KEY = "milaniSearchResultsArchive";
+
+    function loadArchive() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(ARCHIVE_STORAGE_KEY) || "[]");
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveArchive(items) {
+      try {
+        localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(items));
+      } catch (error) {
+        // Storage unavailable or full - archive just won't persist.
+      }
+    }
+
+    function addSelectedToArchive() {
+      const selected = [...selectedResultIndexes]
+        .sort((a, b) => a - b)
+        .map(index => currentResults[index])
+        .filter(Boolean);
+
+      if (selected.length === 0) {
+        return;
+      }
+
+      const archive = loadArchive();
+
+      selected.forEach(result => {
+        archive.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          title: result.title,
+          text: result.paragraph,
+          url: result.url,
+          savedAt: new Date().toISOString()
+        });
+      });
+
+      saveArchive(archive);
+      renderArchivePanel();
+
+      const button = document.getElementById("addToArchiveButton");
+
+      if (button) {
+        const originalText = button.textContent;
+        button.textContent = "به آرشیو افزوده شد!";
+        setTimeout(() => { button.textContent = originalText; }, 1500);
+      }
+    }
+
+    function removeFromArchive(id) {
+      saveArchive(loadArchive().filter(item => item.id !== id));
+      renderArchivePanel();
+    }
+
+    function clearArchive() {
+      saveArchive([]);
+      renderArchivePanel();
+    }
+
+    function renderArchivePanel() {
+      const panel = document.getElementById("archivePanel");
+
+      if (!panel) {
+        return;
+      }
+
+      const items = loadArchive().slice().reverse();
+
+      const listHtml = items.length === 0 ?
+        `<p class="archive-empty">هنوز نتیجه‌ای در آرشیو ذخیره نشده است.</p>` :
+        items.map(item => `
+          <div class="archive-item">
+            <div class="archive-item-title">${escapeHtml(item.title || "")}</div>
+            <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
+            <div class="archive-item-actions">
+              <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
+                بازکردن
+              </a>
+              <button type="button" data-archive-id="${escapeHtml(item.id)}">
+                حذف
+              </button>
+            </div>
+          </div>
+        `).join("");
+
+      panel.innerHTML = `
+        <div class="archive-header">
+          <span>آرشیو نتایج (${items.length})</span>
+          <div class="archive-header-actions">
+            <button type="button" id="archiveClearButton">پاک‌کردن همه</button>
+            <button type="button" id="archiveCloseButton">بستن</button>
+          </div>
+        </div>
+        ${listHtml}
+      `;
+
+      const clearButton = panel.querySelector("#archiveClearButton");
+      if (clearButton) {
+        clearButton.addEventListener("click", clearArchive);
+      }
+
+      const closeButton = panel.querySelector("#archiveCloseButton");
+      if (closeButton) {
+        closeButton.addEventListener("click", closeArchivePanel);
+      }
+
+      panel.querySelectorAll("[data-archive-id]").forEach(button => {
+        button.addEventListener("click", () => {
+          removeFromArchive(button.dataset.archiveId);
+        });
+      });
+    }
+
+    function openArchivePanel() {
+      renderArchivePanel();
+      document.getElementById("archiveOverlay").classList.add("open");
+    }
+
+    function closeArchivePanel() {
+      document.getElementById("archiveOverlay").classList.remove("open");
+    }
+
+    const archiveOverlayEl = document.getElementById("archiveOverlay");
+    if (archiveOverlayEl) {
+      archiveOverlayEl.addEventListener("click", event => {
+        if (event.target === archiveOverlayEl) {
+          closeArchivePanel();
+        }
+      });
+    }
+
+    const archiveToggleButton = document.getElementById("siteArchiveToggle");
+    if (archiveToggleButton) {
+      archiveToggleButton.addEventListener("click", openArchivePanel);
+    }
+
+    // ---- Voice typing (speech-to-text into the search box) ---------
+    // Only the mic (typing by voice) is kept; voice read-aloud (TTS)
+    // was removed because browsers' Persian TTS is unreliable.
+    let siteVoiceRecognition = null;
+
+    function getSpeechRecognitionCtor() {
+      return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    }
+
+    function toggleSiteVoiceInput() {
+      const Ctor = getSpeechRecognitionCtor();
+      const button = document.getElementById("siteVoiceInput");
+
+      if (!Ctor) {
+        if (button) button.textContent = "🎤 پشتیبانی نمی‌شود";
+        return;
+      }
+
+      if (siteVoiceRecognition) {
+        siteVoiceRecognition.stop();
+        return;
+      }
+
+      siteVoiceRecognition = new Ctor();
+      siteVoiceRecognition.lang = "fa-IR";
+      siteVoiceRecognition.interimResults = false;
+      siteVoiceRecognition.maxAlternatives = 1;
+
+      siteVoiceRecognition.addEventListener("start", () => {
+        if (button) {
+          button.classList.add("is-listening");
+          button.textContent = "🎤 در حال شنیدن…";
+        }
+      });
+
+      siteVoiceRecognition.addEventListener("result", event => {
+        const transcript = event.results[0][0].transcript;
+        searchInput.value = transcript;
+        renderResults(transcript);
+        pushSearchHistory(transcript);
+        closeSearchHistoryDropdown();
+      });
+
+      siteVoiceRecognition.addEventListener("end", () => {
+        if (button) {
+          button.classList.remove("is-listening");
+          button.textContent = "🎤 جست‌وجوی صوتی";
+        }
+        siteVoiceRecognition = null;
+      });
+
+      siteVoiceRecognition.start();
+    }
+
+    const siteVoiceButton = document.getElementById("siteVoiceInput");
+    if (siteVoiceButton) {
+      if (!getSpeechRecognitionCtor()) {
+        siteVoiceButton.disabled = true;
+        siteVoiceButton.title = "مرورگر شما از جست‌وجوی صوتی پشتیبانی نمی‌کند";
+      }
+      siteVoiceButton.addEventListener("click", toggleSiteVoiceInput);
+    }
+
+    const siteSearchRoot = document.getElementById("siteSearchRoot");
+
+    function normalize(text) {
+      return (text || "")
+        .toLowerCase()
+        .replace(/[يى]/g, "ی")
+        .replace(/ك/g, "ک")
+        .replace(/ۀ/g, "ه")
+        .replace(/ة/g, "ه")
+        // Item 6: strip Arabic/Persian diacritics (اعراب) and tatweel
+        // so a query typed WITHOUT diacritics still matches text that
+        // HAS them (e.g. "کتاب" finds "کِتاب").
+        .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    // Character-variant equivalence classes - same letter pairs as
+    // normalize() above (ي/ی/ى, ك/ک, ة/ه/ۀ). Used when building a
+    // regex that must match directly against the ORIGINAL (non-
+    // normalized) text - e.g. for highlighting - so a query typed
+    // with either the Persian or Arabic form of a letter still
+    // matches/highlights the other form wherever it appears.
+    const CHAR_VARIANTS = {
+      "ي": "يیى", "ی": "يیى", "ى": "يیى",
+      "ك": "كک", "ک": "كک",
+      "ة": "ةه", "ه": "ةهۀ", "ۀ": "ۀه"
+    };
+
+    function escapeRegExpChar(ch) {
+      return ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function charClassFor(ch) {
+      const variants = CHAR_VARIANTS[ch];
+
+      if (variants) {
+        const unique = [...new Set(variants.split(""))];
+        return `[${unique.join("")}]`;
+      }
+
+      return escapeRegExpChar(ch);
+    }
+
+    // ---- Root-based (stemming) search ------------------------------
+    // Same stemmer as in-page-search.js (kept in sync manually, since
+    // this page doesn't load that file). Two layers, applied in order:
+    //  1) Arabic root-and-pattern (وزن) extraction, a simplified
+    //     version of the classic ISRI algorithm: recognizes the most
+    //     common "augment letter" positions (سألتمونيه) in 4/5/6-letter
+    //     words and strips them to reach the 3-letter triliteral root.
+    //     This is what connects surface-different words like حادثه /
+    //     حدوث / حوادث / حادث, or کتاب / کاتب / مکتوب / الکتاب, which
+    //     no amount of prefix/suffix stripping alone can do.
+    //  2) A light Persian/Arabic affix stripper (prefixes می‌/نمی‌/بی‌/
+    //     ال, suffixes ها/ان/تر/ترین/...) for words the pattern step
+    //     doesn't fully resolve.
+    // Pattern extraction runs BEFORE the generic suffix stripper so
+    // real root letters aren't cannibalized by an accidentally-
+    // matching generic suffix (e.g. "کریم" ends in "یم", also a
+    // common verb suffix - resolving the فعیل pattern first keeps the
+    // "م" that a naive suffix strip would have removed).
+    // Not a full morphological analyzer or dictionary lookup - it
+    // will still miss irregular/weak-letter verbs and occasionally
+    // produce a wrong or overly short root. Good enough for
+    // connecting the common derivational families in this archive; a
+    // dictionary-based approach (e.g. the Arramooz word/root
+    // database) would be the next step up in accuracy if ever needed.
+
+    const STEM_MIN_ROOT_LENGTH = 2;
+
+    // Note: single-letter Arabic proclitics (و/ف/ب/ل/ک) are deliberately
+    // NOT included here - they falsely strip the first letter of countless
+    // ordinary Persian words (e.g. "کتاب" -> "تاب"), doing far more harm
+    // than good on this mostly-Persian corpus.
+    const STEM_PREFIXES = [
+      "نمی", "می", "بی",
+      "وال", "بال", "فال", "کال", "لل",
+      "ال"
+    ].sort((a, b) => b.length - a.length);
+
+    const STEM_SUFFIXES = [
+      "هایمان", "هایتان", "هایشان",
+      "هایم", "هایت", "هایش",
+      "ترین", "های", "گان",
+      "یم", "ید", "ند", "تر",
+      "ها", "ان", "ات", "ون", "ین", "یه",
+      "ی", "ه"
+    ].sort((a, b) => b.length - a.length);
+
+    // "سألتمونيه" - the classic set of Arabic augment letters (with ي
+    // normalized to ی), used when deciding whether a leading/trailing
+    // letter on a long word is likely an augment rather than a root
+    // letter.
+    const AUGMENT_LETTERS = new Set(
+      ["ا", "و", "ی", "ت", "ن", "م", "س", "ه"]
+    );
+
+    const WORD_PATTERN = /[\u0621-\u06FF]+(?:\u200c[\u0621-\u06FF]+)*/g;
+
+    function stripDiacritics(text) {
+      return (text || "")
+        .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+        .replace(/[\u200c\u200e\u200f]/g, "")
+        .replace(/[أإآ]/g, "ا")
+        .replace(/ؤ/g, "و")
+        .replace(/ئ/g, "ی");
+    }
+
+    function cleanWord(word) {
+      return normalize(stripDiacritics(word));
+    }
+
+    // Reduce a 4-letter word to its 3-letter root by removing one
+    // augment letter at the position where a known measure (وزن) puts
+    // it. Returns null if no recognized pattern applies.
+    function reduceFourLetter(word) {
+      const c0 = word[0];
+      const c1 = word[1];
+      const c2 = word[2];
+      const c3 = word[3];
+
+      if (c1 === "ا") return c0 + c2 + c3; // فاعل  (حادث -> حدث)
+      if (c2 === "ا") return c0 + c1 + c3; // فِعال (کتاب -> کتب)
+      if (c2 === "و") return c0 + c1 + c3; // فعول  (حدوث -> حدث)
+      if (c2 === "ی") return c0 + c1 + c3; // فعیل  (کریم -> کرم)
+      if (c0 === "م") return c1 + c2 + c3; // مفعل  (مکتب -> کتب)
+      if (c0 === "ت") return c1 + c2 + c3; // تفعّل (تعلم -> علم)
+
+      return null;
+    }
+
+    // Reduce a 5-letter word to its 3-letter root by removing two
+    // augment letters at known measure positions.
+    function reduceFiveLetter(word) {
+      const c0 = word[0];
+      const c1 = word[1];
+      const c2 = word[2];
+      const c3 = word[3];
+      const c4 = word[4];
+
+      if (c1 === "و" && c2 === "ا") return c0 + c3 + c4; // فواعل (حوادث -> حدث)
+      if (c0 === "م" && c2 === "ا") return c1 + c3 + c4; // مفاعل (مساجد -> سجد)
+      if (c0 === "م" && c3 === "و") return c1 + c2 + c4; // مفعول (مکتوب -> کتب)
+      if (c0 === "ت" && c3 === "ی") return c1 + c2 + c4; // تفعیل (توحید -> وحد)
+      if (c1 === "ت" && c3 === "ا") return c0 + c2 + c4; // تفاعل-ish
+      if (c2 === "ا" && c3 === "ی") return c0 + c1 + c4; // فعائل (رسائل -> رسل)
+
+      return null;
+    }
+
+    // For 6+ letter words, fall back to peeling one plausible augment
+    // letter off either end and letting the loop in deaugmentToRoot()
+    // retry the shorter word.
+    function reduceLongWord(word) {
+      const first = word[0];
+
+      if (AUGMENT_LETTERS.has(first) && word.length - 1 >= 4) {
+        return word.slice(1);
+      }
+
+      const last = word[word.length - 1];
+
+      if (AUGMENT_LETTERS.has(last) && word.length - 1 >= 4) {
+        return word.slice(0, -1);
+      }
+
+      return null;
+    }
+
+    function deaugmentToRoot(word) {
+      let w = word;
+      let guard = 0;
+
+      while (w.length > 3 && guard < 4) {
+        guard += 1;
+
+        let reduced = null;
+
+        if (w.length === 4) {
+          reduced = reduceFourLetter(w);
+        } else if (w.length === 5) {
+          reduced = reduceFiveLetter(w);
+        } else if (w.length >= 6) {
+          reduced = reduceLongWord(w);
+        }
+
+        if (reduced === null || reduced.length >= w.length) {
+          break;
+        }
+
+        w = reduced;
+      }
+
+      return w;
+    }
+
+    function stripOnePrefix(word) {
+      for (const prefix of STEM_PREFIXES) {
+        if (
+          word.startsWith(prefix) &&
+          word.length - prefix.length >= STEM_MIN_ROOT_LENGTH
+        ) {
+          return word.slice(prefix.length);
+        }
+      }
+
+      return word;
+    }
+
+    function stripSuffixes(word) {
+      let result = word;
+
+      for (let pass = 0; pass < 2; pass++) {
+        for (const suffix of STEM_SUFFIXES) {
+          if (
+            result.endsWith(suffix) &&
+            result.length - suffix.length >= STEM_MIN_ROOT_LENGTH
+          ) {
+            result = result.slice(0, -suffix.length);
+            break;
+          }
+        }
+      }
+
+      return result;
+    }
+
+    function stemWord(word) {
+      let w = stripOnePrefix(cleanWord(word));
+
+      if (w.length > 3) {
+        const patternResult = deaugmentToRoot(w);
+
+        if (patternResult.length === 3) {
+          return patternResult;
+        }
+
+        w = patternResult;
+      }
+
+      w = stripSuffixes(w);
+
+      if (w.length > 3) {
+        w = deaugmentToRoot(w);
+      }
+
+      return w;
+    }
+
+    function getQueryStems(query) {
+      return query
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(stemWord)
+        .filter(Boolean);
+    }
+
+    function findWordsInText(text) {
+      const words = [];
+      let match;
+
+      WORD_PATTERN.lastIndex = 0;
+
+      while ((match = WORD_PATTERN.exec(text)) !== null) {
+        words.push({
+          text: match[0],
+          start: match.index,
+          end: match.index + match[0].length,
+          stem: stemWord(match[0])
+        });
+      }
+
+      return words;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    // Item ح (بعینه از بلوک جست‌وجوی داخل صفحه): خروجی Word هر پاراگراف
+    // پاورقی را با class="MsoFootnoteText" مشخص می‌کند، پس همان کلاس
+    // تشخیص می‌دهد که یک بلوک متعلق به متن اصلی است یا پاورقی.
+    function isFootnoteBlock(block) {
+      return !!(block.closest && block.closest(".MsoFootnoteText"));
+    }
+
+    function getParagraphsFromHtml(html) {
+      const parser = new DOMParser();
+      const page = parser.parseFromString(html, "text/html");
+
+      page.querySelectorAll(
+        "script, style, noscript, svg, iframe, header, footer, nav"
+      ).forEach(element => element.remove());
+
+      const blocks = [
+        ...page.body.querySelectorAll(
+          "h1, h2, h3, h4, h5, h6, p, li, blockquote, td, th"
+        )
+      ];
+
+      const seen = new Map();
+
+      blocks.forEach(block => {
+        const text = block.textContent.replace(/\s+/g, " ").trim();
+
+        if (!text || seen.has(text)) {
+          return;
+        }
+
+        seen.set(text, isFootnoteBlock(block));
+      });
+
+      return [...seen.entries()].map(([text, isFootnote]) => ({
+        text: text,
+        isFootnote: isFootnote
+      }));
+    }
+
+    function buildFragmentText(cleanParagraph, position, matchLength) {
+      // Only the matched text itself is used as the text-fragment target.
+      // Earlier versions appended the next two words too, but that spanned
+      // block/element boundaries in the real DOM and made the #:~:text=REMOVED
+      // fragment fail to match - so the "رفتن به عبارت یافت‌شده" link did
+      // nothing. The matched text alone is far more reliable.
+      return cleanParagraph
+        .slice(position, position + matchLength)
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    // Item 2: a "visual key" for a surface word. Two words that LOOK the
+    // same to a reader but differ under the hood (a ZWNJ \u200c hidden
+    // inside, an invisible diacritic, an Arabic vs Persian codepoint for
+    // the same letter) must collapse to ONE derivative chip. We strip
+    // diacritics/ZWNJ/tatweel and normalize letter variants, then use the
+    // result as the grouping key - while still showing a clean, readable
+    // label (the first clean form seen) on the chip itself.
+    function getVisualWordKey(word) {
+      return (word || "")
+        .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+        .replace(/[\u200c\u200d\u200e\u200f]/g, "")
+        .replace(/[يى]/g, "ی")
+        .replace(/ك/g, "ک")
+        .replace(/[ۀ]/g, "ه")
+        .replace(/ة/g, "ه")
+        .replace(/[أإآ]/g, "ا")
+        .replace(/ؤ/g, "و")
+        .replace(/ئ/g, "ی")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+    }
+
+    // A readable label for a derivative key: prefer a clean visible form of
+    // the actual surface word (ZWNJ turned into a normal space-free join is
+    // fine - we just want something the reader recognizes).
+    function getVisualWordLabel(word) {
+      return (word || "")
+        .replace(/[\u200c\u200d]/g, "")
+        .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    // Sentence-bounded snippet for display (item 7). Instead of showing
+    // the whole paragraph (which can be very long), show the sentence that
+    // contains the match - i.e. from the nearest sentence-ender before the
+    // match to the nearest one after it. If no sentence boundary is found,
+    // fall back to a window around the match, and ultimately to the full
+    // paragraph.
+    const SNIPPET_SENTENCE_ENDERS = /[.!?؟۔،؛:\u064B-\u0652]/;
+    const SNIPPET_MAX_LENGTH = 240;
+
+    function getSentenceSnippetBounds(text, startOffset, endOffset) {
+      let sentenceStart = startOffset;
+
+      while (
+        sentenceStart > 0 &&
+        !SNIPPET_SENTENCE_ENDERS.test(text[sentenceStart - 1])
+      ) {
+        sentenceStart--;
+      }
+
+      let sentenceEnd = endOffset;
+
+      while (
+        sentenceEnd < text.length &&
+        !SNIPPET_SENTENCE_ENDERS.test(text[sentenceEnd - 1])
+      ) {
+        sentenceEnd++;
+      }
+
+      if (sentenceEnd - sentenceStart > SNIPPET_MAX_LENGTH) {
+        const half = Math.floor(SNIPPET_MAX_LENGTH / 2);
+        sentenceStart = Math.max(sentenceStart, startOffset - half);
+        sentenceEnd = Math.min(sentenceEnd, endOffset + half);
+      }
+
+      return { sentenceStart, sentenceEnd };
+    }
+
+    // Finds a whole-word match directly against the RAW (un-normalized)
+    // paragraph text - the same technique highlightText already uses -
+    // instead of matching against a normalized copy and slicing the raw
+    // text by an index/length computed from that normalized copy. That
+    // older approach broke whenever the raw paragraph had a diacritic
+    // mark before or inside the matched word: normalize() strips
+    // diacritics and so shortens the string, so a position/length found
+    // in the normalized copy no longer lines up with the raw text - the
+    // classic symptom was a matched word getting its last letter(s) cut
+    // off (e.g. "توحید" -> "توحی"), which then could never be found again
+    // among the real <mark> elements on the destination page and silently
+    // fell back to match #1. Matching directly against the raw text keeps
+    // position and match length self-consistent, so the full word is
+    // always captured correctly.
+    function findRawWholeWordMatch(cleanParagraph, query) {
+      const collapsedQuery = query.trim().replace(/\s+/g, " ");
+
+      if (!collapsedQuery) {
+        return null;
+      }
+
+      const charPattern = collapsedQuery
+        .split("")
+        .map(ch => (ch === " " ? "\\s+" : charClassFor(ch) + DIACRITIC_GAP))
+        .join("");
+
+      const pattern = new RegExp(
+        `(?<![${WORD_BOUNDARY_CHARS}])${charPattern}(?![${WORD_BOUNDARY_CHARS}])`,
+        "i"
+      );
+
+      return pattern.exec(cleanParagraph);
+    }
+
+    function getSentenceSnippet(paragraph, query) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const match = findRawWholeWordMatch(cleanParagraph, query);
+      const position = match ? match.index : -1;
+      const matchLength = match ? match[0].length : 0;
+
+      if (position === -1) {
+        return cleanParagraph.slice(0, SNIPPET_MAX_LENGTH);
+      }
+
+      const { sentenceStart, sentenceEnd } = getSentenceSnippetBounds(
+        cleanParagraph, position, position + matchLength
+      );
+
+      const before = sentenceStart > 0 ? "… " : "";
+      const after = sentenceEnd < cleanParagraph.length ? " …" : "";
+
+      return (
+        before +
+        cleanParagraph.slice(sentenceStart, sentenceEnd).trim() +
+        after
+      );
+    }
+
+    function getStemSentenceSnippet(paragraph, queryStems) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const words = findWordsInText(cleanParagraph);
+      const matchedWord = words.find(
+        word => word.stem && queryStems.includes(word.stem)
+      );
+
+      if (!matchedWord) {
+        return cleanParagraph.slice(0, SNIPPET_MAX_LENGTH);
+      }
+
+      const { sentenceStart, sentenceEnd } = getSentenceSnippetBounds(
+        cleanParagraph, matchedWord.start, matchedWord.end
+      );
+
+      const before = sentenceStart > 0 ? "… " : "";
+      const after = sentenceEnd < cleanParagraph.length ? " …" : "";
+
+      return (
+        before +
+        cleanParagraph.slice(sentenceStart, sentenceEnd).trim() +
+        after
+      );
+    }
+
+    function getFragmentText(paragraph, query) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const match = findRawWholeWordMatch(cleanParagraph, query);
+
+      if (!match) {
+        return query.trim();
+      }
+
+      return buildFragmentText(cleanParagraph, match.index, match[0].length);
+    }
+
+    function getStemFragmentText(paragraph, queryStems) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const words = findWordsInText(cleanParagraph);
+      const matchedWord = words.find(
+        word => word.stem && queryStems.includes(word.stem)
+      );
+
+      if (!matchedWord) {
+        return "";
+      }
+
+      return buildFragmentText(
+        cleanParagraph,
+        matchedWord.start,
+        matchedWord.end - matchedWord.start
+      );
+    }
+
+    function makeTextFragmentUrl(url, fragmentText, extraParams) {
+      // Item 3 fix: document.url is stored as a relative path (e.g.
+      // "Osoul-al-Maaref-al-Elahiyya.htm", taken straight from the
+      // link's href). That's fine for in-site navigation, but a
+      // relative path has no meaning once copied outside the site -
+      // there's no domain for it to resolve against, so it isn't a
+      // real, independently-clickable link in an external paste
+      // target. Resolving it against location.href up front makes the
+      // copied link a full absolute URL.
+      let finalUrl = new URL(url, location.href).href;
+
+      if (extraParams) {
+        // Drop undefined values instead of letting URLSearchParams
+        // stringify them as the literal text "undefined" (this is
+        // what produced "&root=undefined" in copied links).
+        const cleanParams = {};
+
+        Object.keys(extraParams).forEach(key => {
+          if (extraParams[key] !== undefined) {
+            cleanParams[key] = extraParams[key];
+          }
+        });
+
+        const params = new URLSearchParams(cleanParams);
+        const paramString = params.toString();
+
+        if (paramString) {
+          finalUrl += (finalUrl.includes("?") ? "&" : "?") + paramString;
+        }
+      }
+
+      return `${finalUrl}#:~:text=${encodeURIComponent(fragmentText)}`;
+    }
+
+    // Item 6: optional run of diacritics/tatweel allowed between each
+    // typed character, so highlighting still lines up against the
+    // ORIGINAL (possibly diacritized) paragraph text even though the
+    // query itself has none.
+    const DIACRITIC_GAP = "[\\u064B-\\u065F\\u0670\\u06D6-\\u06ED\\u0640]*";
+
+    function highlightText(text, query) {
+      const escapedText = escapeHtml(text);
+      const collapsedQuery = query.trim().replace(/\s+/g, " ");
+
+      if (!collapsedQuery) {
+        return escapedText;
+      }
+
+      const charPattern = collapsedQuery
+        .split("")
+        .map(ch => (ch === " " ?
+          "\\s+" :
+          charClassFor(ch) + DIACRITIC_GAP))
+        .join("");
+
+      const pattern = new RegExp(
+        `(?<![${WORD_BOUNDARY_CHARS}])${charPattern}(?![${WORD_BOUNDARY_CHARS}])`,
+        "gi"
+      );
+
+      return escapedText.replace(
+        pattern,
+        match => `<mark>${match}</mark>`
+      );
+    }
+
+    function highlightStemText(text, queryStems) {
+      const words = findWordsInText(text);
+      let result = "";
+      let lastIndex = 0;
+
+      words.forEach(word => {
+        if (word.stem && queryStems.includes(word.stem)) {
+          result += escapeHtml(text.slice(lastIndex, word.start));
+          result += `<mark>${escapeHtml(text.slice(word.start, word.end))}</mark>`;
+          lastIndex = word.end;
+        }
+      });
+
+      result += escapeHtml(text.slice(lastIndex));
+
+      return result;
+    }
+
+    // برای نتایج جست‌وجوی مجاورتی: هر کدام از کلمات عبارت را هرجا در متن
+    // پیدا شد (نه فقط به‌صورت عبارت پیوسته) علامت می‌زند.
+    function highlightMultipleWords(text, words) {
+      const escapedText = escapeHtml(text);
+      const validWords = (words || []).filter(Boolean);
+
+      if (!validWords.length) {
+        return escapedText;
+      }
+
+      const alternation = validWords
+        .map(word =>
+          word
+            .split("")
+            .map(ch => (ch === " " ? "\\s+" : charClassFor(ch) + DIACRITIC_GAP))
+            .join("")
+        )
+        .join("|");
+
+      const pattern = new RegExp(
+        `(?<![${WORD_BOUNDARY_CHARS}])(?:${alternation})(?![${WORD_BOUNDARY_CHARS}])`,
+        "gi"
+      );
+
+      return escapedText.replace(pattern, match => `<mark>${match}</mark>`);
+    }
+
+    async function loadTextDocuments() {
+      const htmlJobs = searchableItems
+        .filter(item => item.dataset.pdf !== "true")
+        .map(async item => {
+          const link = item.querySelector("a");
+          const title = item.dataset.title || link.textContent;
+          const url = item.dataset.url || link.getAttribute("href");
+
+          try {
+            const response = await fetch(url);
+
+            if (!response.ok) {
+              throw new Error("File could not be loaded");
+            }
+
+            const html = await response.text();
+            const paragraphEntries = getParagraphsFromHtml(html);
+
+            documents.push({
+              type: "html",
+              title: title,
+              url: url,
+              paragraphs: paragraphEntries.map(entry => entry.text),
+              paragraphIsFootnote: paragraphEntries.map(entry => entry.isFootnote)
+            });
+          } catch (error) {
+            console.warn("Text file not loaded:", url, error);
+          }
+        });
+
+      const pdfJobs = searchableItems
+        .filter(item => item.dataset.pdf === "true")
+        .map(async item => {
+          const link = item.querySelector("a");
+          const title = item.dataset.title || link.textContent;
+          const pdfFile = item.dataset.url || link.getAttribute("href");
+
+          try {
+            if (!window.pdfjsLib) {
+              throw new Error("pdf.js not loaded");
+            }
+
+            const loadingTask = pdfjsLib.getDocument({
+              url: pdfFile,
+              disableFontFace: true
+            });
+
+            const pdf = await loadingTask.promise;
+            const paragraphs = [];
+            const pageNumbers = [];
+
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+              const page = await pdf.getPage(pageNumber);
+              const textContent = await page.getTextContent();
+
+              const pageText = textContent.items
+                .map(item => item.str)
+                .join(" ")
+                .replace(/\s+/g, " ")
+                .trim();
+
+              if (pageText.length > 0) {
+                paragraphs.push(pageText);
+                pageNumbers.push(pageNumber);
+              }
+            }
+
+            documents.push({
+              type: "pdf",
+              title: title,
+              pdfFile: pdfFile,
+              viewerBaseUrl: "pdf-viewer.html?file=" + encodeURIComponent(pdfFile) +
+                "&title=" + encodeURIComponent(title),
+              paragraphs: paragraphs,
+              // فایل‌های PDF تفکیک متن/پاورقی ندارند - همه متن اصلی
+              // شمرده می‌شوند تا فیلتر دامنه روی آن‌ها بی‌اثر بماند.
+              paragraphIsFootnote: paragraphs.map(() => false),
+              pageNumbers: pageNumbers
+            });
+          } catch (error) {
+            console.warn("PDF not loaded:", pdfFile, error);
+          }
+        });
+
+      await Promise.all([...htmlJobs, ...pdfJobs]);
+    }
+
+    function pageButton(label, page, disabled = false, isCurrent = false) {
+      const currentAttribute = isCurrent ? 'aria-current="page"' : "";
+      const currentClass = isCurrent ? " current-page" : "";
+
+      return `
+        <button
+          class="page-button${currentClass}"
+          type="button"
+          data-page="${page}"
+          ${disabled ? "disabled" : ""}
+          ${currentAttribute}
+          aria-label="${label}">
+          ${label}
+        </button>
+      `;
+    }
+
+    function getPageNumbers(totalPages, page) {
+      const pages = [];
+
+      if (totalPages <= 7) {
+        for (let number = 1; number <= totalPages; number++) {
+          pages.push(number);
+        }
+        return pages;
+      }
+
+      pages.push(1);
+
+      if (page > 4) {
+        pages.push("dots-right");
+      }
+
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+
+      for (let number = start; number <= end; number++) {
+        pages.push(number);
+      }
+
+      if (page < totalPages - 3) {
+        pages.push("dots-left");
+      }
+
+      pages.push(totalPages);
+
+      return pages;
+    }
+
+    function renderPagination(totalPages) {
+      if (totalPages <= 1) {
+        pagination.innerHTML = "";
+        return;
+      }
+
+      const buttons = [];
+
+      buttons.push(
+        pageButton("صفحهٔ قبلی", currentPage - 1, currentPage === 1)
+      );
+
+      getPageNumbers(totalPages, currentPage).forEach(item => {
+        if (typeof item === "string") {
+          buttons.push('<span class="page-dots" aria-hidden="true">…</span>');
+        } else {
+          buttons.push(
+            pageButton(
+              `صفحهٔ ${item}`,
+              item,
+              false,
+              item === currentPage
+            )
+          );
+        }
+      });
+
+      buttons.push(
+        pageButton(
+          "صفحهٔ بعدی",
+          currentPage + 1,
+          currentPage === totalPages
+        )
+      );
+
+      pagination.innerHTML = buttons.join("");
+
+      pagination.querySelectorAll(".page-button:not(:disabled)")
+        .forEach(button => {
+          button.addEventListener("click", () => {
+            const selectedPage = Number(button.dataset.page);
+
+            if (
+              selectedPage >= 1 &&
+              selectedPage <= totalPages &&
+              selectedPage !== currentPage
+            ) {
+              currentPage = selectedPage;
+              renderCurrentPage();
+
+              searchResults.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+              });
+            }
+          });
+        });
+    }
+
+    function renderCurrentPage() {
+      const totalResults = currentResults.length;
+      const totalPages = Math.ceil(totalResults / resultsPerPage);
+
+      if (currentPage > totalPages) {
+        currentPage = totalPages;
+      }
+
+      const startIndex = (currentPage - 1) * resultsPerPage;
+      const endIndex = startIndex + resultsPerPage;
+      const pageResults = currentResults.slice(startIndex, endIndex);
+
+      const firstResult = startIndex + 1;
+      const lastResult = Math.min(endIndex, totalResults);
+
+      searchResults.innerHTML = `
+        <div class="results-toolbar">
+          <p class="result-count">
+            تعداد نتیجه‌ها: ${totalResults}
+            — نمایش نتیجه‌های ${firstResult} تا ${lastResult}
+          </p>
+
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button
+              type="button"
+              id="selectVisibleButton"
+              class="copy-selected-button"
+              title="انتخاب همهٔ نتایج این صفحه">
+              انتخاب همه
+            </button>
+
+            <button
+              type="button"
+              id="clearSelectionButton"
+              class="copy-selected-button"
+              title="برداشتن انتخاب همهٔ موارد">
+              حذف انتخاب
+            </button>
+
+            <button
+              type="button"
+              id="removeSelectedButton"
+              class="copy-selected-button"
+              title="حذف موارد انتخاب‌شده از نتایج">
+              حذف موارد انتخاب‌شده
+            </button>
+
+            <button
+              type="button"
+              id="addToArchiveButton"
+              class="copy-selected-button"
+              disabled>
+              افزودن به آرشیو
+            </button>
+
+            <button
+              type="button"
+              id="copySelectedButton"
+              class="copy-selected-button"
+              title="با پیست‌کردن، لینک منبع هم همراه متن اضافه می‌شود"
+              disabled>
+              کپی موارد انتخاب‌شده
+            </button>
+          </div>
+        </div>
+
+        ${pageResults.map((result, index) => {
+          const globalIndex = startIndex + index;
+          const checkedAttr = selectedResultIndexes.has(globalIndex) ?
+            "checked" : "";
+
+          return `
+          <article class="text-search-result">
+            <div class="result-header-row">
+              <input
+                type="checkbox"
+                class="result-checkbox"
+                data-global-index="${globalIndex}"
+                ${checkedAttr}
+                aria-label="انتخاب این نتیجه">
+
+              <a
+                class="result-title"
+                href="${escapeHtml(result.url)}"
+                target="_blank"
+                rel="noopener">
+                ${escapeHtml(result.title)} — نتیجهٔ ${globalIndex + 1}
+              </a>
+            </div>
+
+            <p>${
+              currentProximityMode ?
+                highlightMultipleWords(result.snippet, currentProximityWords) :
+              currentRootMode ?
+                highlightStemText(result.snippet, getQueryStems(currentQuery)) :
+                highlightText(result.snippet, currentQuery)
+            }</p>
+
+            <a
+              class="found-word-link"
+              href="${escapeHtml(result.url)}"
+              target="_blank"
+              rel="noopener">
+              رفتن به عبارت یافت‌شده
+            </a>
+          </article>
+        `;
+        }).join("")}
+      `;
+
+      renderPagination(totalPages);
+
+      searchResults
+        .querySelectorAll(".result-checkbox")
+        .forEach(checkbox => {
+          checkbox.addEventListener("change", () => {
+            const index = parseInt(checkbox.dataset.globalIndex, 10);
+
+            if (checkbox.checked) {
+              selectedResultIndexes.add(index);
+            } else {
+              selectedResultIndexes.delete(index);
+            }
+
+            updateCopyButtonState();
+          });
+        });
+
+      const copyButton = document.getElementById("copySelectedButton");
+
+      if (copyButton) {
+        copyButton.addEventListener("click", handleCopySelectedResults);
+      }
+
+      const archiveButton = document.getElementById("addToArchiveButton");
+
+      if (archiveButton) {
+        archiveButton.addEventListener("click", addSelectedToArchive);
+      }
+
+      const selectVisibleButton = document.getElementById("selectVisibleButton");
+      if (selectVisibleButton) {
+        selectVisibleButton.addEventListener("click", () => {
+          pageResults.forEach((_, index) => {
+            selectedResultIndexes.add(startIndex + index);
+          });
+          syncCheckboxStates();
+          updateCopyButtonState();
+        });
+      }
+
+      const clearSelectionButton = document.getElementById("clearSelectionButton");
+      if (clearSelectionButton) {
+        clearSelectionButton.addEventListener("click", () => {
+          selectedResultIndexes.clear();
+          syncCheckboxStates();
+          updateCopyButtonState();
+        });
+      }
+
+      const removeSelectedButton = document.getElementById("removeSelectedButton");
+      if (removeSelectedButton) {
+        removeSelectedButton.addEventListener("click", () => {
+          const selectedObjects = new Set(
+            [...selectedResultIndexes]
+              .sort((a, b) => a - b)
+              .map(index => currentResults[index])
+              .filter(Boolean)
+          );
+
+          if (selectedObjects.size === 0) return;
+
+          if (currentRootMode) {
+            rootBaseResults = rootBaseResults.filter(r => !selectedObjects.has(r));
+          }
+
+          currentResults = currentResults.filter(r => !selectedObjects.has(r));
+          selectedResultIndexes.clear();
+          currentPage = 1;
+          renderCurrentPage();
+        });
+      }
+
+      updateCopyButtonState();
+    }
+
+    // Keep the visible checkboxes in sync with selectedResultIndexes after
+    // a select-all / clear action without a full re-render.
+    function syncCheckboxStates() {
+      searchResults.querySelectorAll(".result-checkbox").forEach(checkbox => {
+        const index = parseInt(checkbox.dataset.globalIndex, 10);
+        checkbox.checked = selectedResultIndexes.has(index);
+      });
+    }
+
+    // Boundary used so normal (non-root) search only matches whole
+    // words - e.g. searching "وجود" must not match inside "الوجود"
+    // or "موجودات". \b doesn't work here since JS regex \w is
+    // ASCII-only, so this uses an explicit lookaround against the
+    // Arabic Unicode letter block (plus ZWNJ, so a half-spaced
+    // compound like "کتاب‌خانه" still counts as one word).
+    const WORD_BOUNDARY_CHARS = "\\u0621-\\u06FF\\u200c";
+
+    function buildWholeWordPattern(normalizedQuery) {
+      const escaped = normalizedQuery
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        .replace(/ /g, "\\s+");
+
+      return new RegExp(
+        `(?<![${WORD_BOUNDARY_CHARS}])${escaped}(?![${WORD_BOUNDARY_CHARS}])`,
+        "i"
+      );
+    }
+
+    // Item ز (بعینه از بلوک جست‌وجوی داخل صفحه): جست‌وجوی مجاورتی - کلمات
+    // عبارت لازم نیست پشت‌سرهم بیایند، کافی است هرکدام حداکثر در فاصله‌ی
+    // maxDistance کلمه از بقیه باشند (به هر ترتیبی). الگوریتم دقیقاً همان
+    // پنجره‌ی لغزان in-page-search.js است، فقط این‌جا روی متن یک پاراگراف
+    // اجرا می‌شود، نه روی گره‌های متنی صفحه.
+    function findProximitySpan(paragraph, queryWords, maxDistance) {
+      const tokens = [];
+      WORD_PATTERN.lastIndex = 0;
+
+      let match;
+      while ((match = WORD_PATTERN.exec(paragraph)) !== null) {
+        tokens.push({
+          normalized: normalize(match[0]),
+          start: match.index,
+          end: match.index + match[0].length
+        });
+      }
+
+      if (tokens.length === 0) {
+        return null;
+      }
+
+      for (let i = 0; i < tokens.length; i++) {
+        const remainingWords = new Set(queryWords);
+        let lastTokenIndex = -1;
+
+        for (
+          let j = i;
+          j < tokens.length && j - i <= maxDistance + queryWords.length - 1;
+          j++
+        ) {
+          if (remainingWords.has(tokens[j].normalized)) {
+            remainingWords.delete(tokens[j].normalized);
+            lastTokenIndex = j;
+          }
+
+          if (remainingWords.size === 0) {
+            break;
+          }
+        }
+
+        if (remainingWords.size === 0) {
+          const wordsBetween = lastTokenIndex - i - (queryWords.length - 1);
+
+          if (wordsBetween <= maxDistance) {
+            return { start: tokens[i].start, end: tokens[lastTokenIndex].end };
+          }
+        }
+      }
+
+      return null;
+    }
+
+    function getProximityQueryWords(query) {
+      return query
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(normalize)
+        .filter(Boolean);
+    }
+
+    function getProximitySnippet(paragraph, span) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      const { sentenceStart, sentenceEnd } = getSentenceSnippetBounds(
+        cleanParagraph, span.start, span.end
+      );
+
+      const before = sentenceStart > 0 ? "… " : "";
+      const after = sentenceEnd < cleanParagraph.length ? " …" : "";
+
+      return (
+        before +
+        cleanParagraph.slice(sentenceStart, sentenceEnd).trim() +
+        after
+      );
+    }
+
+    function getProximityFragmentText(paragraph, span) {
+      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+      return buildFragmentText(cleanParagraph, span.start, span.end - span.start);
+    }
+
+    // Item ب: شمارش تکرار هر «صورت سطحیِ» یافت‌شده (بر اساس کلید بصری، تا
+    // شکل‌های ظاهراً یکسان یک‌جا شمرده شوند)، برای مرتب‌سازی «پرتکرارترین».
+    function getResultFrequencyCounts(results) {
+      const counts = new Map();
+
+      results.forEach(result => {
+        const key = result.matchedWordKeys && result.matchedWordKeys[0];
+
+        if (!key) {
+          return;
+        }
+
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+
+      return counts;
+    }
+
+    function applySortMode(results) {
+      if (resultsSortMode !== "frequency") {
+        return results;
+      }
+
+      const counts = getResultFrequencyCounts(results);
+
+      return results
+        .map((result, index) => ({ result, index }))
+        .sort((a, b) => {
+          const keyA = a.result.matchedWordKeys && a.result.matchedWordKeys[0];
+          const keyB = b.result.matchedWordKeys && b.result.matchedWordKeys[0];
+          const freqA = (keyA && counts.get(keyA)) || 0;
+          const freqB = (keyB && counts.get(keyB)) || 0;
+
+          if (freqB !== freqA) {
+            return freqB - freqA;
+          }
+
+          return a.index - b.index;
+        })
+        .map(entry => entry.result);
+    }
+
+    // Item ح: آیا یک پاراگراف (بر اساس دامنه‌ی متن/پاورقیِ انتخاب‌شده)
+    // اصلاً باید جست‌وجو شود؟
+    function isParagraphInSearchScope(document, paragraphIndex) {
+      const isFootnote = !!(
+        document.paragraphIsFootnote && document.paragraphIsFootnote[paragraphIndex]
+      );
+
+      return isFootnote ? searchInFootnotes : searchInMainText;
+    }
+
+    function buildResultUrl(document, paragraphIndex, query, rootMode, fragmentText, occurrenceIndex) {
+      if (document.type === "pdf") {
+        const pageNumber = document.pageNumbers[paragraphIndex] || 1;
+        const params = new URLSearchParams({
+          q: query.trim(),
+          root: rootMode ? "1" : "0"
+        });
+        const absoluteBase = new URL(document.viewerBaseUrl, location.href).href;
+        return `${absoluteBase}&${params.toString()}#page=${pageNumber}`;
+      }
+
+      return makeTextFragmentUrl(document.url, fragmentText, {
+        q: query.trim(),
+        root: rootMode ? "1" : undefined,
+        frag: fragmentText,
+        occ: occurrenceIndex
+      });
+    }
+
+    function renderResults(query) {
+      const rootMode = !!(siteSearchRoot && siteSearchRoot.checked);
+
+      // Item ز (بعینه): وقتی جست‌وجوی مجاورتی روشن است، جایگزین جست‌وجوی
+      // ریشه‌ای/دقیق می‌شود، نه مکمل آن - همان قاعده‌ی بلوک جست‌وجوی
+      // داخل صفحه. اگر عبارت کمتر از دو کلمه داشته باشد، به‌طور خودکار
+      // به جست‌وجوی دقیق (غیرریشه‌ای) برمی‌گردد.
+      const proximityWords = proximitySearchEnabled ? getProximityQueryWords(query) : [];
+      const useProximity = proximitySearchEnabled && proximityWords.length >= 2;
+      const effectiveRootMode = rootMode && !proximitySearchEnabled;
+
+      const cleanQuery = normalize(query);
+      const queryStems = effectiveRootMode ? getQueryStems(query) : [];
+      const hasQuery = effectiveRootMode ?
+        queryStems.length > 0 :
+        (useProximity ? proximityWords.length > 0 : !!cleanQuery);
+      const wholeWordPattern = (!effectiveRootMode && !useProximity && cleanQuery) ?
+        buildWholeWordPattern(cleanQuery) :
+        null;
+
+      selectedResultIndexes.clear();
+
+      if (!hasQuery) {
+        currentResults = [];
+        currentQuery = "";
+        currentRootMode = effectiveRootMode;
+        currentProximityMode = false;
+        currentProximityWords = [];
+        currentPage = 1;
+        rootBaseResults = [];
+        activeDerivativeKeys.clear();
+        searchResults.innerHTML = "";
+        pagination.innerHTML = "";
+        noResults.style.display = "none";
+        renderDerivativesBlock();
+        return;
+      }
+
+      // Book search-scope: if the user has unchecked every book, don't
+      // search anything - show a dedicated message instead of the
+      // generic "no results" one, since there was no real search.
+      if (selectedBookKeys.size === 0) {
+        currentResults = [];
+        currentQuery = query;
+        currentRootMode = effectiveRootMode;
+        currentProximityMode = useProximity;
+        currentProximityWords = proximityWords;
+        currentPage = 1;
+        rootBaseResults = [];
+        activeDerivativeKeys.clear();
+        searchResults.innerHTML = "";
+        pagination.innerHTML = "";
+        noResults.textContent =
+          "هیچ کتابی برای جست‌وجو انتخاب نشده است. لطفاً حداقل یک کتاب را از فهرست دامنهٔ جست‌وجو انتخاب کنید.";
+        noResults.style.display = "block";
+        renderDerivativesBlock();
+        return;
+      }
+
+      const allResults = [];
+
+      documents
+        .filter(document => selectedBookKeys.has(getDocumentSourceKey(document)))
+        .forEach(document => {
+        // Multiple results within the SAME document can share the exact
+        // same bare fragmentText (e.g. 12 paragraphs that all matched the
+        // word "کتاب" all produce fragmentText === "کتاب"). That text alone
+        // can't tell the destination page which of the 12 occurrences a
+        // particular result link pointed at, so we also send a 1-based
+        // "occ" (occurrence) number: how many times this exact normalized
+        // fragmentText has already appeared earlier in THIS document.
+        const fragmentOccurrenceCounts = new Map();
+
+        function nextOccurrenceIndex(fragmentText) {
+          const key = normalize(fragmentText);
+          const occurrenceIndex = (fragmentOccurrenceCounts.get(key) || 0) + 1;
+
+          fragmentOccurrenceCounts.set(key, occurrenceIndex);
+
+          return occurrenceIndex;
+        }
+
+        document.paragraphs.forEach((paragraph, paragraphIndex) => {
+          // Item ح: دامنه‌ی متن/پاورقی - پاراگرافی که خارج از دامنه‌ی
+          // انتخاب‌شده است اصلاً بررسی نمی‌شود.
+          if (!isParagraphInSearchScope(document, paragraphIndex)) {
+            return;
+          }
+
+          if (useProximity) {
+            const span = findProximitySpan(paragraph, proximityWords, proximityDistance);
+
+            if (span) {
+              const fragmentText = getProximityFragmentText(paragraph, span);
+              const occurrenceIndex = nextOccurrenceIndex(fragmentText);
+
+              allResults.push({
+                title: document.title,
+                paragraph: paragraph,
+                snippet: getProximitySnippet(paragraph, span),
+                matchedWordKeys: [getVisualWordKey(fragmentText)].filter(Boolean),
+                url: buildResultUrl(
+                  document, paragraphIndex, query, rootMode,
+                  fragmentText, occurrenceIndex
+                )
+              });
+            }
+          } else if (effectiveRootMode) {
+            const wordsInParagraph = findWordsInText(paragraph);
+
+            const paragraphStems = new Set(
+              wordsInParagraph.map(word => word.stem).filter(Boolean)
+            );
+
+            const matchesAll = queryStems.every(
+              stem => paragraphStems.has(stem)
+            );
+
+            if (matchesAll) {
+              const fragmentText =
+                getStemFragmentText(paragraph, queryStems) || query.trim();
+              const occurrenceIndex = nextOccurrenceIndex(fragmentText);
+
+              const matchedWords = [...new Set(
+                wordsInParagraph
+                  .filter(word => word.stem && queryStems.includes(word.stem))
+                  .map(word => word.text)
+              )];
+
+              allResults.push({
+                title: document.title,
+                paragraph: paragraph,
+                snippet: getStemSentenceSnippet(paragraph, queryStems),
+                matchedWords: matchedWords,
+                matchedWordKeys: [...new Set(
+                  matchedWords.map(getVisualWordKey).filter(Boolean)
+                )],
+                url: buildResultUrl(
+                  document, paragraphIndex, query, rootMode,
+                  fragmentText, occurrenceIndex
+                )
+              });
+            }
+          } else if (wholeWordPattern.test(normalize(paragraph))) {
+            const fragmentText = getFragmentText(paragraph, query);
+            const occurrenceIndex = nextOccurrenceIndex(fragmentText);
+
+            allResults.push({
+              title: document.title,
+              paragraph: paragraph,
+              snippet: getSentenceSnippet(paragraph, query),
+              matchedWordKeys: [getVisualWordKey(fragmentText)].filter(Boolean),
+              url: buildResultUrl(
+                document, paragraphIndex, query, rootMode,
+                fragmentText, occurrenceIndex
+              )
+            });
+          }
+        });
+      });
+
+      if (allResults.length === 0) {
+        currentResults = [];
+        currentQuery = query;
+        currentRootMode = effectiveRootMode;
+        currentProximityMode = useProximity;
+        currentProximityWords = proximityWords;
+        currentPage = 1;
+        rootBaseResults = [];
+        activeDerivativeKeys.clear();
+        searchResults.innerHTML = "";
+        pagination.innerHTML = "";
+        noResults.textContent = DEFAULT_NO_RESULTS_TEXT;
+        noResults.style.display = "block";
+        renderDerivativesBlock();
+        return;
+      }
+
+      noResults.style.display = "none";
+      currentQuery = query;
+      currentRootMode = effectiveRootMode;
+      currentProximityMode = useProximity;
+      currentProximityWords = proximityWords;
+      currentPage = 1;
+      activeDerivativeKeys.clear();
+
+      // Item ب: مرتب‌سازی نتایج طبق حالت انتخاب‌شده در منوی تنظیمات.
+      const sortedResults = applySortMode(allResults);
+
+      if (effectiveRootMode) {
+        rootBaseResults = sortedResults;
+        currentResults = sortedResults;
+      } else {
+        rootBaseResults = [];
+        currentResults = sortedResults;
+      }
+
+      renderDerivativesBlock();
+      renderCurrentPage();
+    }
+
+    // Item 4: the derivatives overview block. Only shown for root
+    // (stemming) searches - it lists every distinct surface word
+    // ("derivative") found across all matching paragraphs. Clicking
+    // one toggles it in the multi-select (item 1): results are narrowed
+    // to paragraphs containing ANY of the selected derivatives. "همهٔ
+    // مشتقات" clears the selection. Derivatives that look identical to
+    // the reader are collapsed into one chip by their visual key (item 2).
+    // چک‌باکس «مشاهده مشتقات» فقط وقتی جست‌وجوی ریشه‌ای روشن است معنا
+    // دارد، پس بقیه‌ی اوقات از دید کاربر پنهان می‌ماند.
+    function updateDerivativesToggleVisibility() {
+      const label = document.getElementById("showDerivativesLabel");
+
+      if (!label) {
+        return;
+      }
+
+      label.style.display =
+        (siteSearchRoot && siteSearchRoot.checked) ? "inline-flex" : "none";
+    }
+
+    function renderDerivativesBlock() {
+      const block = document.getElementById("derivativesBlock");
+
+      if (!block) {
+        return;
+      }
+
+      if (!currentRootMode || !showDerivatives || rootBaseResults.length === 0) {
+        block.style.display = "none";
+        block.innerHTML = "";
+        return;
+      }
+
+      // Group by visual key so visually-identical words merge into one chip.
+      const derivativeCounts = new Map();
+      const derivativeLabels = new Map();
+
+      rootBaseResults.forEach(result => {
+        const seenInThisResult = new Set();
+
+        result.matchedWords.forEach(word => {
+          const key = getVisualWordKey(word);
+          if (!key) return;
+
+          if (!seenInThisResult.has(key)) {
+            derivativeCounts.set(key, (derivativeCounts.get(key) || 0) + 1);
+            seenInThisResult.add(key);
+          }
+
+          if (!derivativeLabels.has(key)) {
+            derivativeLabels.set(key, getVisualWordLabel(word));
+          }
+        });
+      });
+
+      const derivatives = [...derivativeCounts.keys()].sort(
+        (a, b) => a.localeCompare(b, "fa")
+      );
+
+      const allChipClass = activeDerivativeKeys.size === 0 ?
+        "derivative-chip active-chip" : "derivative-chip";
+
+      const chips = derivatives.map(key => {
+        const chipClass = activeDerivativeKeys.has(key) ?
+          "derivative-chip active-chip" : "derivative-chip";
+        const label = derivativeLabels.get(key) || key;
+
+        return `
+          <button type="button" class="${chipClass}" data-derivative="${escapeHtml(key)}">
+            ${escapeHtml(label)} (${derivativeCounts.get(key)})
+          </button>
+        `;
+      }).join("");
+
+      block.style.display = "block";
+      block.innerHTML = `
+        <p class="derivatives-block-title">
+          مشتقات یافت‌شده - برای مشاهدهٔ نتایج مخصوص هر مشتق، روی آن کلیک کنید (می‌توانید چند مشتق را هم‌زمان انتخاب کنید):
+        </p>
+        <div class="derivatives-chips">
+          <button type="button" class="${allChipClass}" data-derivative="">
+            همهٔ مشتقات
+          </button>
+          ${chips}
+        </div>
+      `;
+
+      block.querySelectorAll("[data-derivative]").forEach(button => {
+        button.addEventListener("click", () => {
+          const key = button.dataset.derivative;
+          toggleDerivative(key || null);
+        });
+      });
+    }
+
+    function toggleDerivative(key) {
+      if (!key) {
+        // "همهٔ مشتقات" resets the filter.
+        activeDerivativeKeys.clear();
+      } else if (activeDerivativeKeys.has(key)) {
+        activeDerivativeKeys.delete(key);
+      } else {
+        activeDerivativeKeys.add(key);
+      }
+
+      currentResults = activeDerivativeKeys.size === 0 ?
+        rootBaseResults :
+        rootBaseResults.filter(result =>
+          result.matchedWordKeys.some(k => activeDerivativeKeys.has(k))
+        );
+
+      currentPage = 1;
+      selectedResultIndexes.clear();
+      renderDerivativesBlock();
+      renderCurrentPage();
+    }
+
+    // ---- منوی تنظیمات ⚙️ (بعینه از بلوک جست‌وجوی داخل صفحه) --------------
+    // فعلاً فقط چهار بخش: مرتب‌سازی، جست‌وجوی مجاورتی، دامنهٔ متن/پاورقی
+    // و نمایش مشتقات. بقیهٔ ابزارهای آن منو (آرشیو، نشانه‌ها، خروجی و...)
+    // در بلوک جست‌وجوی اصلی سایت از قبل به‌صورت دکمه‌های مستقل در نوار
+    // نتایج وجود دارند و فعلاً دست‌نخورده می‌مانند.
+    function renderSettingsMenu() {
+      const menu = document.getElementById("settingsMenu");
+
+      if (!menu) {
+        return;
+      }
+
+      menu.innerHTML = `
+        <div class="settings-section-label">مرتب‌سازی نتایج</div>
+        <label
+          class="settings-radio"
+          title="نتایج را به همان ترتیبی که در متن از بالا به پایین ظاهر شده‌اند نشان بده">
+          <input type="radio" name="siteSortMode" value="position" ${resultsSortMode === "position" ? "checked" : ""}>
+          بر اساس محل وقوع
+        </label>
+        <label
+          class="settings-radio"
+          title="نتایجی را که بیشتر تکرار شده‌اند اول نشان بده">
+          <input type="radio" name="siteSortMode" value="frequency" ${resultsSortMode === "frequency" ? "checked" : ""}>
+          پرتکرارترین
+        </label>
+
+        <div class="settings-separator"></div>
+
+        <div class="settings-section-label">جست‌وجوی پیشرفته</div>
+        <label
+          class="settings-checkbox"
+          title="کلمات عبارت جست‌وجو لازم نیست کنار هم بیایند؛ کافی است در فاصله‌ی مشخص‌شده از هم قرار داشته باشند">
+          <input type="checkbox" id="siteMenuProximityToggle" ${proximitySearchEnabled ? "checked" : ""}>
+          جست‌وجوی مجاورتی (حداکثر فاصله:
+          <input
+            type="number"
+            id="siteMenuProximityDistance"
+            class="settings-proximity-distance"
+            min="1"
+            max="30"
+            title="حداکثر تعداد کلمات مجاز بین کلمات عبارت جست‌وجو"
+            value="${proximityDistance}">
+          کلمه)
+        </label>
+        <label
+          class="settings-checkbox"
+          title="جست‌وجو در متن اصلی کتاب‌ها انجام شود">
+          <input type="checkbox" id="siteMenuSearchMainText" ${searchInMainText ? "checked" : ""}>
+          جست‌وجو در متن
+        </label>
+        <label
+          class="settings-checkbox"
+          title="جست‌وجو در پاورقی‌های کتاب‌ها هم انجام شود">
+          <input type="checkbox" id="siteMenuSearchFootnotes" ${searchInFootnotes ? "checked" : ""}>
+          جست‌وجو در پاورقی
+        </label>
+
+        <div class="settings-separator"></div>
+
+        <label
+          class="settings-checkbox"
+          title="نمایش فهرست کلمات مشتق‌شده‌ای که در جست‌وجوی ریشه‌ای پیدا شده‌اند">
+          <input type="checkbox" id="siteMenuShowDerivatives" ${showDerivatives ? "checked" : ""}>
+          مشاهده مشتقات
+        </label>
+      `;
+
+      menu.querySelectorAll('input[name="siteSortMode"]').forEach(radio => {
+        radio.addEventListener("change", () => {
+          if (!radio.checked) {
+            return;
+          }
+
+          resultsSortMode = radio.value;
+          currentResults = applySortMode(currentResults);
+          rootBaseResults = applySortMode(rootBaseResults);
+          currentPage = 1;
+          renderCurrentPage();
+        });
+      });
+
+      const proximityToggle = menu.querySelector("#siteMenuProximityToggle");
+      const proximityDistanceInput = menu.querySelector("#siteMenuProximityDistance");
+
+      if (proximityToggle) {
+        proximityToggle.addEventListener("change", () => {
+          proximitySearchEnabled = proximityToggle.checked;
+
+          if (searchInput.value.trim()) {
+            renderResults(searchInput.value);
+          }
+        });
+      }
+
+      if (proximityDistanceInput) {
+        proximityDistanceInput.addEventListener("click", event => {
+          event.stopPropagation();
+        });
+
+        proximityDistanceInput.addEventListener("change", () => {
+          const parsed = parseInt(proximityDistanceInput.value, 10);
+          proximityDistance = Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
+          proximityDistanceInput.value = proximityDistance;
+
+          if (proximitySearchEnabled && searchInput.value.trim()) {
+            renderResults(searchInput.value);
+          }
+        });
+      }
+
+      // دامنهٔ متن/پاورقی: هیچ‌وقت هر دو چک‌باکس با هم خاموش نمی‌شوند -
+      // آخرین چک‌باکسِ روشن اگر خاموش شود، خودش دوباره روشن می‌شود و
+      // چیزی تغییر نمی‌کند.
+      const searchMainTextToggle = menu.querySelector("#siteMenuSearchMainText");
+      const searchFootnotesToggle = menu.querySelector("#siteMenuSearchFootnotes");
+
+      if (searchMainTextToggle) {
+        searchMainTextToggle.addEventListener("change", () => {
+          if (!searchMainTextToggle.checked && !searchInFootnotes) {
+            searchMainTextToggle.checked = true;
+            return;
+          }
+
+          searchInMainText = searchMainTextToggle.checked;
+
+          if (searchInput.value.trim()) {
+            renderResults(searchInput.value);
+          }
+        });
+      }
+
+      if (searchFootnotesToggle) {
+        searchFootnotesToggle.addEventListener("change", () => {
+          if (!searchFootnotesToggle.checked && !searchInMainText) {
+            searchFootnotesToggle.checked = true;
+            return;
+          }
+
+          searchInFootnotes = searchFootnotesToggle.checked;
+
+          if (searchInput.value.trim()) {
+            renderResults(searchInput.value);
+          }
+        });
+      }
+
+      const menuShowDerivatives = menu.querySelector("#siteMenuShowDerivatives");
+
+      if (menuShowDerivatives) {
+        menuShowDerivatives.addEventListener("change", () => {
+          showDerivatives = menuShowDerivatives.checked;
+
+          const inlineToggle = document.getElementById("showDerivativesToggle");
+          if (inlineToggle) {
+            inlineToggle.checked = showDerivatives;
+          }
+
+          renderDerivativesBlock();
+        });
+      }
+
+      if (menu.classList.contains("is-open")) {
+        positionSettingsMenu();
+      }
+    }
+
+    let settingsMenuReflowHandler = null;
+
+    function positionSettingsMenu() {
+      const menu = document.getElementById("settingsMenu");
+      const gear = document.getElementById("settingsGear");
+
+      if (!menu || !gear || !menu.classList.contains("is-open")) {
+        return;
+      }
+
+      const GAP = 6;
+      const EDGE_MARGIN = 8;
+      const MIN_USABLE = 200;
+
+      const gearRect = gear.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - gearRect.bottom - GAP - EDGE_MARGIN;
+      const spaceAbove = gearRect.top - GAP - EDGE_MARGIN;
+
+      const openUpward = spaceBelow < MIN_USABLE && spaceAbove > spaceBelow;
+
+      menu.style.left = gearRect.left + "px";
+
+      if (openUpward) {
+        menu.style.top = "auto";
+        menu.style.bottom = (window.innerHeight - gearRect.top + GAP) + "px";
+      } else {
+        menu.style.top = (gearRect.bottom + GAP) + "px";
+        menu.style.bottom = "auto";
+      }
+
+      const available = Math.max(openUpward ? spaceAbove : spaceBelow, MIN_USABLE);
+      menu.style.maxHeight = available + "px";
+    }
+
+    function openSettingsMenu() {
+      const menu = document.getElementById("settingsMenu");
+      const gear = document.getElementById("settingsGear");
+
+      if (!menu) {
+        return;
+      }
+
+      renderSettingsMenu();
+      menu.classList.add("is-open");
+      positionSettingsMenu();
+
+      if (gear) {
+        gear.setAttribute("aria-expanded", "true");
+      }
+
+      if (!settingsMenuReflowHandler) {
+        settingsMenuReflowHandler = () => positionSettingsMenu();
+        window.addEventListener("resize", settingsMenuReflowHandler);
+        window.addEventListener("scroll", settingsMenuReflowHandler, true);
+      }
+    }
+
+    function closeSettingsMenu() {
+      const menu = document.getElementById("settingsMenu");
+      const gear = document.getElementById("settingsGear");
+
+      if (menu) {
+        menu.classList.remove("is-open");
+        menu.style.maxHeight = "";
+        menu.style.left = "";
+        menu.style.top = "";
+        menu.style.bottom = "";
+      }
+
+      if (gear) {
+        gear.setAttribute("aria-expanded", "false");
+      }
+
+      if (settingsMenuReflowHandler) {
+        window.removeEventListener("resize", settingsMenuReflowHandler);
+        window.removeEventListener("scroll", settingsMenuReflowHandler, true);
+        settingsMenuReflowHandler = null;
+      }
+    }
+
+    function toggleSettingsMenu() {
+      const menu = document.getElementById("settingsMenu");
+
+      if (menu && menu.classList.contains("is-open")) {
+        closeSettingsMenu();
+      } else {
+        openSettingsMenu();
+      }
+    }
+
+    const settingsGear = document.getElementById("settingsGear");
+
+    if (settingsGear) {
+      settingsGear.addEventListener("click", event => {
+        event.stopPropagation();
+        toggleSettingsMenu();
+      });
+    }
+
+    document.addEventListener("click", event => {
+      const menu = document.getElementById("settingsMenu");
+      const gear = document.getElementById("settingsGear");
+
+      if (
+        menu &&
+        menu.classList.contains("is-open") &&
+        !menu.contains(event.target) &&
+        event.target !== gear
+      ) {
+        closeSettingsMenu();
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        closeSettingsMenu();
+      }
+    });
+
+    // ---- Item 1: recent-search history ----------------------------------
+    // Same key/shape as in-page-search.js's version, so a term searched
+    // here also shows up in the per-book in-page search's dropdown and
+    // vice versa.
+    const SEARCH_HISTORY_KEY = "milaniSearchHistoryRecent";
+    const SEARCH_HISTORY_MAX = 5;
+
+    function loadSearchHistory() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(SEARCH_HISTORY_KEY) || "[]");
+        return Array.isArray(parsed) ? parsed.filter(item => typeof item === "string") : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveSearchHistory(list) {
+      try {
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(list));
+      } catch (error) {
+        // Storage unavailable or full - history just won't persist.
+      }
+    }
+
+    function pushSearchHistory(query) {
+      const trimmed = (query || "").trim();
+
+      if (!trimmed) {
+        return;
+      }
+
+      const existing = loadSearchHistory().filter(item => item !== trimmed);
+      existing.unshift(trimmed);
+
+      saveSearchHistory(existing.slice(0, SEARCH_HISTORY_MAX));
+    }
+
+    function renderSearchHistoryDropdown() {
+      const dropdown = document.getElementById("siteSearchHistory");
+
+      if (!dropdown) {
+        return;
+      }
+
+      const history = loadSearchHistory();
+
+      if (history.length === 0) {
+        dropdown.innerHTML = "";
+        dropdown.classList.remove("is-open");
+        return;
+      }
+
+      dropdown.innerHTML =
+        `<div class="search-history-label">جست‌وجوهای اخیر</div>` +
+        history.map(item =>
+          `<button type="button" class="search-history-item">${escapeHtml(item)}</button>`
+        ).join("");
+
+      dropdown.querySelectorAll(".search-history-item").forEach(button => {
+        // mousedown (not click) so it fires before the input's blur
+        // handler hides the dropdown out from under it.
+        button.addEventListener("mousedown", event => {
+          event.preventDefault();
+
+          searchInput.value = button.textContent;
+          dropdown.classList.remove("is-open");
+          renderResults(searchInput.value);
+          pushSearchHistory(button.textContent);
+          renderSearchHistoryDropdown();
+        });
+      });
+    }
+
+    function openSearchHistoryDropdown() {
+      const dropdown = document.getElementById("siteSearchHistory");
+
+      if (!dropdown || searchInput.value.trim()) {
+        return;
+      }
+
+      renderSearchHistoryDropdown();
+      cancelSearchHistoryHoverClose();
+
+      if (dropdown.innerHTML.trim()) {
+        dropdown.classList.add("is-open");
+      }
+    }
+
+    function closeSearchHistoryDropdown() {
+      const dropdown = document.getElementById("siteSearchHistory");
+
+      if (dropdown) {
+        dropdown.classList.remove("is-open");
+      }
+    }
+
+    // Item 1 (hover-intent): the dropdown sits a few pixels below the
+    // input, so a mouse moving from the input straight down onto the
+    // dropdown briefly crosses that gap. Closing on the input's
+    // mouseleave immediately, or trusting relatedTarget to already
+    // point at the dropdown, both fire before the pointer actually
+    // lands on it. Instead, leaving the input (or the dropdown) only
+    // *schedules* a close a moment later; entering the other one
+    // cancels that pending close, so the two elements behave as one
+    // continuous hover target and the dropdown never flickers shut
+    // while the mouse is still travelling toward it.
+    let searchHistoryHoverCloseTimer = null;
+
+    function cancelSearchHistoryHoverClose() {
+      if (searchHistoryHoverCloseTimer) {
+        clearTimeout(searchHistoryHoverCloseTimer);
+        searchHistoryHoverCloseTimer = null;
+      }
+    }
+
+    function scheduleSearchHistoryHoverClose() {
+      cancelSearchHistoryHoverClose();
+
+      searchHistoryHoverCloseTimer = setTimeout(() => {
+        searchHistoryHoverCloseTimer = null;
+
+        if (document.activeElement !== searchInput) {
+          closeSearchHistoryDropdown();
+        }
+      }, 200);
+    }
+
+    searchInput.addEventListener("input", function () {
+      renderResults(this.value);
+
+      if (this.value.trim()) {
+        closeSearchHistoryDropdown();
+      } else {
+        openSearchHistoryDropdown();
+      }
+    });
+
+    searchInput.addEventListener("focus", openSearchHistoryDropdown);
+    searchInput.addEventListener("mouseenter", openSearchHistoryDropdown);
+    searchInput.addEventListener("mouseleave", scheduleSearchHistoryHoverClose);
+    searchInput.addEventListener("blur", () => {
+      cancelSearchHistoryHoverClose();
+      closeSearchHistoryDropdown();
+    });
+
+    const siteSearchHistoryDropdown = document.getElementById("siteSearchHistory");
+
+    if (siteSearchHistoryDropdown) {
+      // Same hover-intent pair as the input, so moving the mouse from
+      // the input onto the dropdown (or back) is treated as staying
+      // inside one combined hover area instead of leaving it.
+      siteSearchHistoryDropdown.addEventListener("mouseenter", cancelSearchHistoryHoverClose);
+      siteSearchHistoryDropdown.addEventListener("mouseleave", scheduleSearchHistoryHoverClose);
+    }
+
+    searchInput.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        closeSearchHistoryDropdown();
+
+        if (searchInput.value.trim()) {
+          pushSearchHistory(searchInput.value);
+          renderSearchHistoryDropdown();
+        }
+      }
+
+      if (event.key === "Escape") {
+        closeSearchHistoryDropdown();
+      }
+    });
+
+    document.addEventListener("click", event => {
+      const dropdown = document.getElementById("siteSearchHistory");
+
+      if (
+        dropdown &&
+        dropdown.classList.contains("is-open") &&
+        !dropdown.contains(event.target) &&
+        event.target !== searchInput
+      ) {
+        closeSearchHistoryDropdown();
+      }
+    });
+
+    if (siteSearchRoot) {
+      siteSearchRoot.addEventListener("change", function () {
+        updateDerivativesToggleVisibility();
+
+        if (searchInput.value.trim()) {
+          renderResults(searchInput.value);
+        }
+      });
+    }
+
+    updateDerivativesToggleVisibility();
+
+    const showDerivativesToggle = document.getElementById("showDerivativesToggle");
+
+    if (showDerivativesToggle) {
+      showDerivativesToggle.addEventListener("change", () => {
+        showDerivatives = showDerivativesToggle.checked;
+        renderDerivativesBlock();
+      });
+    }
+
+    // ---- Book search-scope selector ------------------------------------
+    // Lets the user restrict which books participate in site-wide search,
+    // via checkboxes built from the same .searchable-item elements used
+    // to load the books (so both .htm and .pdf sources are covered).
+    // Selection persists across reloads in localStorage; default on a
+    // first-ever visit is "every book selected".
+    const BOOK_SCOPE_STORAGE_KEY = "milaniSearchBookScope";
+
+    const bookScopeEntries = searchableItems
+      .map(item => ({
+        key: item.dataset.url,
+        title: item.dataset.title ||
+          (item.querySelector("a") ? item.querySelector("a").textContent.trim() : "")
+      }))
+      .filter(entry => entry.key);
+
+    const allBookScopeKeys = bookScopeEntries.map(entry => entry.key);
+
+    function loadSelectedBookKeys() {
+      try {
+        const raw = localStorage.getItem(BOOK_SCOPE_STORAGE_KEY);
+
+        if (raw === null) {
+          // First-ever visit - nothing saved yet, default to every book.
+          return new Set(allBookScopeKeys);
+        }
+
+        const parsed = JSON.parse(raw);
+        const known = new Set(allBookScopeKeys);
+
+        // Drop any saved key that no longer matches a real book (e.g.
+        // the library changed since the selection was saved). An
+        // intentionally-empty saved selection (every book unchecked)
+        // is honored as-is, not treated as "nothing saved".
+        return Array.isArray(parsed) ?
+          new Set(parsed.filter(key => known.has(key))) :
+          new Set(allBookScopeKeys);
+      } catch (error) {
+        return new Set(allBookScopeKeys);
+      }
+    }
+
+    let selectedBookKeys = loadSelectedBookKeys();
+
+    function saveSelectedBookKeys() {
+      try {
+        localStorage.setItem(
+          BOOK_SCOPE_STORAGE_KEY,
+          JSON.stringify([...selectedBookKeys])
+        );
+      } catch (error) {
+        // Storage unavailable or full - selection just won't persist.
+      }
+    }
+
+    // Mirrors the key each loaded document is filed under: html
+    // documents keep the original relative "url", pdf documents keep
+    // "pdfFile" - both are the same raw data-url string the checkbox
+    // list is built from, so this always lines the two up correctly.
+    function getDocumentSourceKey(document) {
+      return document.type === "pdf" ? document.pdfFile : document.url;
+    }
+
+    function rerenderResultsIfSearching() {
+      if (searchInput.value.trim()) {
+        renderResults(searchInput.value);
+      }
+    }
+
+    function renderBookScopeList() {
+      const container = document.getElementById("bookScopeList");
+
+      if (!container) {
+        return;
+      }
+
+      container.innerHTML = bookScopeEntries.map(entry => {
+        const checkedAttr = selectedBookKeys.has(entry.key) ? "checked" : "";
+
+        return (
+          `<label class="book-scope-item">` +
+            `<input type="checkbox" class="book-scope-checkbox" ` +
+              `data-book-key="${escapeHtml(entry.key)}" ${checkedAttr}>` +
+            `<span>${escapeHtml(entry.title)}</span>` +
+          `</label>`
+        );
+      }).join("");
+
+      container.querySelectorAll(".book-scope-checkbox").forEach(checkbox => {
+        checkbox.addEventListener("change", () => {
+          const key = checkbox.dataset.bookKey;
+
+          if (checkbox.checked) {
+            selectedBookKeys.add(key);
+          } else {
+            selectedBookKeys.delete(key);
+          }
+
+          saveSelectedBookKeys();
+          rerenderResultsIfSearching();
+        });
+      });
+    }
+
+    renderBookScopeList();
+
+    const bookScopeSelectAllButton = document.getElementById("bookScopeSelectAll");
+    const bookScopeDeselectAllButton = document.getElementById("bookScopeDeselectAll");
+
+    if (bookScopeSelectAllButton) {
+      bookScopeSelectAllButton.addEventListener("click", () => {
+        selectedBookKeys = new Set(allBookScopeKeys);
+        saveSelectedBookKeys();
+        renderBookScopeList();
+        rerenderResultsIfSearching();
+      });
+    }
+
+    if (bookScopeDeselectAllButton) {
+      bookScopeDeselectAllButton.addEventListener("click", () => {
+        selectedBookKeys = new Set();
+        saveSelectedBookKeys();
+        renderBookScopeList();
+        rerenderResultsIfSearching();
+      });
+    }
+
+    function filterTitles(query) {
+      const cleanQuery = normalize(query);
+      let visibleCount = 0;
+
+      allBookListItems.forEach(item => {
+        const titleText = item.dataset.title ||
+          item.querySelector("a")?.textContent ||
+          "";
+
+        const matchesQuery = !cleanQuery ||
+          normalize(titleText).includes(cleanQuery);
+
+        item.style.display = matchesQuery ? "" : "none";
+
+        if (matchesQuery) {
+          visibleCount++;
+        }
+      });
+
+      document.querySelectorAll(".main-branch").forEach(branch => {
+        const hasVisibleItem = [...branch.querySelectorAll("li")]
+          .some(item => item.style.display !== "none");
+
+        if (cleanQuery) {
+          branch.open = hasVisibleItem;
+          branch.style.display = hasVisibleItem ? "" : "none";
+        } else {
+          branch.style.display = "";
+        }
+      });
+
+      titleNoResults.style.display =
+        cleanQuery && visibleCount === 0 ? "block" : "none";
+    }
+
+    titleSearchInput.addEventListener("input", function () {
+      filterTitles(this.value);
+    });
+
+    loadTextDocuments();
+  </script>
+</body>
+</html>
