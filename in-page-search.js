@@ -45,6 +45,12 @@
   // exact same spot again (findRangeForBookmarkText).
   let pendingSelectionOccurrenceIndex = 1;
   const bookmarkFilterTags = new Set();
+  // Item جدید (انتخاب چندگانه): برخلاف bookmarkFilterTags که فقط
+  // فهرست را فیلتر می‌کند، این مجموعه مشخص می‌کند کدام نشانه‌ها با
+  // چک‌باکس علامت خورده‌اند - تا کاربرانی که نمی‌خواهند خروجی سه‌گانه
+  // (PDF/Word/Text) شامل تمام نشانه‌های نمایش‌داده‌شده باشد، بتوانند
+  // زیرمجموعه‌ی دلخواه را انتخاب کنند (رجوع کنید به renderBookmarksPanel).
+  const selectedBookmarkIds = new Set();
 
   // Item ب: results-panel ordering. "position" keeps the original
   // top-to-bottom document order; "frequency" puts the most-repeated
@@ -1744,6 +1750,31 @@
         font-weight: bold;
       }
 
+      /* Item جدید (انتخاب چندگانه): چک‌باکس کنار هر نشانه، هم‌ردیف با
+         متن/دکمه‌های آن - همان الگوی .in-page-result-checkbox در فهرست
+         نتایج جست‌وجو. */
+      .bookmark-item-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+      }
+
+      .in-page-bookmark-checkbox {
+        flex-shrink: 0;
+        margin: 3px 0 0;
+        cursor: pointer;
+      }
+
+      .bookmark-item-content {
+        flex: 1;
+        min-width: 0;
+      }
+
+      #inPageBookmarksPanel .bookmark-selection-badge {
+        color: #64748b;
+        font-size: 0.72rem;
+      }
+
       /* Item ط: floating "add bookmark" affordance for an arbitrary
          text selection. Both start hidden and are shown/positioned
          from JS right before use (see showSelectionBookmarkButton and
@@ -2798,6 +2829,7 @@
   function clearBookmarks() {
     saveBookmarks([]);
     bookmarkFilterTags.clear();
+    selectedBookmarkIds.clear();
     document.querySelectorAll(".in-page-bookmark-marker").forEach(marker => marker.remove());
     renderBookmarksPanel();
     renderSettingsMenu();
@@ -3112,20 +3144,54 @@
   // buildParagraphEntries. Always exports whatever the panel is
   // CURRENTLY showing, so filtering by tag first and then exporting
   // exports just that subset.
+  // Item جدید (چینش کادر نشانه در خروجی‌ها): سه تابع خروجیِ زیر دیگر
+  // یک فهرست تخت از نشانه‌ها نمی‌سازند، بلکه دقیقا همان چینش
+  // سلسله‌مراتبیِ کادر نشانه (renderBookmarksPanel) را بازتولید
+  // می‌کنند: اول عنوان کتاب (شماره‌ی اصلی ۱، ۲...) در ابتدای همان
+  // بخش، و زیر آن عنوان هر برچسب (شماره‌ی فرعی ۱.۱، ۱.۲...) با
+  // نشانه‌های همان زیرگروه - با همان buildBookmarkGroups/
+  // sortedBookmarkTagKeys که کادر نشانه از آن‌ها استفاده می‌کند، تا دو
+  // چینش همیشه دقیقا یکی باشند.
+  function buildBookmarkExportGroups(items) {
+    const groups = buildBookmarkGroups(items, bookmarkFilterTags);
+    const bookTitles = Array.from(groups.keys()).sort(compareFa);
+
+    return bookTitles.map((bookTitle, bookIndex) => {
+      const mainNumber = bookIndex + 1;
+      const tagMap = groups.get(bookTitle);
+      const tagKeys = sortedBookmarkTagKeys(tagMap);
+
+      const tagGroups = tagKeys.map((tagLabel, tagIndex) => ({
+        tagLabel,
+        subNumber: `${mainNumber}.${tagIndex + 1}`,
+        items: tagMap.get(tagLabel)
+      }));
+
+      return { bookTitle: bookTitle || "بدون عنوان", mainNumber, tagGroups };
+    });
+  }
+
   function buildBookmarkExportPlainText(items) {
     const divider = "─".repeat(32);
     const header = `🔖 نشانه‌ها\n${divider}`;
 
-    const body = items.map((item, index) => {
-      const tagsLine = (item.tags && item.tags.length) ?
-        `\n   🏷️ ${item.tags.join("، ")}` :
-        "";
+    const body = buildBookmarkExportGroups(items).map(group => {
+      const tagsBody = group.tagGroups.map(tagGroup => {
+        const itemsBody = tagGroup.items.map((item, index) => {
+          const tagsLine = (item.tags && item.tags.length) ?
+            `\n      🏷️ ${item.tags.join("، ")}` :
+            "";
 
-      return (
-        `${index + 1}. «${item.text}»\n` +
-        `   📘 ${item.title || ""}${tagsLine}\n` +
-        `   🔗 لینک: ${item.url}`
-      );
+          return (
+            `   ${index + 1}. «${item.text}»${tagsLine}\n` +
+            `      🔗 لینک: ${item.url}`
+          );
+        }).join("\n\n");
+
+        return `${tagGroup.subNumber} - ${tagGroup.tagLabel}\n${itemsBody}`;
+      }).join("\n\n");
+
+      return `${group.mainNumber} - ${group.bookTitle}\n\n${tagsBody}`;
     }).join("\n\n");
 
     return `${header}\n\n${body}`;
@@ -3144,22 +3210,38 @@
       return;
     }
 
-    const itemsHtml = items.map((item, index) => {
-      const tagsHtml = (item.tags && item.tags.length) ?
-        `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
-        `font-size:12px;color:#6d28d9;text-align:right;">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
-        "";
+    const itemsHtml = buildBookmarkExportGroups(items).map(group => {
+      const tagsHtml = group.tagGroups.map(tagGroup => {
+        const entriesHtml = tagGroup.items.map((item, index) => {
+          const itemTagsHtml = (item.tags && item.tags.length) ?
+            `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+            `font-size:12px;color:#6d28d9;text-align:right;">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
+            "";
+
+          return (
+            `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+            `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
+            `<strong>${index + 1}.</strong>\u00a0«${escapeHtml(item.text)}»</p>` +
+            itemTagsHtml +
+            `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+            `font-size:12px;text-align:right;">🔗 ` +
+            `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+          );
+        }).join("");
+
+        return (
+          `<p dir="rtl" style="margin:10px 0 6px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:13px;font-weight:bold;color:#6d28d9;text-align:right;">` +
+          `${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</p>` +
+          entriesHtml
+        );
+      }).join("");
 
       return (
-        `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
-        `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-        `<strong>${index + 1}.</strong>\u00a0«${escapeHtml(item.text)}»</p>` +
-        `<p dir="rtl" style="margin:0 0 2px;font-family:Tahoma,Arial,sans-serif;` +
-        `font-size:12px;color:#173b63;text-align:right;">📘 ${escapeHtml(item.title || "")}</p>` +
-        tagsHtml +
-        `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
-        `font-size:12px;text-align:right;">🔗 ` +
-        `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+        `<p dir="rtl" style="margin:16px 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+        `font-size:15px;font-weight:bold;color:#173b63;border-bottom:2px solid #173b63;` +
+        `padding-bottom:4px;text-align:right;">${group.mainNumber} - ${escapeHtml(group.bookTitle)}</p>` +
+        tagsHtml
       );
     }).join("");
 
@@ -3196,15 +3278,31 @@
       return;
     }
 
-    const itemsHtml = items.map((item, index) => `
-      <div class="export-item">
-        <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${escapeHtml(item.text)}»</p>
-        <p class="export-link">📘 ${escapeHtml(item.title || "")}${
-          (item.tags && item.tags.length) ? " — 🏷️ " + escapeHtml(item.tags.join("، ")) : ""
-        }</p>
-        <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
-      </div>
-    `).join("");
+    const itemsHtml = buildBookmarkExportGroups(items).map(group => {
+      const tagsHtml = group.tagGroups.map(tagGroup => {
+        const entriesHtml = tagGroup.items.map((item, index) => `
+          <div class="export-item">
+            <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${escapeHtml(item.text)}»</p>
+            ${
+              (item.tags && item.tags.length) ?
+                `<p class="export-link">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
+                ""
+            }
+            <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
+          </div>
+        `).join("");
+
+        return `
+          <div class="export-group-tag">${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</div>
+          ${entriesHtml}
+        `;
+      }).join("");
+
+      return `
+        <div class="export-group-book">${group.mainNumber} - ${escapeHtml(group.bookTitle)}</div>
+        ${tagsHtml}
+      `;
+    }).join("");
 
     const doc = `<!DOCTYPE html>
       <html lang="fa" dir="rtl">
@@ -3252,6 +3350,23 @@
           .export-link a {
             color: #1d4ed8;
             text-decoration: none;
+          }
+          .export-group-book {
+            margin: 20px 0 6px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #173b63;
+            color: #173b63;
+            font-size: 16px;
+            font-weight: bold;
+          }
+          .export-group-book:first-of-type {
+            margin-top: 4px;
+          }
+          .export-group-tag {
+            margin: 10px 0 4px;
+            color: #6d28d9;
+            font-size: 13px;
+            font-weight: bold;
           }
           @media print {
             body { margin: 10mm; }
@@ -3353,6 +3468,14 @@
       }
     });
 
+    // Item جدید (انتخاب چندگانه): همان کار بالا اما برای چک‌باکس‌ها -
+    // نشانه‌ای که حذف شده دیگر در selectedBookmarkIds نمی‌ماند.
+    Array.from(selectedBookmarkIds).forEach(id => {
+      if (!all.some(item => item.id === id)) {
+        selectedBookmarkIds.delete(id);
+      }
+    });
+
     // Item ۲: clicking several tag chips shows the UNION of their
     // bookmarks (any selected tag matches), so the user can see
     // multiple subgroups together instead of being limited to one tag
@@ -3396,14 +3519,24 @@
 
           const itemsHtml = tagMap.get(tagLabel).map(item => `
             <div class="archive-item">
-              <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
-              <div class="archive-item-actions">
-                <a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">
-                  بازکردن
-                </a>
-                <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
-                  حذف
-                </button>
+              <div class="bookmark-item-row">
+                <input
+                  type="checkbox"
+                  class="in-page-bookmark-checkbox"
+                  data-bookmark-select="${escapeHtml(item.id)}"
+                  ${selectedBookmarkIds.has(item.id) ? "checked" : ""}
+                  aria-label="انتخاب این نشانه">
+                <div class="bookmark-item-content">
+                  <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
+                  <div class="archive-item-actions">
+                    <a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">
+                      بازکردن
+                    </a>
+                    <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
+                      حذف
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           `).join("");
@@ -3420,26 +3553,49 @@
         `;
       }).join("");
 
+    // Item جدید (انتخاب چندگانه): وقتی حداقل یک نشانه با چک‌باکس
+    // علامت خورده باشد، خروجی سه‌گانه فقط شامل همان زیرمجموعه‌ی
+    // انتخاب‌شده (از میان نشانه‌های فعلا نمایش‌داده‌شده) می‌شود؛ در غیر
+    // این صورت رفتار قبلی حفظ می‌شود: تمام نشانه‌های نمایش‌داده‌شده.
+    const hasBookmarkSelection = selectedBookmarkIds.size > 0;
+    const exportItems = hasBookmarkSelection ?
+      items.filter(item => selectedBookmarkIds.has(item.id)) :
+      items;
+    const exportLabel = hasBookmarkSelection ? "انتخاب‌شده" : "نمایش‌داده‌شده";
+
     panel.innerHTML = `
       <div class="archive-header">
         <span>نشانه‌ها (${all.length})</span>
         <div class="archive-header-actions">
+          <button
+            type="button"
+            id="inPageBookmarksSelectAll"
+            title="انتخاب تمام نشانه‌های نمایش‌داده‌شده در همین فهرست"
+            ${items.length === 0 ? "disabled" : ""}>انتخاب همه</button>
+          <button
+            type="button"
+            id="inPageBookmarksClearSelection"
+            title="برداشتن علامت انتخاب از تمام نشانه‌هایی که تاکنون انتخاب کرده‌اید"
+            ${hasBookmarkSelection ? "" : "disabled"}>
+            پاک‌کردن انتخاب
+            ${hasBookmarkSelection ? `<span class="bookmark-selection-badge">(${selectedBookmarkIds.size})</span>` : ""}
+          </button>
           <button type="button" id="inPageBookmarksClear" ${all.length === 0 ? "disabled" : ""}>پاک‌کردن همه</button>
           <button
             type="button"
             id="inPageBookmarksPdf"
-            title="دریافت نشانه‌های نمایش‌داده‌شده به‌صورت یک فایل PDF قابل ذخیره"
-            ${items.length === 0 ? "disabled" : ""}>PDF</button>
+            title="دریافت نشانه‌های ${exportLabel} به‌صورت یک فایل PDF قابل ذخیره"
+            ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
           <button
             type="button"
             id="inPageBookmarksWord"
-            title="دریافت نشانه‌های نمایش‌داده‌شده به‌صورت یک فایل Word"
-            ${items.length === 0 ? "disabled" : ""}>Word</button>
+            title="دریافت نشانه‌های ${exportLabel} به‌صورت یک فایل Word"
+            ${exportItems.length === 0 ? "disabled" : ""}>Word</button>
           <button
             type="button"
             id="inPageBookmarksText"
-            title="دریافت نشانه‌های نمایش‌داده‌شده به‌صورت یک فایل متنی ساده"
-            ${items.length === 0 ? "disabled" : ""}>Text</button>
+            title="دریافت نشانه‌های ${exportLabel} به‌صورت یک فایل متنی ساده"
+            ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
           <button type="button" id="inPageBookmarksClose">بستن</button>
         </div>
       </div>
@@ -3457,23 +3613,55 @@
       closeButton.addEventListener("click", closeBookmarksPanel);
     }
 
-    // Item جدید: PDF/Word/Text export - always over the bookmarks
-    // CURRENTLY VISIBLE in the panel (i.e. respecting the active tag
-    // filter, if any), same "select-a-tag-then-export-just-that" flow
-    // the tag chips already support.
+    // Item جدید (انتخاب چندگانه): «انتخاب همه» فقط نشانه‌های فعلا
+    // نمایش‌داده‌شده (یعنی پس از اعمال فیلتر برچسب، در صورت فعال بودن)
+    // را علامت می‌زند - نه کل نشانه‌های ذخیره‌شده.
+    const selectAllButton = panel.querySelector("#inPageBookmarksSelectAll");
+    if (selectAllButton) {
+      selectAllButton.addEventListener("click", () => {
+        items.forEach(item => selectedBookmarkIds.add(item.id));
+        renderBookmarksPanel();
+      });
+    }
+
+    const clearSelectionButton = panel.querySelector("#inPageBookmarksClearSelection");
+    if (clearSelectionButton) {
+      clearSelectionButton.addEventListener("click", () => {
+        selectedBookmarkIds.clear();
+        renderBookmarksPanel();
+      });
+    }
+
+    panel.querySelectorAll(".in-page-bookmark-checkbox").forEach(checkbox => {
+      checkbox.addEventListener("change", () => {
+        const id = checkbox.dataset.bookmarkSelect;
+
+        if (checkbox.checked) {
+          selectedBookmarkIds.add(id);
+        } else {
+          selectedBookmarkIds.delete(id);
+        }
+
+        renderBookmarksPanel();
+      });
+    });
+
+    // Item جدید: PDF/Word/Text export - بر روی زیرمجموعه‌ی انتخاب‌شده
+    // (اگر چیزی انتخاب شده باشد)، وگرنه روی تمام نشانه‌های CURRENTLY
+    // VISIBLE در پنل (یعنی با احتساب فیلتر برچسب فعال، در صورت وجود).
     const pdfButton = panel.querySelector("#inPageBookmarksPdf");
     if (pdfButton) {
-      pdfButton.addEventListener("click", () => exportBookmarksAsPdf(items));
+      pdfButton.addEventListener("click", () => exportBookmarksAsPdf(exportItems));
     }
 
     const wordButton = panel.querySelector("#inPageBookmarksWord");
     if (wordButton) {
-      wordButton.addEventListener("click", () => exportBookmarksAsWord(items));
+      wordButton.addEventListener("click", () => exportBookmarksAsWord(exportItems));
     }
 
     const textButton = panel.querySelector("#inPageBookmarksText");
     if (textButton) {
-      textButton.addEventListener("click", () => exportBookmarksAsText(items));
+      textButton.addEventListener("click", () => exportBookmarksAsText(exportItems));
     }
 
     panel.querySelectorAll("[data-bookmark-id]").forEach(button => {
