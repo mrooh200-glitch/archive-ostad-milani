@@ -4071,6 +4071,12 @@
   // short, clickable "لینک منبع" pattern handleCopySelectedMatches()
   // already puts on the clipboard for Word's rich-paste, so the
   // downloaded file and a pasted copy always match.
+  // Item جدید (اصلاح چینش در ورد): هر پاراگراف باید dir="rtl" باشد -
+  // دقیقا مثل کادر نشانه (exportBookmarksAsWord) که همین ساختار را
+  // دارد و درست کار می‌کند. dir="ltr" (تلاش قبلی) باعث می‌شد Word
+  // ترتیب شماره/گیومه‌ها را برعکس بچیند؛ چون خودِ متن Persian/Arabic و
+  // راست‌به‌چپ است، پاراگراف هم باید همان جهت را داشته باشد تا موتور
+  // چیدمان دوجهته‌ی Word با محتوا هم‌خوان باشد.
   function exportSelectedAsWord() {
     const selected = getSelectedMatchesInOrder();
 
@@ -4082,10 +4088,10 @@
 
     const itemsHtml = buildParagraphEntries(selected)
       .map((entry, index) => (
-        `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+        `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
         `<strong>${index + 1}.</strong>\u00a0«${entry.html}»</p>` +
-        `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+        `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:12px;text-align:right;">🔗 ` +
         `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
       ))
@@ -5003,23 +5009,22 @@
 
     const text = `${header}\n\n${textBody}`;
 
-    // Item 2: Word only gets the bidi ordering of the quotes/numbers
-    // right when the paragraph's own direction is LTR (its paste
-    // filter decides run order from the paragraph mark, not from the
-    // Unicode bidi algorithm the way Telegram's renderer does) - so
-    // every paragraph below carries dir="ltr" explicitly, while
-    // text-align:right keeps it visually right-aligned everywhere,
-    // Telegram included, since the actual text runs are still RTL
-    // Persian/Arabic and lay out right-to-left regardless of the
-    // container's dir. Please double-check both destinations after
-    // this change - Word's HTML-paste bidi handling is notoriously
-    // inconsistent across versions.
+    // Item جدید (اصلاح چینش در ورد/کلیپ‌بورد): تلاش قبلی اینجا
+    // dir="ltr" گذاشته بود با این فرض که Word فقط این‌طوری ترتیب
+    // شماره/گیومه‌ها را درست می‌چیند - اما همان‌طور که در عمل و با
+    // عکس مشخص شد، دقیقا برعکس است: چون محتوای واقعی پاراگراف
+    // Persian/Arabic و راست‌به‌چپ است، خودِ پاراگراف هم باید dir="rtl"
+    // باشد (دقیقا مثل exportBookmarksAsWord/exportBookmarksAsPdf در
+    // کادر نشانه که با همین ساختار درست کار می‌کند) - در غیر این
+    // صورت موتور چیدمان دوجهته‌ی Word شماره و گیومه‌ها را جابه‌جا
+    // می‌چیند. text-align:right همچنان چیدمان راست‌چین را در همه‌جا،
+    // از جمله تلگرام، حفظ می‌کند.
     const htmlBody = entries
       .map((entry, index) => (
-        `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+        `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
         `<strong>${index + 1}.</strong>\u00a0«${entry.html}»</p>` +
-        `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+        `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:12px;text-align:right;">🔗 ` +
         `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">` +
         `لینک منبع</a></p>`
