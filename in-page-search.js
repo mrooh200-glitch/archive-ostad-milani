@@ -35,6 +35,19 @@
   let proximitySearchEnabled = false;
   let proximityDistance = 5;
 
+  // Item ح: text/footnote search scope. Word's export marks every
+  // footnote paragraph with class="MsoFootnoteText" (see div[id^=ftn]
+  // blocks at the end of the document body), so that class is what
+  // tells a text node apart from the main body. Both start enabled -
+  // the default is to search everywhere - and toggling one off never
+  // leaves both off (see the checkbox handlers in renderSettingsMenu).
+  let searchInMainText = true;
+  let searchInFootnotes = true;
+
+  function isFootnoteTextNode(node) {
+    return !!(node.parentElement && node.parentElement.closest(".MsoFootnoteText"));
+  }
+
   async function copyTextToClipboard(text) {
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -1593,6 +1606,16 @@
             return NodeFilter.FILTER_REJECT;
           }
 
+          const inFootnote = isFootnoteTextNode(node);
+
+          if (inFootnote && !searchInFootnotes) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          if (!inFootnote && !searchInMainText) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
           return NodeFilter.FILTER_ACCEPT;
         }
       }
@@ -2695,6 +2718,18 @@
           value="${proximityDistance}">
         کلمه)
       </label>
+      <label
+        class="in-page-settings-checkbox"
+        title="جست‌وجو در متن اصلی صفحه انجام شود">
+        <input type="checkbox" id="inPageMenuSearchMainText" ${searchInMainText ? "checked" : ""}>
+        جست‌وجو در متن
+      </label>
+      <label
+        class="in-page-settings-checkbox"
+        title="جست‌وجو در پاورقی‌های صفحه هم انجام شود">
+        <input type="checkbox" id="inPageMenuSearchFootnotes" ${searchInFootnotes ? "checked" : ""}>
+        جست‌وجو در پاورقی
+      </label>
     `;
 
     const bind = (id, handler) => {
@@ -2772,6 +2807,45 @@
 
         const input = document.getElementById("inPageSearchInput");
         if (proximitySearchEnabled && input && input.value.trim()) {
+          performSearch();
+        }
+      });
+    }
+
+    // Item ح: text/footnote scope checkboxes. Unchecking one while the
+    // other is already off would silently zero out every future
+    // search, so that last checkbox is not allowed to uncheck itself -
+    // it just snaps back on and nothing changes.
+    const searchMainTextToggle = menu.querySelector("#inPageMenuSearchMainText");
+    const searchFootnotesToggle = menu.querySelector("#inPageMenuSearchFootnotes");
+
+    if (searchMainTextToggle) {
+      searchMainTextToggle.addEventListener("change", () => {
+        if (!searchMainTextToggle.checked && !searchInFootnotes) {
+          searchMainTextToggle.checked = true;
+          return;
+        }
+
+        searchInMainText = searchMainTextToggle.checked;
+
+        const input = document.getElementById("inPageSearchInput");
+        if (input && input.value.trim()) {
+          performSearch();
+        }
+      });
+    }
+
+    if (searchFootnotesToggle) {
+      searchFootnotesToggle.addEventListener("change", () => {
+        if (!searchFootnotesToggle.checked && !searchInMainText) {
+          searchFootnotesToggle.checked = true;
+          return;
+        }
+
+        searchInFootnotes = searchFootnotesToggle.checked;
+
+        const input = document.getElementById("inPageSearchInput");
+        if (input && input.value.trim()) {
           performSearch();
         }
       });
