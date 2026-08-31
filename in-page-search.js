@@ -1548,10 +1548,12 @@
         font-weight: bold;
       }
 
-      #inPageArchivePanel .archive-header-actions {
+      #inPageArchivePanel .archive-header-actions,
+      #inPageBookmarksPanel .archive-header-actions {
         display: flex;
         align-items: center;
         gap: 8px;
+        flex-wrap: wrap;
       }
 
       .archive-item {
@@ -1584,7 +1586,8 @@
 
       .archive-item-actions a,
       .archive-item-actions button,
-      #inPageArchivePanel .archive-header-actions button {
+      #inPageArchivePanel .archive-header-actions button,
+      #inPageBookmarksPanel .archive-header-actions button {
         border: 1px solid #93c5fd;
         border-radius: 6px;
         background: #eff6ff;
@@ -1597,9 +1600,16 @@
       }
 
       .archive-item-actions a:hover,
-      .archive-item-actions button:hover,
-      #inPageArchivePanel .archive-header-actions button:hover {
+      .archive-item-actions button:hover:not(:disabled),
+      #inPageArchivePanel .archive-header-actions button:hover:not(:disabled),
+      #inPageBookmarksPanel .archive-header-actions button:hover:not(:disabled) {
         background: #dbeafe;
+      }
+
+      #inPageArchivePanel .archive-header-actions button:disabled,
+      #inPageBookmarksPanel .archive-header-actions button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
       }
 
       .archive-empty {
@@ -2793,6 +2803,48 @@
     return hasNoTagGroup ? named.concat([BOOKMARK_NO_TAG_LABEL]) : named;
   }
 
+  // Resolves buildBookmarkGroups()'s Map-of-Maps into a plain, already-
+  // numbered array: [{ mainNumber, bookTitle, tagGroups: [{ subNumber,
+  // tagLabel, items }] }]. This is the SAME hierarchical کتاب→برچسب
+  // ordering renderBookmarksPanel used to build inline; it now lives
+  // here once so the notebook export (below) walks the exact same
+  // order/numbering the panel shows - they can never drift apart.
+  function resolveBookmarkExportGroups(items, restrictTag) {
+    const groups = buildBookmarkGroups(items, restrictTag);
+    const bookTitles = Array.from(groups.keys()).sort(compareFa);
+
+    return bookTitles.map((bookTitle, bookIndex) => {
+      const mainNumber = bookIndex + 1;
+      const tagMap = groups.get(bookTitle);
+      const tagKeys = sortedBookmarkTagKeys(tagMap);
+
+      const tagGroups = tagKeys.map((tagLabel, tagIndex) => ({
+        subNumber: `${mainNumber}.${tagIndex + 1}`,
+        tagLabel,
+        items: tagMap.get(tagLabel)
+      }));
+
+      return { mainNumber, bookTitle: bookTitle || "بدون عنوان", tagGroups };
+    });
+  }
+
+  // The list currently on screen (respecting bookmarkFilterTag), with
+  // the same "stale filter" fallback renderBookmarksPanel already
+  // applied inline. Shared by the panel and by the notebook export so
+  // "دریافت..." always exports exactly what the panel is showing.
+  function getVisibleBookmarks() {
+    const all = loadBookmarks().slice().reverse();
+    const allTags = getAllBookmarkTags(all);
+
+    if (bookmarkFilterTag && !allTags.includes(bookmarkFilterTag)) {
+      bookmarkFilterTag = null;
+    }
+
+    return bookmarkFilterTag ?
+      all.filter(item => (item.tags || []).includes(bookmarkFilterTag)) :
+      all;
+  }
+
   function renderBookmarksPanel() {
     const panel = document.getElementById("inPageBookmarksPanel");
 
@@ -2800,19 +2852,9 @@
       return;
     }
 
-    const all = loadBookmarks().slice().reverse();
+    const items = getVisibleBookmarks();
+    const all = loadBookmarks();
     const allTags = getAllBookmarkTags(all);
-
-    // Stale filter (its tag got removed along with the last bookmark
-    // that had it) - fall back to showing everything instead of an
-    // empty list with no visible way to explain why.
-    if (bookmarkFilterTag && !allTags.includes(bookmarkFilterTag)) {
-      bookmarkFilterTag = null;
-    }
-
-    const items = bookmarkFilterTag ?
-      all.filter(item => (item.tags || []).includes(bookmarkFilterTag)) :
-      all;
 
     const tagChipsHtml = allTags.length === 0 ? "" : `
       <div class="bookmark-tag-filter">
@@ -2832,22 +2874,15 @@
     // ۱، ۲...) و داخل هر کتاب بر اساس برچسب (الفبایی، شماره‌ی فرعی
     // ۱.۱، ۱.۲...) گروه‌بندی می‌شوند - مستقل از ترتیب/زمان ذخیره‌شدن
     // نشانه‌ها توسط کاربر.
-    const groups = buildBookmarkGroups(items, bookmarkFilterTag);
-    const bookTitles = Array.from(groups.keys()).sort(compareFa);
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
 
     const listHtml = items.length === 0 ?
       `<p class="archive-empty">${
         bookmarkFilterTag ? "نشانه‌ای با این برچسب یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
       }</p>` :
-      bookTitles.map((bookTitle, bookIndex) => {
-        const mainNumber = bookIndex + 1;
-        const tagMap = groups.get(bookTitle);
-        const tagKeys = sortedBookmarkTagKeys(tagMap);
-
-        const tagsHtml = tagKeys.map((tagLabel, tagIndex) => {
-          const subNumber = `${mainNumber}.${tagIndex + 1}`;
-
-          const itemsHtml = tagMap.get(tagLabel).map(item => `
+      groups.map(book => {
+        const tagsHtml = book.tagGroups.map(tagGroup => {
+          const itemsHtml = tagGroup.items.map(item => `
             <div class="archive-item">
               <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
               <div class="archive-item-actions">
@@ -2862,13 +2897,13 @@
           `).join("");
 
           return `
-            <div class="bookmark-group-tag">${subNumber} - ${escapeHtml(tagLabel)}</div>
+            <div class="bookmark-group-tag">${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</div>
             ${itemsHtml}
           `;
         }).join("");
 
         return `
-          <div class="bookmark-group-book">${mainNumber} - ${escapeHtml(bookTitle || "بدون عنوان")}</div>
+          <div class="bookmark-group-book">${book.mainNumber} - ${escapeHtml(book.bookTitle)}</div>
           ${tagsHtml}
         `;
       }).join("");
@@ -2877,6 +2912,27 @@
       <div class="archive-header">
         <span>نشانه‌ها (${all.length})</span>
         <div class="archive-header-actions">
+          <button
+            type="button"
+            id="inPageBookmarksExportText"
+            title="دریافت این فهرست نشانه‌ها به‌صورت یک فایل متنی ساده (txt.)"
+            ${items.length === 0 ? "disabled" : ""}>
+            Text
+          </button>
+          <button
+            type="button"
+            id="inPageBookmarksExportWord"
+            title="دریافت این فهرست نشانه‌ها به‌صورت یک فایل ورد (doc.)، با لینک منبعِ کوتاه و قابل کلیک"
+            ${items.length === 0 ? "disabled" : ""}>
+            Word
+          </button>
+          <button
+            type="button"
+            id="inPageBookmarksExportPdf"
+            title="دریافت این فهرست نشانه‌ها به‌صورت یک فایل PDF، با لینک منبعِ کوتاه و قابل کلیک"
+            ${items.length === 0 ? "disabled" : ""}>
+            PDF
+          </button>
           <button type="button" id="inPageBookmarksClear">پاک‌کردن همه</button>
           <button type="button" id="inPageBookmarksClose">بستن</button>
         </div>
@@ -2895,6 +2951,21 @@
       closeButton.addEventListener("click", closeBookmarksPanel);
     }
 
+    const exportTextButton = panel.querySelector("#inPageBookmarksExportText");
+    if (exportTextButton) {
+      exportTextButton.addEventListener("click", exportBookmarksAsText);
+    }
+
+    const exportWordButton = panel.querySelector("#inPageBookmarksExportWord");
+    if (exportWordButton) {
+      exportWordButton.addEventListener("click", exportBookmarksAsWord);
+    }
+
+    const exportPdfButton = panel.querySelector("#inPageBookmarksExportPdf");
+    if (exportPdfButton) {
+      exportPdfButton.addEventListener("click", exportBookmarksAsPdf);
+    }
+
     panel.querySelectorAll("[data-bookmark-id]").forEach(button => {
       button.addEventListener("click", () => {
         removeBookmark(button.dataset.bookmarkId);
@@ -2908,6 +2979,239 @@
         renderBookmarksPanel();
       });
     });
+  }
+
+  // ---- Item ی: bookmarks notebook export (Text/Word/PDF) ---------------
+  // Rather than a second, separate "دفترچه یادداشت" panel duplicating
+  // what the bookmarks panel already does (free-form text + tags,
+  // organized by book/برچسب), this gives the EXISTING bookmarks list a
+  // one-click export - "notebook" as an output format of the bookmarks,
+  // not a parallel feature to maintain. Structure mirrors
+  // buildExportPlainText/exportSelectedAsWord/exportSelectedAsPdf above
+  // (same divider/header conventions, same "🔗 لینک منبع" link label as
+  // the archive export - not the plain "بازکردن" link the bookmarks
+  // panel itself uses) so a notebook export and a search-results export
+  // read as one consistent family of documents.
+  const BOOKMARKS_EXPORT_DIVIDER = "─".repeat(32);
+
+  function getBookmarksNotebookTitle(restrictTag) {
+    return restrictTag ? `دفترچه نشانه‌ها — برچسب «${restrictTag}»` : "دفترچه نشانه‌ها";
+  }
+
+  function buildBookmarksExportPlainText(groups, restrictTag) {
+    const header = `📑 ${getBookmarksNotebookTitle(restrictTag)}\n${BOOKMARKS_EXPORT_DIVIDER}`;
+
+    const body = groups.map(book => {
+      const bookHeader = `${book.mainNumber} - ${book.bookTitle}`;
+
+      const tagsText = book.tagGroups.map(tagGroup => {
+        const tagHeader = `${tagGroup.subNumber} - ${tagGroup.tagLabel}`;
+        const itemsText = tagGroup.items
+          .map(item => `«${item.text || ""}»\n🔗 لینک منبع: ${item.url || ""}`)
+          .join("\n\n");
+
+        return `${tagHeader}\n${itemsText}`;
+      }).join("\n\n");
+
+      return `${bookHeader}\n\n${tagsText}`;
+    }).join(`\n\n${BOOKMARKS_EXPORT_DIVIDER}\n\n`);
+
+    return `${header}\n\n${body}`;
+  }
+
+  function exportBookmarksAsText() {
+    const items = getVisibleBookmarks();
+
+    if (items.length === 0) {
+      return;
+    }
+
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
+    const text = buildBookmarksExportPlainText(groups, bookmarkFilterTag);
+
+    downloadTextFile(`${getBookmarksNotebookTitle(bookmarkFilterTag)}.txt`, text);
+  }
+
+  function exportBookmarksAsWord() {
+    const items = getVisibleBookmarks();
+
+    if (items.length === 0) {
+      return;
+    }
+
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
+    const title = escapeHtml(getBookmarksNotebookTitle(bookmarkFilterTag));
+
+    const bodyHtml = groups.map(book => {
+      const tagsHtml = book.tagGroups.map(tagGroup => {
+        const itemsHtml = tagGroup.items.map(item => (
+          `<p dir="ltr" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
+          `«${escapeHtml(item.text || "")}»</p>` +
+          `<p dir="ltr" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:12px;text-align:right;">🔗 ` +
+          `<a href="${escapeHtml(item.url || "#")}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+        )).join("");
+
+        return (
+          `<p dir="ltr" style="margin:8px 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:13px;font-weight:bold;color:#6d28d9;text-align:right;">` +
+          `${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</p>${itemsHtml}`
+        );
+      }).join("");
+
+      return (
+        `<p dir="ltr" style="margin:14px 0 6px;padding-bottom:4px;border-bottom:2px solid #173b63;` +
+        `font-family:Tahoma,Arial,sans-serif;font-size:15px;font-weight:bold;color:#173b63;` +
+        `text-align:right;">${book.mainNumber} - ${escapeHtml(book.bookTitle)}</p>${tagsHtml}`
+      );
+    }).join("");
+
+    const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8">
+        <title>${title}</title>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:DoNotOptimizeForBrowser/>
+          </w:WordDocument>
+        </xml>
+        <![endif]-->
+      </head>
+      <body dir="rtl" style="font-family:Tahoma,Arial,sans-serif;">
+        <table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 12px;">
+          <tr>
+            <td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;
+              font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;
+              color:#173b63;text-align:right;">📑&nbsp;${title}</td>
+          </tr>
+        </table>
+        ${bodyHtml}
+      </body>
+    </html>`;
+
+    downloadTextFile(
+      `${getBookmarksNotebookTitle(bookmarkFilterTag)}.doc`,
+      doc,
+      "application/msword;charset=utf-8"
+    );
+  }
+
+  function exportBookmarksAsPdf() {
+    const items = getVisibleBookmarks();
+
+    if (items.length === 0) {
+      return;
+    }
+
+    const groups = resolveBookmarkExportGroups(items, bookmarkFilterTag);
+    const title = escapeHtml(getBookmarksNotebookTitle(bookmarkFilterTag));
+
+    const bodyHtml = groups.map(book => {
+      const tagsHtml = book.tagGroups.map(tagGroup => {
+        const itemsHtml = tagGroup.items.map(item => `
+          <div class="export-item">
+            <p class="export-snippet">«${escapeHtml(item.text || "")}»</p>
+            <p class="export-link">🔗 <a href="${escapeHtml(item.url || "#")}">لینک منبع</a></p>
+          </div>
+        `).join("");
+
+        return `
+          <div class="export-tag-header">${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</div>
+          ${itemsHtml}
+        `;
+      }).join("");
+
+      return `
+        <div class="export-book-header">${book.mainNumber} - ${escapeHtml(book.bookTitle)}</div>
+        ${tagsHtml}
+      `;
+    }).join("");
+
+    const doc = `<!DOCTYPE html>
+      <html lang="fa" dir="rtl">
+      <head>
+        <meta charset="utf-8">
+        <title>${title}</title>
+        <style>
+          * {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          body {
+            font-family: Tahoma, Arial, sans-serif;
+            direction: rtl;
+            text-align: right;
+            color: #1f2937;
+            margin: 24px;
+          }
+          .export-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            margin-bottom: 18px;
+            background: #eff6ff;
+            border-right: 5px solid #2563eb;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #173b63;
+          }
+          .export-book-header {
+            margin: 18px 0 6px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid #173b63;
+            font-size: 16px;
+            font-weight: bold;
+            color: #173b63;
+          }
+          .export-tag-header {
+            margin: 10px 0 6px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #6d28d9;
+          }
+          .export-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+          }
+          .export-snippet {
+            margin: 0 0 4px;
+            font-size: 15px;
+            line-height: 2;
+          }
+          .export-link {
+            margin: 0;
+            font-size: 12px;
+          }
+          .export-link a {
+            color: #1d4ed8;
+            text-decoration: none;
+          }
+          @media print {
+            body { margin: 10mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="export-header">📑 ${title}</div>
+        ${bodyHtml}
+        <script>window.onload = () => window.print();<\/script>
+      </body>
+      </html>`;
+
+    const printWindow = window.open("", "_blank");
+
+    if (!printWindow) {
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(doc);
+    printWindow.document.close();
   }
 
   function openBookmarksPanel() {
