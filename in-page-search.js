@@ -78,6 +78,55 @@
   let searchInMainText = true;
   let searchInFootnotes = true;
 
+  // ---- Item جدید: تنظیمات مطالعه (حالت شب + اندازهٔ متن) ---------------
+  // با یک کلید مشترک در localStorage ذخیره می‌شوند تا ترجیح کاربر بین
+  // همهٔ کتاب‌های سایت یکسان بماند، نه فقط همین صفحه.
+  const READING_PREFS_KEY = "milaniReadingPrefs";
+  const READING_ZOOM_STEP = 0.1;
+  const READING_ZOOM_MIN = 0.7;
+  const READING_ZOOM_MAX = 1.8;
+
+  function loadReadingPrefs() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(READING_PREFS_KEY) || "{}");
+      return {
+        darkMode: !!parsed.darkMode,
+        zoom: typeof parsed.zoom === "number" ? parsed.zoom : 1
+      };
+    } catch (error) {
+      return { darkMode: false, zoom: 1 };
+    }
+  }
+
+  function saveReadingPrefs(prefs) {
+    try {
+      localStorage.setItem(READING_PREFS_KEY, JSON.stringify(prefs));
+    } catch (error) {
+      // Storage unavailable or full - preference just won't persist.
+    }
+  }
+
+  let readingPrefs = loadReadingPrefs();
+
+  function applyReadingPrefs() {
+    document.documentElement.classList.toggle("in-page-dark-mode", readingPrefs.darkMode);
+    document.body.style.zoom = readingPrefs.zoom;
+
+    const darkButton = document.getElementById("inPageDarkModeToggle");
+
+    if (darkButton) {
+      darkButton.textContent = readingPrefs.darkMode ? "☀️" : "🌙";
+      darkButton.title = readingPrefs.darkMode ? "حالت روز" : "حالت شب";
+      darkButton.setAttribute("aria-label", darkButton.title);
+    }
+
+    const zoomLabel = document.getElementById("inPageReadingZoomLabel");
+
+    if (zoomLabel) {
+      zoomLabel.textContent = `${Math.round(readingPrefs.zoom * 100)}٪`;
+    }
+  }
+
   function isFootnoteTextNode(node) {
     return !!(node.parentElement && node.parentElement.closest(".MsoFootnoteText"));
   }
@@ -763,6 +812,15 @@
           🎤
         </button>
 
+        <button
+          id="inPageDarkModeToggle"
+          type="button"
+          class="in-page-voice-input-button"
+          title="حالت شب"
+          aria-label="حالت شب">
+          🌙
+        </button>
+
         <label
           class="in-page-search-root-label"
           for="inPageSearchRoot"
@@ -1245,6 +1303,59 @@
       mark.in-page-search-match.current-match {
         outline: 2px solid #ea580c;
         background: #fbbf24;
+      }
+
+      /* Item جدید: حالت شب برای صفحهٔ مطالعه - چون این کلاس‌ها روی کل
+         html اعمال می‌شوند و خودِ کادر جست‌وجو هم زیرمجموعهٔ همان html
+         است، دوباره معکوسش می‌کنیم تا رنگ عادی (نه معکوس) بماند و
+         همیشه خوانا باشد - دقیقاً همان تکنیکی که در index.htm برای
+         تصاویر/iframeها استفاده شده.
+         Item جدید: اندازهٔ متن صفحه با zoom (نه font-size) تنظیم
+         می‌شود، چون بسیاری از پاراگراف‌های خروجی Word سایز فونت مستقیم
+         و ثابت (px/pt) روی خودشان دارند که با تغییر font-size روی
+         body/html اصلاً تحت‌تأثیر قرار نمی‌گیرند؛ zoom همه‌چیز
+         (متن‌ها، فاصله‌ها، تصاویر) را یک‌دست بزرگ/کوچک می‌کند. */
+      html.in-page-dark-mode {
+        filter: invert(1) hue-rotate(180deg);
+      }
+
+      html.in-page-dark-mode #inPageSearchBox,
+      html.in-page-dark-mode #inPageSearchResults,
+      html.in-page-dark-mode img,
+      html.in-page-dark-mode video {
+        filter: invert(1) hue-rotate(180deg);
+      }
+
+      .in-page-reading-size-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        padding: 4px 9px 8px;
+      }
+
+      .in-page-reading-size-row button {
+        flex: 1;
+        padding: 6px 0;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        background: #f8fafc;
+        color: #1f2937;
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.9rem;
+      }
+
+      .in-page-reading-size-row button:hover {
+        background: #eff6ff;
+      }
+
+      .in-page-reading-size-label {
+        flex: 0 0 auto;
+        min-width: 34px;
+        text-align: center;
+        color: #64748b;
+        font-size: 0.78rem;
       }
 
       @media (max-width: 600px) {
@@ -4674,6 +4785,16 @@
         <input type="checkbox" id="inPageMenuSearchFootnotes" ${searchInFootnotes ? "checked" : ""}>
         جست‌وجو در پاورقی
       </label>
+
+      <div class="in-page-settings-separator"></div>
+
+      <div class="in-page-settings-section-label">نمایش صفحه</div>
+      <div class="in-page-reading-size-row">
+        <button type="button" id="inPageReadingZoomOut" title="کوچک‌کردن متن">A-</button>
+        <span id="inPageReadingZoomLabel" class="in-page-reading-size-label">${Math.round(readingPrefs.zoom * 100)}٪</span>
+        <button type="button" id="inPageReadingZoomIn" title="بزرگ‌کردن متن">A+</button>
+        <button type="button" id="inPageReadingZoomReset" title="بازگشت به اندازهٔ پیش‌فرض">⟲</button>
+      </div>
     `;
 
     const bind = (id, handler) => {
@@ -4802,6 +4923,24 @@
         }
       });
     }
+
+    bind("inPageReadingZoomOut", () => {
+      readingPrefs.zoom = Math.max(READING_ZOOM_MIN, Math.round((readingPrefs.zoom - READING_ZOOM_STEP) * 100) / 100);
+      saveReadingPrefs(readingPrefs);
+      applyReadingPrefs();
+    });
+
+    bind("inPageReadingZoomIn", () => {
+      readingPrefs.zoom = Math.min(READING_ZOOM_MAX, Math.round((readingPrefs.zoom + READING_ZOOM_STEP) * 100) / 100);
+      saveReadingPrefs(readingPrefs);
+      applyReadingPrefs();
+    });
+
+    bind("inPageReadingZoomReset", () => {
+      readingPrefs.zoom = 1;
+      saveReadingPrefs(readingPrefs);
+      applyReadingPrefs();
+    });
 
     // Content just got rebuilt (badges/rows can appear or disappear),
     // so if the menu is currently open, re-measure and reposition it
@@ -5623,6 +5762,17 @@
 
     createSearchBox();
     setupSelectionBookmarking();
+    applyReadingPrefs();
+
+    const darkModeToggleButton = document.getElementById("inPageDarkModeToggle");
+
+    if (darkModeToggleButton) {
+      darkModeToggleButton.addEventListener("click", () => {
+        readingPrefs.darkMode = !readingPrefs.darkMode;
+        saveReadingPrefs(readingPrefs);
+        applyReadingPrefs();
+      });
+    }
 
     const input = document.getElementById("inPageSearchInput");
     const previousButton = document.getElementById("inPageSearchPrevious");
