@@ -2411,21 +2411,30 @@
     return `${base}?${params.toString()}#:~:text=${encodeURIComponent(fragmentText)}`;
   }
 
-  // ---- Item جدید (آدرس‌های داخل متن/پاورقی) ---------------------------
-  // A matched/selected paragraph - especially a footnote paragraph
-  // (class="MsoFootnoteText") - can itself contain real <a href> links
-  // (e.g. a source address cited inside the footnote). Every copy/export
-  // path below only ever worked off of plain container.textContent,
-  // which silently drops those href attributes - the visible link text
-  // survives but the actual address it pointed to does not. These
-  // helpers pull such links back out so every export path can carry
-  // them along explicitly, instead of just the tool's own generated
-  // "لینک منبع" back-reference to the page.
+  // ---- Item جدید (شماره‌ی پاورقی داخل متن + آدرس‌های داخل پاورقی) -----
+  // Two related things get lost when a paragraph is copied/exported,
+  // because every path below only ever worked off of plain
+  // container.textContent:
+  //   1) A footnote REFERENCE marker inside the main text (e.g. the
+  //      "[28]" at the end of a paragraph) is itself a link - not to an
+  //      external address, but to the footnote's own paragraph
+  //      elsewhere on the same page (class="MsoFootnoteText", per
+  //      isFootnoteTextNode above). textContent keeps the bare "[28]"
+  //      but drops the connection entirely, so the footnote's actual
+  //      wording never makes it into the copy/export.
+  //   2) A real external <a href> that happens to sit inside a
+  //      paragraph (main text or a footnote's own text) - e.g. a source
+  //      address cited inside a footnote - loses its href the same way.
+  // Both are "references" a paragraph can carry; these helpers resolve
+  // each <a> found in the exported slice into one of the two, so every
+  // export path can append what it actually points to - either the
+  // footnote's full text or the external address - not just re-use the
+  // tool's own generated "لینک منبع" back-reference to the page.
 
-  // Fragment-only hrefs ("#ftn1"-style footnote back-references) aren't
-  // real external addresses worth exporting - they just jump around the
-  // same page - so they're filtered out here rather than at every call
-  // site.
+  // Fragment-only hrefs ("#_ftn28"-style) aren't real external
+  // addresses - they just jump around the same page - so they're never
+  // treated as an exportable link. What they resolve to as a FOOTNOTE
+  // is handled separately by resolveFootnoteRef below.
   function resolveExportableHref(rawHref) {
     const trimmed = (rawHref || "").trim();
 
@@ -2440,45 +2449,146 @@
     }
   }
 
-  // Collects every distinct real link inside `container` whose text
-  // falls (even partially) within [start, end) of that container's own
-  // textContent - i.e. within whatever slice is actually being
-  // copied/exported, not the whole surrounding element.
+  // If `rawHref` points at a fragment on THIS same page (Word's export
+  // writes footnote references as "<file>.htm#_ftn28", which resolves
+  // to the current page once the filename matches), returns that
+  // fragment's raw id (e.g. "_ftn28"); otherwise null. Comparing the
+  // pre-fragment URL mirrors the exact same same-page check already
+  // used elsewhere in this file (see the bookmark "بازکردن" handling).
+  function resolveSamePageFragmentId(rawHref) {
+    try {
+      const absolute = new URL(rawHref, location.href);
+
+      if (!absolute.hash || absolute.href.split("#")[0] !== location.href.split("#")[0]) {
+        return null;
+      }
+
+      return decodeURIComponent(absolute.hash.slice(1));
+    } catch (error) {
+      return null;
+    }
+  }
+
+  // Resolves an in-page anchor to the footnote paragraph it actually
+  // points to, if any: finds the element the fragment names (by id,
+  // falling back to Word's <a name="..."> convention), then walks up
+  // to the nearest footnote paragraph/block from there. Returns the
+  // footnote's own text (its leading "[28]" back-reference marker
+  // stripped, since the export already shows that marker as the
+  // reference's own label) or null if this anchor isn't a footnote
+  // reference at all (e.g. a plain same-page jump link).
+  function resolveFootnoteRef(rawHref, anchorEl) {
+    const fragmentId = resolveSamePageFragmentId(rawHref);
+
+    if (!fragmentId) {
+      return null;
+    }
+
+    let target = document.getElementById(fragmentId);
+
+    if (!target) {
+      const named = document.getElementsByName(fragmentId);
+      target = named && named.length ? named[0] : null;
+    }
+
+    if (!target || target === anchorEl) {
+      return null;
+    }
+
+    const footnoteContainer = target.closest ?
+      target.closest(".MsoFootnoteText, [id^='ftn'], [id^='_ftn'], [id^='edn'], [id^='_edn']") :
+      null;
+
+    if (!footnoteContainer) {
+      return null;
+    }
+
+    const text = footnoteContainer.textContent
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\[?\d+\]?[.\)]?\s*/, "");
+
+    return text || null;
+  }
+
+  // Classifies every given <a href> as either a footnote reference
+  // (kind: "footnote", carrying the footnote's own text) or a plain
+  // external link (kind: "link", carrying its address) - skipping
+  // anything that's neither (e.g. a bare same-page jump link with no
+  // matching footnote). De-duplicates by resolved footnote text /
+  // href so the same reference used twice in one excerpt isn't listed
+  // twice.
+  function collectFootnoteAndLinkRefs(anchors) {
+    const seen = new Set();
+    const refs = [];
+
+    anchors.forEach(anchor => {
+      const rawHref = anchor.getAttribute("href");
+
+      if (!rawHref) {
+        return;
+      }
+
+      const label = anchor.textContent.replace(/\s+/g, " ").trim();
+      const footnoteText = resolveFootnoteRef(rawHref, anchor);
+
+      if (footnoteText) {
+        const key = `fn:${footnoteText}`;
+
+        if (seen.has(key)) {
+          return;
+        }
+
+        seen.add(key);
+        refs.push({ kind: "footnote", label: label || "پاورقی", text: footnoteText });
+        return;
+      }
+
+      const href = resolveExportableHref(rawHref);
+
+      if (!href) {
+        return;
+      }
+
+      const key = `link:${href}`;
+
+      if (seen.has(key)) {
+        return;
+      }
+
+      seen.add(key);
+      refs.push({ kind: "link", label: label || href, href });
+    });
+
+    return refs;
+  }
+
+  // Collects every distinct reference (footnote or external link)
+  // inside `container` whose anchor text falls (even partially) within
+  // [start, end) of that container's own textContent - i.e. within
+  // whatever slice is actually being copied/exported, not the whole
+  // surrounding element.
   function collectLinksInContainerRange(container, start, end) {
     if (!container || typeof container.querySelectorAll !== "function") {
       return [];
     }
 
-    const seen = new Set();
-    const links = [];
-
-    container.querySelectorAll("a[href]").forEach(anchor => {
-      const href = resolveExportableHref(anchor.getAttribute("href"));
-
-      if (!href || seen.has(href)) {
-        return;
-      }
-
+    const anchorsInRange = Array.from(container.querySelectorAll("a[href]")).filter(anchor => {
       const anchorStart = getTextOffsetBefore(container, anchor);
       const anchorEnd = anchorStart + anchor.textContent.length;
 
-      if (anchorEnd <= start || anchorStart >= end) {
-        return;
-      }
-
-      seen.add(href);
-
-      const label = anchor.textContent.replace(/\s+/g, " ").trim();
-      links.push({ label: label || href, href });
+      return !(anchorEnd <= start || anchorStart >= end);
     });
 
-    return links;
+    return collectFootnoteAndLinkRefs(anchorsInRange);
   }
 
   // Same idea, but for a live Selection Range that's about to be lost
   // (e.g. once the tag popover steals focus) rather than for a
   // paragraph container still attached to the page - cloneContents()
-  // keeps any <a> the selection crossed into, in either direction.
+  // keeps any <a> the selection crossed into, in either direction, and
+  // resolveFootnoteRef still resolves it against the live document
+  // regardless of the anchor now sitting in a detached fragment.
   function collectLinksInRange(range) {
     if (!range) {
       return [];
@@ -2492,69 +2602,65 @@
       return [];
     }
 
-    const seen = new Set();
-    const links = [];
-
-    fragment.querySelectorAll("a[href]").forEach(anchor => {
-      const href = resolveExportableHref(anchor.getAttribute("href"));
-
-      if (!href || seen.has(href)) {
-        return;
-      }
-
-      seen.add(href);
-
-      const label = anchor.textContent.replace(/\s+/g, " ").trim();
-      links.push({ label: label || href, href });
-    });
-
-    return links;
+    return collectFootnoteAndLinkRefs(Array.from(fragment.querySelectorAll("a[href]")));
   }
 
-  // Plain-text targets have no clickable links, so any link the
-  // matched/bookmarked text carried is appended as its own labeled
-  // line right under the "🔗 لینک منبع" line, address spelled out in
-  // full since there's no way to make it clickable in plain text.
-  function buildLinksPlainTextSuffix(links, indent) {
-    if (!links || links.length === 0) {
+  // Plain-text targets have no clickable links, so every reference the
+  // matched/bookmarked text carried - a footnote's own wording, or an
+  // external address - is appended as its own labeled line right under
+  // the "🔗 لینک منبع" line.
+  function buildLinksPlainTextSuffix(refs, indent) {
+    if (!refs || refs.length === 0) {
       return "";
     }
 
-    return links
-      .map(link => `\n${indent}🔗 آدرس داخل متن/پاورقی «${link.label}»: ${link.href}`)
+    return refs
+      .map(ref => (
+        ref.kind === "footnote" ?
+          `\n${indent}📝 پاورقی ${ref.label}: ${ref.text}` :
+          `\n${indent}🔗 آدرس داخل متن/پاورقی «${ref.label}»: ${ref.href}`
+      ))
       .join("");
   }
 
-  // Rich/HTML targets (clipboard rich-paste, Word export, PDF export)
-  // get an actual clickable link instead, one per line, right under the
-  // paragraph and its own "لینک منبع" line - reusing the exact same
-  // "<p dir=rtl>...</p>" shape those already use so the two blend in.
-  function buildLinksHtmlSuffix(links) {
-    if (!links || links.length === 0) {
+  // Rich/HTML targets (clipboard rich-paste, Word export, PDF export):
+  // a footnote reference gets its actual text spelled out in a line of
+  // its own; an external link gets an actual clickable link - both
+  // right under the paragraph and its own "لینک منبع" line, reusing the
+  // exact same "<p dir=rtl>...</p>" shape those already use so they all
+  // blend in.
+  function buildLinksHtmlSuffix(refs) {
+    if (!refs || refs.length === 0) {
       return "";
     }
 
-    return links
-      .map(link => (
-        `<p dir="rtl" style="margin:0 0 10px;font-family:Tahoma,Arial,sans-serif;` +
-        `font-size:12px;text-align:right;color:#4b5563;">🔗 آدرس داخل متن/پاورقی: ` +
-        `<a href="${escapeHtml(link.href)}" style="color:#1d4ed8;text-decoration:none;">` +
-        `${escapeHtml(link.label)}</a></p>`
+    return refs
+      .map(ref => (
+        ref.kind === "footnote" ?
+          `<p dir="rtl" style="margin:0 0 10px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:12px;text-align:right;color:#4b5563;">📝 پاورقی ${escapeHtml(ref.label)}: ` +
+          `${escapeHtml(ref.text)}</p>` :
+          `<p dir="rtl" style="margin:0 0 10px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:12px;text-align:right;color:#4b5563;">🔗 آدرس داخل متن/پاورقی: ` +
+          `<a href="${escapeHtml(ref.href)}" style="color:#1d4ed8;text-decoration:none;">` +
+          `${escapeHtml(ref.label)}</a></p>`
       ))
       .join("");
   }
 
   // Same as buildLinksHtmlSuffix, but using the PDF export's own
   // ".export-link" class instead of inline styles.
-  function buildLinksPdfSuffix(links) {
-    if (!links || links.length === 0) {
+  function buildLinksPdfSuffix(refs) {
+    if (!refs || refs.length === 0) {
       return "";
     }
 
-    return links
-      .map(link => (
-        `<p class="export-link">🔗 آدرس داخل متن/پاورقی: ` +
-        `<a href="${escapeHtml(link.href)}">${escapeHtml(link.label)}</a></p>`
+    return refs
+      .map(ref => (
+        ref.kind === "footnote" ?
+          `<p class="export-link">📝 پاورقی ${escapeHtml(ref.label)}: ${escapeHtml(ref.text)}</p>` :
+          `<p class="export-link">🔗 آدرس داخل متن/پاورقی: ` +
+          `<a href="${escapeHtml(ref.href)}">${escapeHtml(ref.label)}</a></p>`
       ))
       .join("");
   }
