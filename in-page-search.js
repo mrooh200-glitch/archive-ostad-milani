@@ -31,11 +31,20 @@
   // selection anywhere on the page or a batch of selected search
   // results. "selection" mode stores the exact selected text pending
   // save; "matches" mode saves one bookmark per currently
-  // selectedMatchIndexes entry. bookmarkFilterTag narrows the
-  // bookmarks panel list to one tag at a time (null = show all).
+  // selectedMatchIndexes entry. bookmarkFilterTags narrows the
+  // bookmarks panel list (Item ۲): any tag in the set may be active at
+  // once (OR filter) - an empty set means "show all" - so the user can
+  // click several tag chips together and see the union of their
+  // bookmarks, instead of being limited to one tag at a time.
   let pendingBookmarkMode = null;
   let pendingSelectionText = "";
-  let bookmarkFilterTag = null;
+  // Item ۳/۱: which occurrence (top-to-bottom, 1-based) of
+  // pendingSelectionText on the page the live selection was, captured
+  // while the selection is still fresh (see handleDocumentSelectionChange)
+  // so it can be saved alongside the bookmark and later used to find the
+  // exact same spot again (findRangeForBookmarkText).
+  let pendingSelectionOccurrenceIndex = 1;
+  const bookmarkFilterTags = new Set();
 
   // Item ب: results-panel ordering. "position" keeps the original
   // top-to-bottom document order; "frequency" puts the most-repeated
@@ -1669,6 +1678,36 @@
         color: #ffffff;
       }
 
+      /* Item ۱: subtle in-text marker placed right after a bookmarked
+         passage. Deliberately small/low-opacity so it doesn't compete
+         with the surrounding text for attention; a click removes the
+         bookmark and the marker itself. */
+      .in-page-bookmark-marker {
+        display: inline-block;
+        font-size: 0.68em;
+        opacity: 0.45;
+        margin: 0 2px;
+        cursor: pointer;
+        vertical-align: super;
+        line-height: 1;
+        user-select: none;
+      }
+
+      .in-page-bookmark-marker:hover {
+        opacity: 0.9;
+      }
+
+      /* Item ۳: brief highlight flash used when "بازکردن" jumps to a
+         bookmark already present on the current page. */
+      .in-page-bookmark-flash {
+        background: #fef08a;
+        transition: background 1.2s ease;
+      }
+
+      .in-page-bookmark-flash.is-fading {
+        background: transparent;
+      }
+
       /* Item ط (چینش کتاب/برچسب): سرتیترهای گروه‌بندی سلسله‌مراتبی -
          عنوان کتاب با شماره‌ی اصلی (۱، ۲...) و زیرش عنوان برچسب با
          شماره‌ی فرعی (۱.۱، ۱.۲...) - که جای تکرار عنوان/برچسب روی تک‌تک
@@ -2705,7 +2744,7 @@
     return `${base}#:~:text=${encodeURIComponent(fragment)}`;
   }
 
-  function addBookmark({ text, url, tags }) {
+  function addBookmark({ text, url, tags, occurrenceIndex }) {
     const trimmedText = (text || "").trim();
 
     if (!trimmedText) {
@@ -2720,22 +2759,329 @@
       text: trimmedText,
       url: url || (location.origin + location.pathname),
       tags: Array.isArray(tags) ? tags : [],
+      // Item ۱/۳: which occurrence of this text on the page this
+      // particular bookmark refers to, so it can be found again later
+      // (in-text marker, same-page "بازکردن") even if the text repeats
+      // elsewhere on the page.
+      occurrenceIndex: occurrenceIndex > 0 ? occurrenceIndex : 1,
       savedAt: new Date().toISOString()
     });
 
     saveBookmarks(bookmarks);
     renderBookmarksPanel();
+    markBookmarksOnCurrentPage();
   }
 
   function removeBookmark(id) {
     saveBookmarks(loadBookmarks().filter(item => item.id !== id));
+    removeBookmarkMarker(id);
     renderBookmarksPanel();
   }
 
   function clearBookmarks() {
     saveBookmarks([]);
-    bookmarkFilterTag = null;
+    bookmarkFilterTags.clear();
+    document.querySelectorAll(".in-page-bookmark-marker").forEach(marker => marker.remove());
     renderBookmarksPanel();
+  }
+
+  // ---- Item ۱ و ۳: locating a bookmark's text back in the live DOM ----
+  // Bookmarks only store raw text (plus which occurrence of it), not a
+  // reference to a node - so re-finding them (to draw the subtle in-text
+  // marker, or to jump "بازکردن" to the right spot without a full page
+  // reload) means searching the page's own text the same way the search
+  // feature already normalizes/matches, but generalized to ANY text,
+  // not just the current query's <mark> elements.
+
+  // Walks the same visible-text nodes the search box itself would look
+  // at, minus the app's own UI chrome (settings/results/overlays/
+  // popovers) - reusing isWithinAppInterface so a bookmark can never be
+  // "found" inside the search UI itself.
+  function getAllBodyTextNodesForLookup() {
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          const parent = node.parentElement;
+
+          if (
+            !parent ||
+            ignoredTags.has(parent.tagName) ||
+            isWithinAppInterface(parent) ||
+            !node.nodeValue
+          ) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+
+    const nodes = [];
+
+    while (walker.nextNode()) {
+      nodes.push(walker.currentNode);
+    }
+
+    return nodes;
+  }
+
+  // Builds one normalize()-equivalent string across the WHOLE page
+  // (spanning node boundaries), character-by-character, while keeping a
+  // parallel array mapping each output character back to the exact
+  // (node, offset) it came from - the only way to turn a plain
+  // substring match back into a real DOM Range afterwards.
+  const BOOKMARK_CHAR_MAP = { "ي": "ی", "ى": "ی", "ك": "ک", "ۀ": "ه", "ة": "ه" };
+  const BOOKMARK_DIACRITICS_RE = /[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/;
+
+  function buildBodyNormalizedTextMap() {
+    const nodes = getAllBodyTextNodesForLookup();
+    let normalized = "";
+    const positions = [];
+    let lastWasSpace = true;
+
+    nodes.forEach(node => {
+      const text = node.nodeValue;
+
+      for (let i = 0; i < text.length; i++) {
+        let ch = text[i];
+
+        if (BOOKMARK_DIACRITICS_RE.test(ch)) {
+          continue;
+        }
+
+        ch = ch.toLowerCase();
+        ch = BOOKMARK_CHAR_MAP[ch] || ch;
+
+        if (/\s/.test(ch)) {
+          if (lastWasSpace) {
+            continue;
+          }
+
+          normalized += " ";
+          positions.push({ node, offset: i });
+          lastWasSpace = true;
+        } else {
+          normalized += ch;
+          positions.push({ node, offset: i });
+          lastWasSpace = false;
+        }
+      }
+    });
+
+    return { normalized, positions };
+  }
+
+  // Finds the nth (1-based) occurrence of rawText anywhere in the
+  // page's own text and returns it as a DOM Range, or null if it can no
+  // longer be found (page content changed since the bookmark was
+  // saved). Falls back to the first occurrence if the requested one no
+  // longer exists, rather than failing outright.
+  function findRangeForBookmarkText(rawText, occurrenceIndex) {
+    const target = normalize(rawText);
+
+    if (!target) {
+      return null;
+    }
+
+    const { normalized, positions } = buildBodyNormalizedTextMap();
+    const wanted = occurrenceIndex > 0 ? occurrenceIndex : 1;
+
+    let fromIndex = 0;
+    let foundStart = -1;
+    let count = 0;
+
+    while (true) {
+      const idx = normalized.indexOf(target, fromIndex);
+
+      if (idx === -1) {
+        break;
+      }
+
+      count++;
+
+      if (count === wanted) {
+        foundStart = idx;
+        break;
+      }
+
+      fromIndex = idx + 1;
+    }
+
+    if (foundStart === -1) {
+      foundStart = normalized.indexOf(target);
+
+      if (foundStart === -1) {
+        return null;
+      }
+    }
+
+    const endIndex = foundStart + target.length - 1;
+    const startPos = positions[foundStart];
+    const endPos = positions[endIndex];
+
+    if (!startPos || !endPos) {
+      return null;
+    }
+
+    const range = document.createRange();
+
+    try {
+      range.setStart(startPos.node, startPos.offset);
+      range.setEnd(endPos.node, endPos.offset + 1);
+    } catch (error) {
+      return null;
+    }
+
+    return range;
+  }
+
+  // Counts how many earlier occurrences of normalize(rawText) exist
+  // before a given (node, offset) anchor point, so a freshly-made
+  // bookmark can record which specific occurrence it is (mirrors
+  // computeMatchOccurrenceIndex, but works for ANY anchor point on the
+  // page, not just a <mark> produced by the current search).
+  function computeTextOccurrenceIndexAtNode(anchorNode, anchorOffset, rawText) {
+    const target = normalize(rawText);
+
+    if (!target) {
+      return 1;
+    }
+
+    const { normalized, positions } = buildBodyNormalizedTextMap();
+
+    // anchorNode is usually the exact text node a live selection
+    // started in (offset matters). It can also be an element (e.g. the
+    // snippet's paragraph container for a "matches" bookmark) - in
+    // that case, anchor at the first text position inside it instead.
+    let anchorPos = anchorNode.nodeType === Node.TEXT_NODE ?
+      positions.findIndex(pos => pos.node === anchorNode && pos.offset >= anchorOffset) :
+      positions.findIndex(pos => anchorNode.contains(pos.node));
+
+    if (anchorPos === -1) {
+      anchorPos = normalized.length;
+    }
+
+    let count = 0;
+    let fromIndex = 0;
+
+    while (true) {
+      const idx = normalized.indexOf(target, fromIndex);
+
+      if (idx === -1 || idx > anchorPos) {
+        break;
+      }
+
+      count++;
+      fromIndex = idx + 1;
+    }
+
+    return count > 0 ? count : 1;
+  }
+
+  // Item ۱: draws the small, low-opacity marker right after a
+  // bookmarked passage (see .in-page-bookmark-marker), and wires it so
+  // clicking it removes the bookmark - the "با اختیار کاربر می‌تونه حذف
+  // بشه" requirement. Silently does nothing if the text can no longer
+  // be found (e.g. content changed) or is already marked.
+  function insertBookmarkMarker(range, bookmarkId) {
+    if (document.querySelector(`.in-page-bookmark-marker[data-bookmark-id="${bookmarkId}"]`)) {
+      return;
+    }
+
+    const marker = document.createElement("span");
+    marker.className = "in-page-bookmark-marker";
+    marker.dataset.bookmarkId = bookmarkId;
+    marker.title = "این نشانه حذف شود؟ (کلیک کنید)";
+    marker.textContent = "🔖";
+
+    marker.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (window.confirm("این نشانه حذف شود؟")) {
+        removeBookmark(bookmarkId);
+      }
+    });
+
+    const insertionPoint = range.cloneRange();
+    insertionPoint.collapse(false);
+
+    try {
+      insertionPoint.insertNode(marker);
+    } catch (error) {
+      // Range couldn't host a new node here (rare edge case) - the
+      // bookmark itself is still saved, it just won't get an in-text
+      // marker this time.
+    }
+  }
+
+  function removeBookmarkMarker(bookmarkId) {
+    document.querySelectorAll(`.in-page-bookmark-marker[data-bookmark-id="${bookmarkId}"]`)
+      .forEach(marker => marker.remove());
+  }
+
+  // Re-scans every bookmark that belongs to THIS page (by title) and
+  // marks any that aren't marked yet. Safe to call repeatedly (e.g.
+  // once at page load, and again right after saving a new bookmark) -
+  // insertBookmarkMarker skips anything already marked.
+  function markBookmarksOnCurrentPage() {
+    const currentTitle = getPageTitle();
+
+    loadBookmarks()
+      .filter(item => (item.title || "") === currentTitle)
+      .forEach(item => {
+        const range = findRangeForBookmarkText(item.text, item.occurrenceIndex || 1);
+
+        if (range) {
+          insertBookmarkMarker(range, item.id);
+        }
+      });
+  }
+
+  // Item ۳: scrolls to a same-page bookmark and briefly flashes it, as
+  // a substitute for the browser's native #:~:text= scrolling - which
+  // only fires on an actual (cross-document) navigation and silently
+  // does nothing on a same-page hash change, which is exactly what
+  // clicking a same-page "بازکردن" link would otherwise be.
+  function scrollToRangeAndFlash(range) {
+    const anchorElement = range.startContainer.nodeType === Node.TEXT_NODE ?
+      range.startContainer.parentElement :
+      range.startContainer;
+
+    if (anchorElement && typeof anchorElement.scrollIntoView === "function") {
+      anchorElement.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    try {
+      const flash = document.createElement("span");
+      flash.className = "in-page-bookmark-flash";
+      range.surroundContents(flash);
+
+      setTimeout(() => {
+        flash.classList.add("is-fading");
+
+        setTimeout(() => {
+          const parent = flash.parentNode;
+
+          if (!parent) {
+            return;
+          }
+
+          while (flash.firstChild) {
+            parent.insertBefore(flash.firstChild, flash);
+          }
+
+          parent.removeChild(flash);
+          parent.normalize();
+        }, 1200);
+      }, 300);
+    } catch (error) {
+      // Range crosses element boundaries - surroundContents can't wrap
+      // it. The scroll above still got the user to the right spot.
+    }
   }
 
   // Item ط (چینش کتاب/برچسب): چون نشانه‌های چند کتاب/فایل مختلف در یک
@@ -2752,11 +3098,14 @@
 
   // یک نشانه‌ی چندبرچسبی زیر هر یک از برچسب‌هایش تکرار می‌شود؛ نشانه‌ی
   // بدون برچسب زیر زیرگروه BOOKMARK_NO_TAG_LABEL می‌رود. وقتی فیلتر
-  // برچسبیِ بالای پنل فعال است (restrictTag)، هر نشانه فقط زیر همان
-  // یک برچسب انتخابی قرار می‌گیرد - نه زیر بقیه‌ی برچسب‌های احتمالی‌اش -
-  // چون کاربر صریحاً نمایش را به یک برچسب محدود کرده است.
-  function buildBookmarkGroups(items, restrictTag) {
+  // برچسبیِ بالای پنل فعال است (restrictTags، Item ۲: می‌تواند شامل چند
+  // برچسب هم‌زمان باشد)، هر نشانه فقط زیر همان برچسب‌هایی قرار می‌گیرد
+  // که هم در تگ‌های خودش و هم در مجموعه‌ی انتخاب‌شده باشند - نه زیر بقیه‌ی
+  // برچسب‌های احتمالی‌اش - چون کاربر صریحاً نمایش را به آن برچسب‌ها
+  // محدود کرده است.
+  function buildBookmarkGroups(items, restrictTags) {
     const bookMap = new Map();
+    const hasRestriction = restrictTags && restrictTags.size > 0;
 
     items.forEach(item => {
       const bookTitle = item.title || "";
@@ -2766,8 +3115,8 @@
       }
 
       const tagMap = bookMap.get(bookTitle);
-      const tagsForGrouping = restrictTag ?
-        [restrictTag] :
+      const tagsForGrouping = hasRestriction ?
+        (item.tags || []).filter(tag => restrictTags.has(tag)) :
         ((item.tags && item.tags.length) ? item.tags : [BOOKMARK_NO_TAG_LABEL]);
 
       tagsForGrouping.forEach(tag => {
@@ -2803,15 +3152,21 @@
     const all = loadBookmarks().slice().reverse();
     const allTags = getAllBookmarkTags(all);
 
-    // Stale filter (its tag got removed along with the last bookmark
-    // that had it) - fall back to showing everything instead of an
-    // empty list with no visible way to explain why.
-    if (bookmarkFilterTag && !allTags.includes(bookmarkFilterTag)) {
-      bookmarkFilterTag = null;
-    }
+    // Stale filter entries (their tag got removed along with the last
+    // bookmark that had it) - drop just those, keep the rest of the
+    // active selection.
+    Array.from(bookmarkFilterTags).forEach(tag => {
+      if (!allTags.includes(tag)) {
+        bookmarkFilterTags.delete(tag);
+      }
+    });
 
-    const items = bookmarkFilterTag ?
-      all.filter(item => (item.tags || []).includes(bookmarkFilterTag)) :
+    // Item ۲: clicking several tag chips shows the UNION of their
+    // bookmarks (any selected tag matches), so the user can see
+    // multiple subgroups together instead of being limited to one tag
+    // at a time.
+    const items = bookmarkFilterTags.size > 0 ?
+      all.filter(item => (item.tags || []).some(tag => bookmarkFilterTags.has(tag))) :
       all;
 
     const tagChipsHtml = allTags.length === 0 ? "" : `
@@ -2819,7 +3174,7 @@
         ${allTags.map(tag => `
           <button
             type="button"
-            class="bookmark-tag-chip${tag === bookmarkFilterTag ? " is-active" : ""}"
+            class="bookmark-tag-chip${bookmarkFilterTags.has(tag) ? " is-active" : ""}"
             data-bookmark-filter-tag="${escapeHtml(tag)}">
             ${escapeHtml(tag)}
           </button>
@@ -2832,12 +3187,12 @@
     // ۱، ۲...) و داخل هر کتاب بر اساس برچسب (الفبایی، شماره‌ی فرعی
     // ۱.۱، ۱.۲...) گروه‌بندی می‌شوند - مستقل از ترتیب/زمان ذخیره‌شدن
     // نشانه‌ها توسط کاربر.
-    const groups = buildBookmarkGroups(items, bookmarkFilterTag);
+    const groups = buildBookmarkGroups(items, bookmarkFilterTags);
     const bookTitles = Array.from(groups.keys()).sort(compareFa);
 
     const listHtml = items.length === 0 ?
       `<p class="archive-empty">${
-        bookmarkFilterTag ? "نشانه‌ای با این برچسب یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
+        bookmarkFilterTags.size > 0 ? "نشانه‌ای با این برچسب‌ها یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
       }</p>` :
       bookTitles.map((bookTitle, bookIndex) => {
         const mainNumber = bookIndex + 1;
@@ -2851,7 +3206,7 @@
             <div class="archive-item">
               <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
               <div class="archive-item-actions">
-                <a href="${escapeHtml(item.url || "#")}">
+                <a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">
                   بازکردن
                 </a>
                 <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
@@ -2901,11 +3256,61 @@
       });
     });
 
+    // Item ۲: each chip toggles independently in the set, instead of
+    // one chip's selection clearing another's - so several can be
+    // active together.
     panel.querySelectorAll("[data-bookmark-filter-tag]").forEach(chip => {
       chip.addEventListener("click", () => {
         const tag = chip.dataset.bookmarkFilterTag;
-        bookmarkFilterTag = bookmarkFilterTag === tag ? null : tag;
+
+        if (bookmarkFilterTags.has(tag)) {
+          bookmarkFilterTags.delete(tag);
+        } else {
+          bookmarkFilterTags.add(tag);
+        }
+
         renderBookmarksPanel();
+      });
+    });
+
+    // Item ۳: if this bookmark's saved URL points at THIS same file,
+    // jump straight to it in the live DOM instead of relying on the
+    // href - a same-page hash-only navigation never triggers the
+    // browser's native #:~:text= scrolling, so the link would
+    // otherwise silently do nothing.
+    panel.querySelectorAll("[data-bookmark-open]").forEach(link => {
+      link.addEventListener("click", event => {
+        const id = link.dataset.bookmarkOpen;
+        const item = loadBookmarks().find(bookmark => bookmark.id === id);
+
+        if (!item) {
+          return;
+        }
+
+        let itemUrl;
+
+        try {
+          itemUrl = new URL(item.url, location.href);
+        } catch (error) {
+          return;
+        }
+
+        const isSamePage = itemUrl.origin === location.origin &&
+          itemUrl.pathname === location.pathname;
+
+        if (!isSamePage) {
+          return;
+        }
+
+        const range = findRangeForBookmarkText(item.text, item.occurrenceIndex || 1);
+
+        if (!range) {
+          return;
+        }
+
+        event.preventDefault();
+        closeBookmarksPanel();
+        scrollToRangeAndFlash(range);
       });
     });
   }
@@ -3068,7 +3473,8 @@
       addBookmark({
         text: pendingSelectionText,
         url: buildSelectionBookmarkUrl(pendingSelectionText),
-        tags
+        tags,
+        occurrenceIndex: pendingSelectionOccurrenceIndex
       });
     } else if (pendingBookmarkMode === "matches") {
       [...selectedMatchIndexes]
@@ -3076,10 +3482,16 @@
         .map(index => matches[index])
         .filter(Boolean)
         .forEach(mark => {
+          const snippetText = getSnippetPlainText(mark);
+          const container = getSnippetContainer(mark);
+
           addBookmark({
-            text: getSnippetPlainText(mark),
+            text: snippetText,
             url: buildMatchUrl(mark),
-            tags
+            tags,
+            occurrenceIndex: container ?
+              computeTextOccurrenceIndexAtNode(container, 0, snippetText) :
+              1
           });
         });
     }
@@ -3120,6 +3532,17 @@
     pendingSelectionText = selectedText;
 
     const range = selection.getRangeAt(0);
+
+    // Item ۱/۳: capture which occurrence of this text the live
+    // selection is, while the Range is still valid - by the time the
+    // popover is saved, focusing its input has usually already cleared
+    // the page's own selection.
+    pendingSelectionOccurrenceIndex = computeTextOccurrenceIndexAtNode(
+      range.startContainer,
+      range.startOffset,
+      selectedText
+    );
+
     showSelectionBookmarkButton(range.getBoundingClientRect());
   }
 
@@ -4633,8 +5056,19 @@
     });
 
     document.addEventListener("keydown", event => {
+      // Item ۴: Esc closes these overlays the same way moving the
+      // mouse away from them already does, instead of only reacting to
+      // clicks outside or an explicit "بستن" button.
       if (event.key === "Escape") {
         closeSettingsMenu();
+
+        if (archiveOverlayElement && archiveOverlayElement.classList.contains("open")) {
+          closeArchivePanel();
+        }
+
+        if (bookmarksOverlayElement && bookmarksOverlayElement.classList.contains("open")) {
+          closeBookmarksPanel();
+        }
       }
     });
 
@@ -4652,6 +5086,11 @@
     });
 
     applyIncomingQueryFromUrl();
+
+    // Item ۱: mark any bookmarks that belong to this page right in the
+    // text, so a returning reader can see at a glance where they left
+    // one, without having to open the bookmarks panel first.
+    markBookmarksOnCurrentPage();
   }
 
   if (document.readyState === "loading") {
