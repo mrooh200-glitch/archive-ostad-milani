@@ -21,8 +21,21 @@
   let searchBoxElement = null;
   let resultsPanelElement = null;
   let archiveOverlayElement = null;
+  let bookmarksOverlayElement = null;
+  let selectionBookmarkButtonElement = null;
+  let selectionTagPopoverElement = null;
   const selectedMatchIndexes = new Set();
   const activeDerivativeKeys = new Set();
+
+  // Item ط: bookmarks (free-form tags), on either a live text
+  // selection anywhere on the page or a batch of selected search
+  // results. "selection" mode stores the exact selected text pending
+  // save; "matches" mode saves one bookmark per currently
+  // selectedMatchIndexes entry. bookmarkFilterTag narrows the
+  // bookmarks panel list to one tag at a time (null = show all).
+  let pendingBookmarkMode = null;
+  let pendingSelectionText = "";
+  let bookmarkFilterTag = null;
 
   // Item ب: results-panel ordering. "position" keeps the original
   // top-to-bottom document order; "frequency" puts the most-repeated
@@ -795,6 +808,73 @@
       }
     });
 
+    // Item ط: bookmarks panel, same overlay/dialog pattern as the
+    // archive above.
+    const bookmarksOverlay = document.createElement("div");
+    bookmarksOverlay.id = "inPageBookmarksOverlay";
+    bookmarksOverlay.innerHTML = `<div id="inPageBookmarksPanel" role="dialog" aria-label="نشانه‌ها"></div>`;
+    document.body.insertBefore(bookmarksOverlay, archiveOverlay.nextSibling);
+    bookmarksOverlayElement = bookmarksOverlay;
+
+    bookmarksOverlay.addEventListener("click", event => {
+      if (event.target === bookmarksOverlay) {
+        closeBookmarksPanel();
+      }
+    });
+
+    // Item ط: the small floating "🔖 نشانه‌گذاری" button that appears
+    // near any text the user selects on the page (outside the search
+    // UI itself), plus the tag-input popover it opens. Both are
+    // position:fixed and repositioned in JS right before they're
+    // shown - see showSelectionBookmarkButton/showTagPopoverAt below.
+    const selectionBookmarkButton = document.createElement("button");
+    selectionBookmarkButton.type = "button";
+    selectionBookmarkButton.id = "inPageSelectionBookmarkButton";
+    selectionBookmarkButton.className = "in-page-selection-bookmark-button";
+    selectionBookmarkButton.textContent = "🔖 نشانه‌گذاری";
+    document.body.appendChild(selectionBookmarkButton);
+    selectionBookmarkButtonElement = selectionBookmarkButton;
+
+    selectionBookmarkButton.addEventListener("click", event => {
+      event.stopPropagation();
+      handleSelectionBookmarkButtonClick();
+    });
+
+    const selectionTagPopover = document.createElement("div");
+    selectionTagPopover.id = "inPageSelectionTagPopover";
+    selectionTagPopover.className = "in-page-selection-tag-popover";
+    selectionTagPopover.innerHTML = `
+      <input
+        type="text"
+        id="inPageSelectionTagInput"
+        placeholder="برچسب (اختیاری، با کاما جدا کنید)">
+      <div class="in-page-selection-tag-popover-actions">
+        <button type="button" id="inPageSelectionTagSave">ذخیره</button>
+        <button type="button" id="inPageSelectionTagCancel">انصراف</button>
+      </div>
+    `;
+    document.body.appendChild(selectionTagPopover);
+    selectionTagPopoverElement = selectionTagPopover;
+
+    selectionTagPopover.addEventListener("click", event => {
+      event.stopPropagation();
+    });
+
+    selectionTagPopover.querySelector("#inPageSelectionTagSave")
+      .addEventListener("click", handleTagPopoverSave);
+    selectionTagPopover.querySelector("#inPageSelectionTagCancel")
+      .addEventListener("click", () => hideTagPopover(false));
+
+    selectionTagPopover.querySelector("#inPageSelectionTagInput")
+      .addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          handleTagPopoverSave();
+        } else if (event.key === "Escape") {
+          hideTagPopover(false);
+        }
+      });
+
     const style = document.createElement("style");
     style.textContent = `
       #inPageSearchBox {
@@ -1528,6 +1608,170 @@
         text-align: center;
         font-size: 0.86rem;
       }
+
+      /* Item ط: bookmarks panel reuses .archive-header / .archive-item
+         etc. above (#inPageBookmarksPanel instead of
+         #inPageArchivePanel) so the two panels look identical; only
+         the tag chips/pills below are bookmark-specific. */
+      #inPageBookmarksOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 10001;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.45);
+      }
+
+      #inPageBookmarksOverlay.open {
+        display: flex;
+      }
+
+      #inPageBookmarksPanel {
+        width: min(560px, 100%);
+        max-height: 80vh;
+        overflow-y: auto;
+        background: #ffffff;
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+        font-family: Tahoma, Arial, sans-serif;
+        direction: rtl;
+        text-align: right;
+      }
+
+      .bookmark-tag-filter {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 10px 16px;
+        border-bottom: 1px solid #eef2f7;
+      }
+
+      .bookmark-tag-chip {
+        border: 1px solid #c4b5fd;
+        border-radius: 999px;
+        background: #f5f3ff;
+        color: #6d28d9;
+        font: inherit;
+        font-size: 0.72rem;
+        padding: 3px 10px;
+        cursor: pointer;
+      }
+
+      .bookmark-tag-chip:hover {
+        background: #ede9fe;
+      }
+
+      .bookmark-tag-chip.is-active {
+        background: #6d28d9;
+        border-color: #6d28d9;
+        color: #ffffff;
+      }
+
+      .bookmark-item-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin: 0 0 6px;
+      }
+
+      .bookmark-tag-pill {
+        border: 1px solid #c4b5fd;
+        border-radius: 999px;
+        background: #f5f3ff;
+        color: #6d28d9;
+        font-size: 0.7rem;
+        padding: 1px 8px;
+      }
+
+      /* Item ط: floating "add bookmark" affordance for an arbitrary
+         text selection. Both start hidden and are shown/positioned
+         from JS right before use (see showSelectionBookmarkButton and
+         showTagPopoverAt). */
+      .in-page-selection-bookmark-button {
+        display: none;
+        position: fixed;
+        z-index: 10002;
+        border: none;
+        border-radius: 999px;
+        background: #173b63;
+        color: #ffffff;
+        font: inherit;
+        font-size: 0.78rem;
+        padding: 6px 14px;
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.3);
+        cursor: pointer;
+      }
+
+      .in-page-selection-bookmark-button.is-open {
+        display: block;
+      }
+
+      .in-page-selection-bookmark-button:hover {
+        background: #0f2a47;
+      }
+
+      .in-page-selection-tag-popover {
+        display: none;
+        position: fixed;
+        z-index: 10002;
+        flex-direction: column;
+        gap: 8px;
+        width: 260px;
+        background: #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+        padding: 10px;
+        font-family: Tahoma, Arial, sans-serif;
+        direction: rtl;
+        text-align: right;
+      }
+
+      .in-page-selection-tag-popover.is-open {
+        display: flex;
+      }
+
+      .in-page-selection-tag-popover input[type="text"] {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 6px 8px;
+        font: inherit;
+        font-size: 0.82rem;
+      }
+
+      .in-page-selection-tag-popover-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+
+      .in-page-selection-tag-popover-actions button {
+        border: 1px solid #93c5fd;
+        border-radius: 6px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font: inherit;
+        font-size: 0.78rem;
+        padding: 5px 12px;
+        cursor: pointer;
+      }
+
+      .in-page-selection-tag-popover-actions button:hover {
+        background: #dbeafe;
+      }
+
+      .in-page-selection-tag-popover-actions #inPageSelectionTagCancel {
+        border-color: #cbd5e1;
+        background: #f8fafc;
+        color: #475569;
+      }
+
+      .in-page-selection-tag-popover-actions #inPageSelectionTagCancel:hover {
+        background: #eef2f7;
+      }
     `;
 
     document.head.appendChild(style);
@@ -1568,7 +1812,8 @@
     return node.parentElement &&
       (
         node.parentElement.closest("#inPageSearchBox") ||
-        node.parentElement.closest("#inPageSearchResults")
+        node.parentElement.closest("#inPageSearchResults") ||
+        node.parentElement.closest("#inPageSelectionTagPopover")
       );
   }
 
@@ -2386,6 +2631,451 @@
     archiveOverlayElement.classList.remove("open");
   }
 
+  // ---- Item ط: bookmarks (free-form tags) ------------------------------
+  // Same localStorage pattern as the archive above, but under its own
+  // key/shape (a bookmark isn't tied to a search match - it can be any
+  // selected text - and it carries a "tags" array). Shared across book
+  // pages the same way ARCHIVE_STORAGE_KEY is.
+  const BOOKMARKS_STORAGE_KEY = "milaniBookmarks";
+  const BOOKMARK_URL_FRAGMENT_MAX_LENGTH = 200;
+
+  function loadBookmarks() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(BOOKMARKS_STORAGE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveBookmarks(items) {
+    try {
+      localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(items));
+    } catch (error) {
+      // Storage unavailable or full - bookmarks just won't persist.
+    }
+  }
+
+  // Splits on Latin/Persian commas, trims, drops empties, and
+  // deduplicates - "قانون, قانون ،مثال" -> ["قانون", "مثال"].
+  function parseTagsInput(raw) {
+    return Array.from(new Set(
+      (raw || "")
+        .split(/[،,]+/)
+        .map(tag => tag.trim())
+        .filter(Boolean)
+    ));
+  }
+
+  function getAllBookmarkTags(bookmarks) {
+    const tags = new Set();
+    bookmarks.forEach(item => (item.tags || []).forEach(tag => tags.add(tag)));
+    return Array.from(tags).sort((a, b) => a.localeCompare(b, "fa"));
+  }
+
+  // A bookmarked selection has no <mark> element to build a
+  // text-fragment URL from the way buildMatchUrl does for search
+  // results, so this builds the same kind of #:~:text= link directly
+  // from the raw selected string - literal text, not normalized,
+  // matching buildMatchUrl's own convention. Long selections are
+  // capped for the URL only (the full text is still stored and shown
+  // in the panel); the capped prefix is still a literal substring of
+  // the real page text, so the browser's native text-fragment match
+  // still finds it.
+  function buildSelectionBookmarkUrl(text) {
+    const base = location.origin + location.pathname;
+    const trimmed = (text || "").trim();
+
+    if (!trimmed) {
+      return base;
+    }
+
+    const fragment = trimmed.length > BOOKMARK_URL_FRAGMENT_MAX_LENGTH ?
+      trimmed.slice(0, BOOKMARK_URL_FRAGMENT_MAX_LENGTH) :
+      trimmed;
+
+    return `${base}#:~:text=${encodeURIComponent(fragment)}`;
+  }
+
+  function addBookmark({ text, url, tags }) {
+    const trimmedText = (text || "").trim();
+
+    if (!trimmedText) {
+      return;
+    }
+
+    const bookmarks = loadBookmarks();
+
+    bookmarks.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: getPageTitle(),
+      text: trimmedText,
+      url: url || (location.origin + location.pathname),
+      tags: Array.isArray(tags) ? tags : [],
+      savedAt: new Date().toISOString()
+    });
+
+    saveBookmarks(bookmarks);
+    renderBookmarksPanel();
+  }
+
+  function removeBookmark(id) {
+    saveBookmarks(loadBookmarks().filter(item => item.id !== id));
+    renderBookmarksPanel();
+  }
+
+  function clearBookmarks() {
+    saveBookmarks([]);
+    bookmarkFilterTag = null;
+    renderBookmarksPanel();
+  }
+
+  function renderBookmarksPanel() {
+    const panel = document.getElementById("inPageBookmarksPanel");
+
+    if (!panel) {
+      return;
+    }
+
+    const all = loadBookmarks().slice().reverse();
+    const allTags = getAllBookmarkTags(all);
+
+    // Stale filter (its tag got removed along with the last bookmark
+    // that had it) - fall back to showing everything instead of an
+    // empty list with no visible way to explain why.
+    if (bookmarkFilterTag && !allTags.includes(bookmarkFilterTag)) {
+      bookmarkFilterTag = null;
+    }
+
+    const items = bookmarkFilterTag ?
+      all.filter(item => (item.tags || []).includes(bookmarkFilterTag)) :
+      all;
+
+    const tagChipsHtml = allTags.length === 0 ? "" : `
+      <div class="bookmark-tag-filter">
+        ${allTags.map(tag => `
+          <button
+            type="button"
+            class="bookmark-tag-chip${tag === bookmarkFilterTag ? " is-active" : ""}"
+            data-bookmark-filter-tag="${escapeHtml(tag)}">
+            ${escapeHtml(tag)}
+          </button>
+        `).join("")}
+      </div>
+    `;
+
+    const listHtml = items.length === 0 ?
+      `<p class="archive-empty">${
+        bookmarkFilterTag ? "نشانه‌ای با این برچسب یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
+      }</p>` :
+      items.map(item => `
+        <div class="archive-item">
+          <div class="archive-item-title">${escapeHtml(item.title || "")}</div>
+          <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
+          ${(item.tags && item.tags.length) ? `
+            <div class="bookmark-item-tags">
+              ${item.tags.map(tag => `<span class="bookmark-tag-pill">${escapeHtml(tag)}</span>`).join("")}
+            </div>
+          ` : ""}
+          <div class="archive-item-actions">
+            <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
+              بازکردن
+            </a>
+            <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
+              حذف
+            </button>
+          </div>
+        </div>
+      `).join("");
+
+    panel.innerHTML = `
+      <div class="archive-header">
+        <span>نشانه‌ها (${all.length})</span>
+        <div class="archive-header-actions">
+          <button type="button" id="inPageBookmarksClear">پاک‌کردن همه</button>
+          <button type="button" id="inPageBookmarksClose">بستن</button>
+        </div>
+      </div>
+      ${tagChipsHtml}
+      ${listHtml}
+    `;
+
+    const clearButton = panel.querySelector("#inPageBookmarksClear");
+    if (clearButton) {
+      clearButton.addEventListener("click", clearBookmarks);
+    }
+
+    const closeButton = panel.querySelector("#inPageBookmarksClose");
+    if (closeButton) {
+      closeButton.addEventListener("click", closeBookmarksPanel);
+    }
+
+    panel.querySelectorAll("[data-bookmark-id]").forEach(button => {
+      button.addEventListener("click", () => {
+        removeBookmark(button.dataset.bookmarkId);
+      });
+    });
+
+    panel.querySelectorAll("[data-bookmark-filter-tag]").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const tag = chip.dataset.bookmarkFilterTag;
+        bookmarkFilterTag = bookmarkFilterTag === tag ? null : tag;
+        renderBookmarksPanel();
+      });
+    });
+  }
+
+  function openBookmarksPanel() {
+    renderBookmarksPanel();
+    bookmarksOverlayElement.classList.add("open");
+  }
+
+  function closeBookmarksPanel() {
+    bookmarksOverlayElement.classList.remove("open");
+  }
+
+  // ---- Item ط: bookmarking a live text selection ------------------------
+  // Detects any non-empty selection made anywhere outside the search
+  // UI/panels themselves, shows a small floating "🔖" button next to
+  // it, and - on click - swaps that button for a tag-input popover at
+  // the same spot. addSelectedToBookmarks (settings menu) reuses the
+  // very same popover in "matches" mode - see pendingBookmarkMode.
+
+  function isWithinAppInterface(el) {
+    return !!(el && (
+      el.closest("#inPageSearchBox") ||
+      el.closest("#inPageSearchResults") ||
+      el.closest("#inPageArchiveOverlay") ||
+      el.closest("#inPageBookmarksOverlay") ||
+      el.closest("#inPageSelectionBookmarkButton") ||
+      el.closest("#inPageSelectionTagPopover")
+    ));
+  }
+
+  function positionFloatingElementNearRect(el, rect) {
+    const GAP = 8;
+    const elRect = el.getBoundingClientRect();
+
+    let left = rect.left + rect.width / 2 - elRect.width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - elRect.width - 8));
+
+    let top = rect.top - elRect.height - GAP;
+    if (top < 8) {
+      // No room above (selection starts near the top of the
+      // viewport) - flip to just below the selection instead.
+      top = rect.bottom + GAP;
+    }
+
+    el.style.left = left + "px";
+    el.style.top = top + "px";
+  }
+
+  function hideSelectionBookmarkButton() {
+    if (selectionBookmarkButtonElement) {
+      selectionBookmarkButtonElement.classList.remove("is-open");
+    }
+  }
+
+  function showSelectionBookmarkButton(rect) {
+    if (!selectionBookmarkButtonElement) {
+      return;
+    }
+
+    selectionBookmarkButtonElement.classList.add("is-open");
+    positionFloatingElementNearRect(selectionBookmarkButtonElement, rect);
+  }
+
+  function handleSelectionBookmarkButtonClick() {
+    if (!pendingSelectionText) {
+      return;
+    }
+
+    const rect = selectionBookmarkButtonElement.getBoundingClientRect();
+    pendingBookmarkMode = "selection";
+    hideSelectionBookmarkButton();
+    showTagPopoverAt(rect);
+  }
+
+  function addSelectedToBookmarks() {
+    if (selectedMatchIndexes.size === 0) {
+      return;
+    }
+
+    const gear = document.getElementById("inPageSettingsGear");
+    pendingBookmarkMode = "matches";
+    showTagPopoverAt(gear ? gear.getBoundingClientRect() : null);
+  }
+
+  function showTagPopoverAt(rect) {
+    if (!selectionTagPopoverElement) {
+      return;
+    }
+
+    const input = selectionTagPopoverElement.querySelector("#inPageSelectionTagInput");
+    if (input) {
+      input.value = "";
+    }
+
+    selectionTagPopoverElement.classList.add("is-open");
+
+    if (rect) {
+      positionFloatingElementNearRect(selectionTagPopoverElement, rect);
+    } else {
+      const popoverRect = selectionTagPopoverElement.getBoundingClientRect();
+      selectionTagPopoverElement.style.left =
+        Math.max(8, (window.innerWidth - popoverRect.width) / 2) + "px";
+      selectionTagPopoverElement.style.top =
+        Math.max(8, (window.innerHeight - popoverRect.height) / 2) + "px";
+    }
+
+    if (input) {
+      input.focus();
+    }
+  }
+
+  function hideTagPopover(showSavedFeedback) {
+    if (!selectionTagPopoverElement) {
+      return;
+    }
+
+    if (showSavedFeedback) {
+      const originalHtml = selectionTagPopoverElement.innerHTML;
+
+      selectionTagPopoverElement.innerHTML =
+        `<div style="text-align:center;padding:6px 0;">نشانه ذخیره شد!</div>`;
+
+      setTimeout(() => {
+        selectionTagPopoverElement.classList.remove("is-open");
+        selectionTagPopoverElement.innerHTML = originalHtml;
+
+        selectionTagPopoverElement.querySelector("#inPageSelectionTagSave")
+          .addEventListener("click", handleTagPopoverSave);
+        selectionTagPopoverElement.querySelector("#inPageSelectionTagCancel")
+          .addEventListener("click", () => hideTagPopover(false));
+
+        selectionTagPopoverElement.querySelector("#inPageSelectionTagInput")
+          .addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              handleTagPopoverSave();
+            } else if (event.key === "Escape") {
+              hideTagPopover(false);
+            }
+          });
+      }, 1200);
+    } else {
+      selectionTagPopoverElement.classList.remove("is-open");
+    }
+
+    pendingBookmarkMode = null;
+    pendingSelectionText = "";
+
+    if (window.getSelection) {
+      window.getSelection().removeAllRanges();
+    }
+  }
+
+  function handleTagPopoverSave() {
+    const input = selectionTagPopoverElement.querySelector("#inPageSelectionTagInput");
+    const tags = parseTagsInput(input ? input.value : "");
+
+    if (pendingBookmarkMode === "selection") {
+      addBookmark({
+        text: pendingSelectionText,
+        url: buildSelectionBookmarkUrl(pendingSelectionText),
+        tags
+      });
+    } else if (pendingBookmarkMode === "matches") {
+      [...selectedMatchIndexes]
+        .sort((a, b) => a - b)
+        .map(index => matches[index])
+        .filter(Boolean)
+        .forEach(mark => {
+          addBookmark({
+            text: getSnippetPlainText(mark),
+            url: buildMatchUrl(mark),
+            tags
+          });
+        });
+    }
+
+    hideTagPopover(true);
+  }
+
+  function handleDocumentSelectionChange() {
+    // The popover stays open (and the button hidden) for as long as
+    // the user is filling it in, even though clicking into its own
+    // text input collapses/changes the page selection underneath it.
+    if (
+      selectionTagPopoverElement &&
+      selectionTagPopoverElement.classList.contains("is-open")
+    ) {
+      return;
+    }
+
+    const selection = window.getSelection();
+    const selectedText = selection && !selection.isCollapsed ?
+      selection.toString().trim() :
+      "";
+
+    if (
+      !selectedText ||
+      !selection.anchorNode ||
+      isWithinAppInterface(
+        selection.anchorNode.nodeType === Node.ELEMENT_NODE ?
+          selection.anchorNode :
+          selection.anchorNode.parentElement
+      )
+    ) {
+      hideSelectionBookmarkButton();
+      pendingSelectionText = "";
+      return;
+    }
+
+    pendingSelectionText = selectedText;
+
+    const range = selection.getRangeAt(0);
+    showSelectionBookmarkButton(range.getBoundingClientRect());
+  }
+
+  function setupSelectionBookmarking() {
+    let selectionChangeTimer = null;
+
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selectionChangeTimer);
+      selectionChangeTimer = setTimeout(handleDocumentSelectionChange, 200);
+    });
+
+    document.addEventListener("click", event => {
+      if (
+        selectionBookmarkButtonElement &&
+        selectionBookmarkButtonElement.classList.contains("is-open") &&
+        !isWithinAppInterface(event.target)
+      ) {
+        hideSelectionBookmarkButton();
+      }
+
+      if (
+        selectionTagPopoverElement &&
+        selectionTagPopoverElement.classList.contains("is-open") &&
+        event.target !== selectionTagPopoverElement &&
+        !selectionTagPopoverElement.contains(event.target)
+      ) {
+        hideTagPopover(false);
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (
+        event.key === "Escape" &&
+        selectionTagPopoverElement &&
+        selectionTagPopoverElement.classList.contains("is-open")
+      ) {
+        hideTagPopover(false);
+      }
+    });
+  }
+
   // ---- Item 4-الف: direct file export ---------------------------------
   // Reuses the exact same header + numbered-snippet text that
   // handleCopySelectedMatches builds for the clipboard, so the
@@ -2647,6 +3337,22 @@
         <span>افزودن به آرشیو</span>
         ${hasSelection ? `<span class="in-page-settings-badge">${selectedCount}</span>` : ""}
       </button>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuOpenBookmarks"
+        title="باز کردن نشانه‌هایی که تاکنون در متن یا نتایج جست‌وجو ذخیره کرده‌اید">
+        <span>نشانه‌ها</span>
+      </button>
+      <button
+        type="button"
+        class="in-page-settings-item"
+        id="inPageMenuAddToBookmarks"
+        title="افزودن موارد انتخاب‌شده به نشانه‌ها همراه با برچسب دلخواه"
+        ${hasSelection ? "" : "disabled"}>
+        <span>افزودن نشانه به انتخاب‌شده‌ها</span>
+        ${hasSelection ? `<span class="in-page-settings-badge">${selectedCount}</span>` : ""}
+      </button>
 
       <div class="in-page-settings-separator"></div>
 
@@ -2755,6 +3461,14 @@
     });
     bind("inPageMenuAddToArchive", () => {
       addSelectedToArchive();
+    });
+    bind("inPageMenuOpenBookmarks", () => {
+      openBookmarksPanel();
+      closeSettingsMenu();
+    });
+    bind("inPageMenuAddToBookmarks", () => {
+      addSelectedToBookmarks();
+      closeSettingsMenu();
     });
     bind("inPageMenuCopySelected", () => {
       handleCopySelectedMatches();
@@ -3671,6 +4385,7 @@
     document.title = getPageTitle();
 
     createSearchBox();
+    setupSelectionBookmarking();
 
     const input = document.getElementById("inPageSearchInput");
     const previousButton = document.getElementById("inPageSearchPrevious");
