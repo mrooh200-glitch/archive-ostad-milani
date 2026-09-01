@@ -1597,7 +1597,7 @@
               data-pdf="true">
               <a
                 class="pdf-link"
-                href="pdf-viewer.html?file=Marefat-Taala-Allah-bellah.pdf&title=معرفت الله تعالی"
+                href="pdfjs-viewer/web/viewer.html?file=../../Marefat-Taala-Allah-bellah.pdf&title=معرفت الله تعالی"
                 target="_blank"
                 rel="noopener">
                 معرفت الله تعالی
@@ -4210,7 +4210,15 @@
               type: "pdf",
               title: title,
               pdfFile: pdfFile,
-              viewerBaseUrl: "pdf-viewer.html?file=" + encodeURIComponent(pdfFile) +
+              // Item جدید: دیگه از نمایشگر سفارشی pdf-viewer.html استفاده
+              // نمی‌کنیم - چون بارها معلوم شد استخراج متن/اسکرول توش
+              // قابل‌اعتماد نیست. حالا از خودِ نمایشگر رسمی pdf.js
+              // (همونی که فایرفاکس استفاده می‌کنه) استفاده می‌شه که
+              // جست‌وجو و پرش به نتیجه داخلش واقعاً کار می‌کنه. آدرس
+              // فایل PDF کامل/مطلق فرستاده می‌شه تا فرقی نکنه نمایشگر
+              // چند پوشه اونورتر باشه.
+              viewerBaseUrl: "pdfjs-viewer/web/viewer.html?file=" +
+                encodeURIComponent(new URL(pdfFile, location.href).href) +
                 "&title=" + encodeURIComponent(title),
               paragraphs: paragraphs,
               // Item ح: مفهوم پاورقی در فایل PDF وجود ندارد؛ همه به‌عنوان
@@ -5060,13 +5068,23 @@
 
     function buildResultUrl(document, paragraphIndex, query, rootMode, fragmentText, occurrenceIndex) {
       if (document.type === "pdf") {
+        // Item جدید: به‌جای نمایشگر سفارشی خودمون (که جست‌وجو/اسکرولش
+        // قابل‌اعتماد نبود)، از قابلیت واقعی و مستندِ خودِ نمایشگر
+        // رسمی pdf.js استفاده می‌کنیم: #search=...&phrase=true دقیقاً
+        // همون کاری رو می‌کنه که با Ctrl+F تایپ‌کردن انجام می‌شد -
+        // جست‌وجو، هایلایت، و اسکرول به اولین نتیجه، هر سه به‌طور
+        // خودکار و توسط خودِ pdf.js (نه کد ما). fragmentText (شکل واقعی
+        // یافت‌شده در متن) فرستاده می‌شود، نه query خام - چون در حالت
+        // ریشه‌ای این دو می‌توانند فرق داشته باشند و pdf.js چیزی از
+        // ریشه‌یابی نمی‌داند.
         const pageNumber = document.pageNumbers[paragraphIndex] || 1;
-        const params = new URLSearchParams({
-          q: query.trim(),
-          root: rootMode ? "1" : "0"
-        });
+        const searchTerm = (fragmentText || query).trim();
         const absoluteBase = new URL(document.viewerBaseUrl, location.href).href;
-        return `${absoluteBase}&${params.toString()}#page=${pageNumber}`;
+        const separator = absoluteBase.includes("?") ? "&" : "?";
+
+        return `${absoluteBase}${separator}` +
+          `#search=${encodeURIComponent(searchTerm)}&phrase=true&page=${pageNumber}` +
+          `&occ=${occurrenceIndex}`;
       }
 
       // Item جدید (مشکل طولانی‌بودن لینک در ایتا): در جست‌وجوی معمولی
