@@ -1,0 +1,11 @@
+name = "milani-archive-ai"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# اتصال به Workers AI (برای مدل BGE-M3) -- نیازی به کلید نداره
+[ai]
+binding = "AI"
+
+# کلید Gemini به‌صورت secret اضافه می‌شه (نه اینجا در فایل)
+# با این دستور در ترمینال (یا GitHub Actions):
+# wrangler secret put GEMINI_API_KEY
