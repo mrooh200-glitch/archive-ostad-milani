@@ -1254,6 +1254,21 @@
       text-decoration: underline;
     }
 
+    /* Item جدید: نشان «صفحهٔ N - پاراگراف M» برای نتایج PDF - چون لینک
+       فقط تا سطح صفحه می‌تواند دقیق باشد (رجوع کنید به buildResultUrl)،
+       این عدد کمک می‌کند کاربر سریع‌تر داخل همان صفحه پیدایش کند. */
+    .result-pdf-location {
+      display: inline-block;
+      margin-inline-start: 8px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #64748b;
+      font-size: 0.72rem;
+      font-weight: normal;
+      white-space: nowrap;
+    }
+
     .result-snippet-link {
       display: block;
       margin: 10px 0 0;
@@ -1597,7 +1612,7 @@
               data-pdf="true">
               <a
                 class="pdf-link"
-                href="pdf-viewer.html?file=Marefat-Taala-Allah-bellah.pdf&title=معرفت الله تعالی"
+                href="Marefat-Taala-Allah-bellah.pdf"
                 target="_blank"
                 rel="noopener">
                 معرفت الله تعالی
@@ -1611,7 +1626,7 @@
               data-pdf="true">
               <a
                 class="pdf-link"
-                href="pdf-viewer.html?file=Bab-ol-Hadi-Ashar.pdf&title=الباب الحادی عشر"
+                href="Bab-ol-Hadi-Ashar.pdf"
                 target="_blank"
                 rel="noopener">
                 الباب الحادی عشر
@@ -4203,40 +4218,78 @@
             const pdf = await loadingTask.promise;
             const paragraphs = [];
             const pageNumbers = [];
+            // Item جدید: به‌ازای هر پاراگراف، اینکه چندمین پاراگراف
+            // *همان صفحه* است (نه کل سند) - برای نمایش «صفحهٔ ۷ -
+            // پاراگراف ۳» در بلوک نتایج.
+            const paragraphOnPage = [];
 
             for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
               const page = await pdf.getPage(pageNumber);
               const textContent = await page.getTextContent();
 
-              const pageText = textContent.items
-                .map(item => item.str)
-                .join(" ")
-                .replace(/\s+/g, " ")
-                .trim();
+              // Item جدید: قبلاً کل متن یک صفحه با فاصله به هم چسبانده
+              // می‌شد (یک "پاراگراف" بزرگ به ازای هر صفحه). حالا با
+              // بررسی فاصلهٔ عمودیِ بین آیتم‌های متنی (مختصات y از
+              // transform هرکدام)، جایی که این فاصله به‌طور غیرعادی
+              // بزرگ باشد (یعنی یک خط خالی/فاصلهٔ پاراگراف واقعی)،
+              // پاراگراف جدید در نظر گرفته می‌شود - نه فقط شکستن خط
+              // معمولی.
+              const pageParagraphs = [];
+              let currentLines = [];
+              let lastY = null;
 
-              if (pageText.length > 0) {
-                paragraphs.push(pageText);
-                pageNumbers.push(pageNumber);
+              textContent.items.forEach(item => {
+                if (!item.str) {
+                  return;
+                }
+
+                const y = item.transform ? item.transform[5] : null;
+                const height = item.height || (item.transform ? Math.abs(item.transform[3]) : 0) || 10;
+
+                if (lastY !== null && y !== null && Math.abs(lastY - y) > height * 1.6) {
+                  const joined = currentLines.join(" ").replace(/\s+/g, " ").trim();
+
+                  if (joined) {
+                    pageParagraphs.push(joined);
+                  }
+
+                  currentLines = [];
+                }
+
+                currentLines.push(item.str);
+
+                if (y !== null) {
+                  lastY = y;
+                }
+              });
+
+              const lastJoined = currentLines.join(" ").replace(/\s+/g, " ").trim();
+
+              if (lastJoined) {
+                pageParagraphs.push(lastJoined);
               }
+
+              pageParagraphs.forEach((paragraphText, indexOnPage) => {
+                paragraphs.push(paragraphText);
+                pageNumbers.push(pageNumber);
+                paragraphOnPage.push(indexOnPage + 1);
+              });
             }
 
             documents.push({
               type: "pdf",
               title: title,
               pdfFile: pdfFile,
-              // Item جدید: برگشتیم به همون نمایشگر سفارشی pdf-viewer.html
-              // - چون معلوم شد این‌جا متنِ فارسی/عربی رو درست (با فونت
-              // درست) رسم می‌کنه، در حالی که نمایشگر رسمی pdf.js برای
-              // همین فایل‌ها صفحهٔ سفید نشون می‌داد. باگ‌های اصلیِ همین
-              // نمایشگر سفارشی (استخراج متن برای جست‌وجو، و اسکرول به
-              // نتیجه) قبلاً پیدا و رفع شدند.
-              viewerBaseUrl: "pdf-viewer.html?file=" + encodeURIComponent(pdfFile) +
-                "&title=" + encodeURIComponent(title),
+              // Item جدید (تصمیم نهایی): دیگه نیازی به viewerBaseUrl
+              // نیست - buildResultUrl حالا مستقیم به pdfFile خودش لینک
+              // می‌دهد (رجوع کنید به توضیح آنجا: تنها موتوری که این
+              // فونت‌های قدیمی را درست می‌خواند، موتور خودِ مرورگره).
               paragraphs: paragraphs,
               // Item ح: مفهوم پاورقی در فایل PDF وجود ندارد؛ همه به‌عنوان
               // متن اصلی در نظر گرفته می‌شوند.
               footnoteFlags: paragraphs.map(() => false),
-              pageNumbers: pageNumbers
+              pageNumbers: pageNumbers,
+              paragraphOnPage: paragraphOnPage
             });
           } catch (error) {
             console.warn("PDF not loaded:", pdfFile, error);
@@ -4458,6 +4511,12 @@
                 rel="noopener">
                 ${escapeHtml(result.title)}
               </a>
+
+              ${result.pdfPageNumber ? `
+                <span class="result-pdf-location">
+                  صفحهٔ ${result.pdfPageNumber} — پاراگراف ${result.pdfParagraphOnPage}
+                </span>
+              ` : ""}
             </div>
 
             <a
@@ -5080,16 +5139,20 @@
 
     function buildResultUrl(document, paragraphIndex, query, rootMode, fragmentText, occurrenceIndex) {
       if (document.type === "pdf") {
-        // Item جدید: برگشتیم به نمایشگر سفارشی خودمون (رجوع کنید به
-        // توضیح بالای viewerBaseUrl) - این‌جا از همون پارامترهای q/root
-        // که pdf-viewer.html خودش می‌فهمد استفاده می‌کنیم.
+        // Item جدید (تصمیم نهایی): بعد از بررسی مفصل معلوم شد این
+        // PDFهای خاص (فونت فارسی/عربیِ قدیمی، کدگذاری موقعیتی) با
+        // موتور pdf.js (چه سفارشی، چه رسمی) درست خوانده نمی‌شوند - نه
+        // به‌خاطر باگ در کد، بلکه چون دادهٔ درست اصلاً داخل خودِ فایل
+        // نیست. تنها موتوری که این فایل‌ها را درست می‌خواند، موتور
+        // داخلیِ خودِ مرورگر (PDFium در کروم/اج) است - و آن فقط از طریق
+        // بازکردنِ مستقیمِ خودِ فایل PDF فعال می‌شود، نه از طریق هیچ
+        // نمایشگر واسطه‌ای. پس اینجا مستقیم به خودِ فایل با #page=N
+        // اشاره می‌کنیم؛ پرش به خطِ دقیق از طریق لینک ممکن نیست (این
+        // قابلیتی است که هیچ مرورگری آن را از طریق URL در اختیار
+        // نمی‌گذارد) - کاربر با یک Ctrl+F دستی به کلمه می‌رسد.
         const pageNumber = document.pageNumbers[paragraphIndex] || 1;
-        const params = new URLSearchParams({
-          q: query.trim(),
-          root: rootMode ? "1" : "0"
-        });
-        const absoluteBase = new URL(document.viewerBaseUrl, location.href).href;
-        return `${absoluteBase}&${params.toString()}#page=${pageNumber}`;
+        const absoluteBase = new URL(document.pdfFile, location.href).href;
+        return `${absoluteBase}#page=${pageNumber}`;
       }
 
       // Item جدید (مشکل طولانی‌بودن لینک در ایتا): در جست‌وجوی معمولی
@@ -5260,6 +5323,12 @@
             return;
           }
 
+          // Item جدید: برای نتایج PDF، شمارهٔ صفحه و شمارهٔ پاراگراف
+          // (در همون صفحه) رو هم به نتیجه اضافه می‌کنیم تا در بلوک
+          // نمایش نتایج نشون داده بشه.
+          const pdfPageNumber = document.type === "pdf" ? document.pageNumbers[paragraphIndex] : null;
+          const pdfParagraphOnPage = document.type === "pdf" ? document.paragraphOnPage[paragraphIndex] : null;
+
           if (proximitySearchEnabled) {
             const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
             const span = findProximitySpan(cleanParagraph, proximityWords, proximityDistance);
@@ -5275,6 +5344,8 @@
                 paragraph: paragraph,
                 snippet: getProximitySentenceSnippet(paragraph, proximityWords, proximityDistance),
                 sortKey: normalize(fragmentText),
+                pdfPageNumber: pdfPageNumber,
+                pdfParagraphOnPage: pdfParagraphOnPage,
                 url: buildResultUrl(
                   document, paragraphIndex, query, false,
                   fragmentText, occurrenceIndex
@@ -5314,6 +5385,8 @@
                 matchedWords: matchedWords,
                 matchedWordKeys: matchedWordKeys,
                 sortKey: matchedWordKeys[0] || normalize(fragmentText),
+                pdfPageNumber: pdfPageNumber,
+                pdfParagraphOnPage: pdfParagraphOnPage,
                 url: buildResultUrl(
                   document, paragraphIndex, query, rootMode,
                   fragmentText, occurrenceIndex
@@ -5329,6 +5402,8 @@
               paragraph: paragraph,
               snippet: getSentenceSnippet(paragraph, query),
               sortKey: normalize(fragmentText),
+              pdfPageNumber: pdfPageNumber,
+              pdfParagraphOnPage: pdfParagraphOnPage,
               url: buildResultUrl(
                 document, paragraphIndex, query, rootMode,
                 fragmentText, occurrenceIndex
