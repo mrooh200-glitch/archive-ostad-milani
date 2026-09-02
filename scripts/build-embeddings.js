@@ -6,6 +6,17 @@
  * و ساخت بردار معنایی (embedding) برای هر بخش با Cloudflare Workers AI (مدل BGE-M3).
  * نتیجه در فایل embeddings.json ذخیره می‌شه.
  *
+ * Item جدید (بهینه‌سازی مصرف Workers AI): این نسخه دیگه هر بار همهٔ
+ * تکه‌های متن رو از نو embed نمی‌کنه. embeddings.json قبلی رو می‌خونه،
+ * و برای هر تکه‌ای که متنش دقیقاً با دفعهٔ قبل یکیه، بردار قبلی‌ش رو
+ * دوباره استفاده می‌کنه (بدون تماس با API). فقط تکه‌های واقعاً جدید یا
+ * تغییرکرده به Cloudflare فرستاده می‌شن. این هم سهمیهٔ رایگان روزانهٔ
+ * نورون رو صرفه‌جویی می‌کنه، هم اجرای اسکریپت رو سریع‌تر می‌کنه.
+ *
+ * توجه: چون تکه‌بندی بر اساس ترتیب پاراگراف‌هاست، اگه یک پاراگراف اول
+ * فایل تغییر کنه، ممکنه مرز تکه‌های بعدی هم جابه‌جا بشه و آنها هم
+ * (درست، نه اشتباه) دوباره embed بشن. این طبیعیه و رفتار درستیه.
+ *
  * اجرا: node scripts/build-embeddings.js
  * نیاز به دو متغیر محیطی: CLOUDFLARE_API_TOKEN و CLOUDFLARE_ACCOUNT_ID
  */
@@ -116,7 +127,32 @@ async function embedBatch(texts) {
   return json.result.data;
 }
 
-// ---------- ۵ب. فشرده‌سازی بردار به base64 (به‌جای آرایهٔ متنی اعداد) ----------
+// ---------- ۵الف. کلید یکتا برای هر تکه (برای تشخیص «همون تکهٔ قبلیه») ----------
+// source + متن دقیق تکه، چون اگه حتی یک کلمه عوض بشه باید دوباره embed بشه.
+function chunkKey(sourceFile, text) {
+  return `${sourceFile}:::${text}`;
+}
+
+// ---------- ۵ب. خوندن embeddings.json قبلی (اگه وجود داشته باشه) ----------
+// و ساخت یک Map از کلید تکه -> رکورد کامل قبلی (شامل بردار base64)،
+// تا بشه بردارهای تکه‌های تغییرنکرده رو بدون تماس با API دوباره استفاده کرد.
+function loadPreviousEmbeddingsMap() {
+  const map = new Map();
+  if (!fs.existsSync(OUTPUT_FILE)) return map;
+
+  try {
+    const prevRaw = fs.readFileSync(OUTPUT_FILE, "utf-8");
+    const prevData = JSON.parse(prevRaw);
+    for (const item of prevData) {
+      map.set(chunkKey(item.source, item.text), item);
+    }
+  } catch (err) {
+    console.warn("هشدار: خوندن embeddings.json قبلی ناموفق بود، همه‌چیز از نو embed می‌شه.", err.message);
+  }
+  return map;
+}
+
+// ---------- ۵ج. فشرده‌سازی بردار به base64 (به‌جای آرایهٔ متنی اعداد) ----------
 // یک بردار ۱۰۲۴ عددی به‌صورت متن JSON خیلی حجیم می‌شه (هر عدد با کلی رقم اعشار).
 // با تبدیل به Float32Array و بعد base64، حجم حدود ۳ تا ۴ برابر کوچیک‌تر می‌شه.
 function vectorToBase64(vector) {
@@ -130,7 +166,7 @@ async function main() {
   const files = findHtmFiles(REPO_ROOT);
   console.log(`${files.length} فایل پیدا شد:`, files.map((f) => path.basename(f)));
 
-  const allChunks = []; // { book, text }
+  const allChunks = []; // { book, source, text }
 
   for (const file of files) {
     const bookName = path.basename(file, path.extname(file));
@@ -142,26 +178,54 @@ async function main() {
     }
   }
 
-  console.log(`جمع کل: ${allChunks.length} تکه متن. شروع ساخت بردارها...`);
+  console.log(`جمع کل: ${allChunks.length} تکه متن.`);
 
-  // ساخت بردار به‌صورت دسته‌ای (batch) برای جلوگیری از تعداد زیاد درخواست
-  const BATCH_SIZE = 20;
-  const results = [];
+  // ---------- تفکیک تکه‌های «قبلاً embed شده و بدون تغییر» از «جدید/تغییرکرده» ----------
+  const previousMap = loadPreviousEmbeddingsMap();
+  const results = new Array(allChunks.length); // نتیجهٔ نهایی، هم‌ترتیب با allChunks
+  const toEmbed = []; // { index, text } — فقط اونایی که واقعاً باید به API فرستاده بشن
 
-  for (let i = 0; i < allChunks.length; i += BATCH_SIZE) {
-    const batch = allChunks.slice(i, i + BATCH_SIZE);
-    const texts = batch.map((c) => c.text);
-    console.log(`  ساخت بردار برای بخش ${i + 1} تا ${i + batch.length} از ${allChunks.length}...`);
+  for (let i = 0; i < allChunks.length; i++) {
+    const chunk = allChunks[i];
+    const key = chunkKey(chunk.source, chunk.text);
+    const prev = previousMap.get(key);
 
-    const vectors = await embedBatch(texts);
+    if (prev && prev.vector) {
+      // این تکه دقیقاً قبلاً هم بوده و متنش عوض نشده -- بردار قبلی رو نگه دار
+      results[i] = { book: chunk.book, source: chunk.source, text: chunk.text, vector: prev.vector };
+    } else {
+      toEmbed.push({ index: i, text: chunk.text });
+    }
+  }
 
-    for (let j = 0; j < batch.length; j++) {
-      results.push({
-        book: batch[j].book,
-        source: batch[j].source,
-        text: batch[j].text,
-        vector: vectorToBase64(vectors[j]),
-      });
+  console.log(
+    `${allChunks.length - toEmbed.length} تکه بدون تغییر (بردار قبلی دوباره استفاده شد)، ` +
+      `${toEmbed.length} تکه جدید/تغییرکرده باید embed بشه.`
+  );
+
+  if (toEmbed.length === 0) {
+    console.log("هیچ تکهٔ جدیدی برای embed کردن نیست. فقط embeddings.json با همون محتوای قبلی بازنویسی می‌شه.");
+  } else {
+    // ساخت بردار به‌صورت دسته‌ای (batch) برای جلوگیری از تعداد زیاد درخواست
+    const BATCH_SIZE = 20;
+
+    for (let i = 0; i < toEmbed.length; i += BATCH_SIZE) {
+      const batch = toEmbed.slice(i, i + BATCH_SIZE);
+      const texts = batch.map((c) => c.text);
+      console.log(`  ساخت بردار برای بخش ${i + 1} تا ${i + batch.length} از ${toEmbed.length} تکهٔ جدید...`);
+
+      const vectors = await embedBatch(texts);
+
+      for (let j = 0; j < batch.length; j++) {
+        const originalIndex = batch[j].index;
+        const chunk = allChunks[originalIndex];
+        results[originalIndex] = {
+          book: chunk.book,
+          source: chunk.source,
+          text: chunk.text,
+          vector: vectorToBase64(vectors[j]),
+        };
+      }
     }
   }
 
