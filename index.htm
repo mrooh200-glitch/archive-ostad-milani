@@ -953,10 +953,19 @@
     }
 
     .ai-search-result {
+      display: block;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
       padding: 12px 14px;
       background: #f8fafc;
+      text-decoration: none;
+      color: inherit;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .ai-search-result:hover {
+      border-color: #1d4ed8;
+      background: #eff6ff;
     }
 
     .ai-search-result strong {
@@ -1020,6 +1029,15 @@
       margin-top: 8px;
       color: #94a3b8;
       font-size: 0.78rem;
+    }
+
+    .ai-chat-sources a {
+      color: #1d4ed8;
+      text-decoration: none;
+    }
+
+    .ai-chat-sources a:hover {
+      text-decoration: underline;
     }
 
     .tree {
@@ -1308,45 +1326,30 @@
       display: block;
     }
 
-    /* Item جدید: قبلاً برچسب فرمت («HTML»/«PDF») جلوی هر عنوان تکرار
-       می‌شد؛ حالا که فهرست دو ستونهٔ جدا برای HTML و PDF دارد (رجوع
-       کنید به .book-columns)، همان تیتر بالای ستون این نقش را ایفا
-       می‌کند و تکرار برچسب روی تک‌تک آیتم‌ها لازم نیست. */
-
-    /* Item جدید: چیدمان دو ستونهٔ HTML/PDF کنار هم، با فاصلهٔ معقول
-       بین‌شان و تیتر مشخص بالای هر ستون. */
-    .book-columns {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 32px;
-    }
-
-    .book-column-title {
-      margin: 0;
-      padding: 17px 20px 12px;
-      border-bottom: 2px solid #dbe3ee;
-      color: #173b63;
-      font-size: 1.05rem;
+    .html-link::before {
+      content: "HTML";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #dcfce7;
+      color: #166534;
+      font-size: 0.72rem;
       font-weight: bold;
+      direction: ltr;
     }
 
-    /* Item جدید: شمارهٔ ردیف، کنار چک‌باکسِ «مطالعهٔ کنار هم» و قبل از
-       خودِ عنوان - عنوان‌ها به ترتیب الفبا مرتب و شماره‌گذاری می‌شوند
-       (رجوع کنید به sortAndNumberBookColumns در اسکریپت پایین صفحه). */
-    .book-index {
-      flex-shrink: 0;
-      min-width: 24px;
-      text-align: center;
-      color: #94a3b8;
-      font-size: 0.82rem;
-      font-variant-numeric: tabular-nums;
-    }
-
-    @media (max-width: 760px) {
-      .book-columns {
-        grid-template-columns: 1fr;
-        gap: 6px;
-      }
+    .pdf-link::before {
+      content: "PDF";
+      display: inline-block;
+      margin-left: 9px;
+      padding: 1px 7px;
+      border-radius: 5px;
+      background: #fee2e2;
+      color: #b91c1c;
+      font-size: 0.72rem;
+      font-weight: bold;
+      direction: ltr;
     }
 
     .text-search-results {
@@ -1649,161 +1652,142 @@
 
       <section class="tree" aria-label="فهرست منابع">
 
-      <div class="book-columns">
+      <details class="main-branch" open>
+        <summary></summary>
 
-        <div class="main-branch book-column">
-          <div class="book-column-title">نسخهٔ HTML</div>
+        <div class="branch-content">
+          <ul class="book-list">
 
-          <div class="branch-content">
-            <ul class="book-list">
+            <li
+              class="searchable-item"
+              data-title="آقای جوادی و حدوث"
+              data-url="Aghaye-Javadi-va-Hodous.htm">
+              <a
+                class="html-link"
+                href="Aghaye-Javadi-va-Hodous.htm"
+                target="_blank"
+                rel="noopener">
+                آقای جوادی و حدوث
+              </a>
+            </li>
 
-              <li
-                class="searchable-item"
-                data-title="آقای جوادی و حدوث"
-                data-url="Aghaye-Javadi-va-Hodous.htm">
-                <a
-                  class="html-link"
-                  href="Aghaye-Javadi-va-Hodous.htm"
-                  target="_blank"
-                  rel="noopener">
-                  آقای جوادی و حدوث
-                </a>
-              </li>
+            <li
+              class="searchable-item"
+              data-title="اثبات توحید و بطلان وحدت وجود"
+              data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
+              <a
+                class="html-link"
+                href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
+                target="_blank"
+                rel="noopener">
+                اثبات توحید و بطلان وحدت وجود
+              </a>
+            </li>
 
-              <li
-                class="searchable-item"
-                data-title="اثبات توحید و بطلان وحدت وجود"
-                data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
-                <a
-                  class="html-link"
-                  href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
-                  target="_blank"
-                  rel="noopener">
-                  اثبات توحید و بطلان وحدت وجود
-                </a>
-              </li>
+            <li
+              class="searchable-item"
+              data-title="اصول المعارف الالهیة"
+              data-url="Osoul-al-Maaref-al-Elahiyya.htm">
+              <a
+                class="html-link"
+                href="Osoul-al-Maaref-al-Elahiyya.htm"
+                target="_blank"
+                rel="noopener">
+                اصول المعارف الالهیة
+              </a>
+            </li>
 
-              <li
-                class="searchable-item"
-                data-title="اصول المعارف الالهیة"
-                data-url="Osoul-al-Maaref-al-Elahiyya.htm">
-                <a
-                  class="html-link"
-                  href="Osoul-al-Maaref-al-Elahiyya.htm"
-                  target="_blank"
-                  rel="noopener">
-                  اصول المعارف الالهیة
-                </a>
-              </li>
+            <li
+              class="searchable-item"
+              data-title="الإعلان عن اسرار الفلسفة والعرفان"
+              data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
+              <a
+                class="html-link"
+                href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                الإعلان عن اسرار الفلسفة والعرفان
+              </a>
+            </li>
 
-              <li
-                class="searchable-item"
-                data-title="الإعلان عن اسرار الفلسفة والعرفان"
-                data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
-                <a
-                  class="html-link"
-                  href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
-                  target="_blank"
-                  rel="noopener">
-                  الإعلان عن اسرار الفلسفة والعرفان
-                </a>
-              </li>
+            <li
+              class="searchable-item"
+              data-title="فراتر از عرفان"
+              data-url="Faratar-az-Erfan.htm">
+              <a
+                class="html-link"
+                href="Faratar-az-Erfan.htm"
+                target="_blank"
+                rel="noopener">
+                فراتر از عرفان
+              </a>
+            </li>
 
-              <li
-                class="searchable-item"
-                data-title="فراتر از عرفان"
-                data-url="Faratar-az-Erfan.htm">
-                <a
-                  class="html-link"
-                  href="Faratar-az-Erfan.htm"
-                  target="_blank"
-                  rel="noopener">
-                  فراتر از عرفان
-                </a>
-              </li>
+            <li
+              class="searchable-item"
+              data-title="متن درس معرفة الله محشی"
+              data-url="marefatollah-mohashsha.htm">
+              <a
+                class="html-link"
+                href="marefatollah-mohashsha.htm"
+                target="_blank"
+                rel="noopener">
+                متن درس معرفة الله (محشّی)
+              </a>
+            </li>
 
-              <li
-                class="searchable-item"
-                data-title="متن درس معرفة الله محشی"
-                data-url="marefatollah-mohashsha.htm">
-                <a
-                  class="html-link"
-                  href="marefatollah-mohashsha.htm"
-                  target="_blank"
-                  rel="noopener">
-                  متن درس معرفة الله (محشّی)
-                </a>
-              </li>
+            <li
+              class="searchable-item"
+              data-title="الباب الحادی عشر"
+              data-url="Bab-ol-Hadi-Ashar.html">
+              <a
+                class="html-link"
+                href="Bab-ol-Hadi-Ashar.html"
+                target="_blank"
+                rel="noopener">
+                الباب الحادی عشر
+              </a>
+            </li>
 
-            </ul>
-          </div>
+          </ul>
         </div>
+      </details>
 
-        <div class="main-branch book-column">
-          <div class="book-column-title">PDF</div>
+      <details class="main-branch" open>
+        <summary>نسخه‌های PDF</summary>
 
-          <div class="branch-content">
-            <ul class="book-list">
-              <li
-                class="searchable-item"
-                data-title="معرفة الله تعالی بالله"
-                data-url="Marefat-Taala-Allah-bellah.pdf"
-                data-pdf="true">
-                <a
-                  class="pdf-link"
-                  href="Marefat-Taala-Allah-bellah.pdf"
-                  target="_blank"
-                  rel="noopener">
-                  معرفة الله تعالی بالله
-                </a>
-              </li>
+        <div class="branch-content">
+          <ul class="book-list">
+            <li
+              class="searchable-item"
+              data-title="معرفت الله تعالی"
+              data-url="Marefat-Taala-Allah-bellah.pdf"
+              data-pdf="true">
+              <a
+                class="pdf-link"
+                href="Marefat-Taala-Allah-bellah.pdf"
+                target="_blank"
+                rel="noopener">
+                معرفت الله تعالی
+              </a>
+            </li>
 
-              <li
-                class="searchable-item"
-                data-title="الباب الحادی عشر"
-                data-url="Bab-ol-Hadi-Ashar.pdf"
-                data-pdf="true">
-                <a
-                  class="pdf-link"
-                  href="Bab-ol-Hadi-Ashar.pdf"
-                  target="_blank"
-                  rel="noopener">
-                  الباب الحادی عشر
-                </a>
-              </li>
-
-              <li
-                class="searchable-item"
-                data-title="اصول المعارف الالهیة"
-                data-url="Osul-ol-Maaref-ol-Elahiyyah.pdf"
-                data-pdf="true">
-                <a
-                  class="pdf-link"
-                  href="Osul-ol-Maaref-ol-Elahiyyah.pdf"
-                  target="_blank"
-                  rel="noopener">
-                  اصول المعارف الالهیة
-                </a>
-              </li>
-
-              <li
-                class="searchable-item"
-                data-title="فراتر از عرفان"
-                data-url="Faratar-az-Erfan.pdf"
-                data-pdf="true">
-                <a
-                  class="pdf-link"
-                  href="Faratar-az-Erfan.pdf"
-                  target="_blank"
-                  rel="noopener">
-                  فراتر از عرفان
-                </a>
-              </li>
-            </ul>
-          </div>
+            <li
+              class="searchable-item"
+              data-title="الباب الحادی عشر"
+              data-url="Bab-ol-Hadi-Ashar.pdf"
+              data-pdf="true">
+              <a
+                class="pdf-link"
+                href="Bab-ol-Hadi-Ashar.pdf"
+                target="_blank"
+                rel="noopener">
+                الباب الحادی عشر
+              </a>
+            </li>
+          </ul>
         </div>
-
-      </div>
+      </details>
 
     </section>
     </div>
@@ -2025,28 +2009,12 @@
     <div id="compareReadGrid" class="compare-read-grid"></div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-    // ---- Item جدید: مرتب‌سازی الفبایی + شماره‌گذاری ستون‌های HTML/PDF --
-    // هر ستون (HTML و PDF) جدا بر اساس عنوان (data-title) به ترتیب
-    // الفبای فارسی مرتب و شماره‌گذاری می‌شود. این کار پیش از خواندن
-    // searchableItems انجام می‌شود تا بقیهٔ اسکریپت (از جمله فهرست
-    // دامنهٔ جست‌وجو) هم همین ترتیب را ببیند.
-    document.querySelectorAll(".book-column .book-list").forEach(list => {
-      const items = [...list.querySelectorAll(":scope > li.searchable-item")];
-
-      items.sort((a, b) =>
-        (a.dataset.title || "").localeCompare(b.dataset.title || "", "fa")
-      );
-
-      items.forEach((item, index) => {
-        const indexBadge = document.createElement("span");
-        indexBadge.className = "book-index";
-        indexBadge.textContent = `${index + 1}.`;
-        item.insertBefore(indexBadge, item.firstChild);
-
-        list.appendChild(item);
-      });
-    });
+    if (window.pdfjsLib) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
 
     const searchInput = document.getElementById("siteSearch");
     const searchResults = document.getElementById("searchResults");
@@ -4442,12 +4410,105 @@
           }
         });
 
-      // Item جدید: PDFها دیگر برای جست‌وجوی متنی بارگذاری/استخراج
-      // نمی‌شوند - نه لینکی به آن‌ها در نتایج جست‌وجو ساخته می‌شود و نه
-      // در فهرست دامنهٔ جست‌وجو ظاهر می‌شوند. کاربر برای PDFها مستقیماً
-      // از فهرست ستون PDF در تب «مطالعه» استفاده می‌کند و مرورگر خودش
-      // (نمایشگر پیش‌فرض PDF) آن را باز می‌کند.
-      await Promise.all(htmlJobs);
+      const pdfJobs = searchableItems
+        .filter(item => item.dataset.pdf === "true")
+        .map(async item => {
+          const link = item.querySelector("a");
+          const title = item.dataset.title || link.textContent;
+          const pdfFile = item.dataset.url || link.getAttribute("href");
+
+          try {
+            if (!window.pdfjsLib) {
+              throw new Error("pdf.js not loaded");
+            }
+
+            const loadingTask = pdfjsLib.getDocument({
+              url: pdfFile,
+              disableFontFace: true
+            });
+
+            const pdf = await loadingTask.promise;
+            const paragraphs = [];
+            const pageNumbers = [];
+            // Item جدید: به‌ازای هر پاراگراف، اینکه چندمین پاراگراف
+            // *همان صفحه* است (نه کل سند) - برای نمایش «صفحهٔ ۷ -
+            // پاراگراف ۳» در بلوک نتایج.
+            const paragraphOnPage = [];
+
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+              const page = await pdf.getPage(pageNumber);
+              const textContent = await page.getTextContent();
+
+              // Item جدید: قبلاً کل متن یک صفحه با فاصله به هم چسبانده
+              // می‌شد (یک "پاراگراف" بزرگ به ازای هر صفحه). حالا با
+              // بررسی فاصلهٔ عمودیِ بین آیتم‌های متنی (مختصات y از
+              // transform هرکدام)، جایی که این فاصله به‌طور غیرعادی
+              // بزرگ باشد (یعنی یک خط خالی/فاصلهٔ پاراگراف واقعی)،
+              // پاراگراف جدید در نظر گرفته می‌شود - نه فقط شکستن خط
+              // معمولی.
+              const pageParagraphs = [];
+              let currentLines = [];
+              let lastY = null;
+
+              textContent.items.forEach(item => {
+                if (!item.str) {
+                  return;
+                }
+
+                const y = item.transform ? item.transform[5] : null;
+                const height = item.height || (item.transform ? Math.abs(item.transform[3]) : 0) || 10;
+
+                if (lastY !== null && y !== null && Math.abs(lastY - y) > height * 1.6) {
+                  const joined = currentLines.join(" ").replace(/\s+/g, " ").trim();
+
+                  if (joined) {
+                    pageParagraphs.push(joined);
+                  }
+
+                  currentLines = [];
+                }
+
+                currentLines.push(item.str);
+
+                if (y !== null) {
+                  lastY = y;
+                }
+              });
+
+              const lastJoined = currentLines.join(" ").replace(/\s+/g, " ").trim();
+
+              if (lastJoined) {
+                pageParagraphs.push(lastJoined);
+              }
+
+              pageParagraphs.forEach((paragraphText, indexOnPage) => {
+                paragraphs.push(paragraphText);
+                pageNumbers.push(pageNumber);
+                paragraphOnPage.push(indexOnPage + 1);
+              });
+            }
+
+            documents.push({
+              type: "pdf",
+              title: title,
+              pdfFile: pdfFile,
+              // Item جدید (تصمیم نهایی): دیگه نیازی به viewerBaseUrl
+              // نیست - buildResultUrl حالا مستقیم به pdfFile خودش لینک
+              // می‌دهد (رجوع کنید به توضیح آنجا: تنها موتوری که این
+              // فونت‌های قدیمی را درست می‌خواند، موتور خودِ مرورگره).
+              paragraphs: paragraphs,
+              // Item ح: مفهوم پاورقی در فایل PDF وجود ندارد؛ همه به‌عنوان
+              // متن اصلی در نظر گرفته می‌شوند.
+              footnoteFlags: paragraphs.map(() => false),
+              pageNumbers: pageNumbers,
+              paragraphOnPage: paragraphOnPage
+            });
+          } catch (error) {
+            console.warn("PDF not loaded:", pdfFile, error);
+          }
+        });
+
+      await Promise.all([...htmlJobs, ...pdfJobs]);
     }
 
     function pageButton(label, page, disabled = false, isCurrent = false) {
@@ -5289,10 +5350,22 @@
     }
 
     function buildResultUrl(document, paragraphIndex, query, rootMode, fragmentText, occurrenceIndex) {
-      // Item جدید: قبلاً اینجا یک شاخهٔ جدا برای document.type === "pdf"
-      // بود که مستقیماً به فایل PDF با #page=N لینک می‌داد. چون PDFها
-      // دیگر وارد جست‌وجوی متنی نمی‌شوند (رجوع کنید به حذف pdfJobs)،
-      // آن شاخه دیگر هرگز اجرا نمی‌شد و حذف شده است.
+      if (document.type === "pdf") {
+        // Item جدید (تصمیم نهایی): بعد از بررسی مفصل معلوم شد این
+        // PDFهای خاص (فونت فارسی/عربیِ قدیمی، کدگذاری موقعیتی) با
+        // موتور pdf.js (چه سفارشی، چه رسمی) درست خوانده نمی‌شوند - نه
+        // به‌خاطر باگ در کد، بلکه چون دادهٔ درست اصلاً داخل خودِ فایل
+        // نیست. تنها موتوری که این فایل‌ها را درست می‌خواند، موتور
+        // داخلیِ خودِ مرورگر (PDFium در کروم/اج) است - و آن فقط از طریق
+        // بازکردنِ مستقیمِ خودِ فایل PDF فعال می‌شود، نه از طریق هیچ
+        // نمایشگر واسطه‌ای. پس اینجا مستقیم به خودِ فایل با #page=N
+        // اشاره می‌کنیم؛ پرش به خطِ دقیق از طریق لینک ممکن نیست (این
+        // قابلیتی است که هیچ مرورگری آن را از طریق URL در اختیار
+        // نمی‌گذارد) - کاربر با یک Ctrl+F دستی به کلمه می‌رسد.
+        const pageNumber = document.pageNumbers[paragraphIndex] || 1;
+        const absoluteBase = new URL(document.pdfFile, location.href).href;
+        return `${absoluteBase}#page=${pageNumber}`;
+      }
 
       // Item جدید (مشکل طولانی‌بودن لینک در ایتا): در جست‌وجوی معمولی
       // (غیرریشه‌ای)، fragmentText معمولاً همان query است - نگه‌داشتنش
@@ -6013,11 +6086,7 @@
     // نمی‌شود؛ هر بار که صفحه باز می‌شود، از نو با «همه» شروع می‌کند.
     // انتخاب/لغوانتخاب کاربر همچنان در همان بازدید (تا وقتی صفحه باز
     // است) به یاد می‌ماند، فقط با رفرش صفحه ریست می‌شود.
-    // Item جدید: فایل‌های PDF از این بلوک (دامنهٔ جست‌وجو در کتاب‌ها،
-    // در تب جست‌وجوی اصلی سایت) حذف شده‌اند - جست‌وجوی متنی دیگر روی
-    // PDFها انجام نمی‌شود (رجوع کنید به حذف pdfJobs در loadTextDocuments).
     const bookScopeEntries = searchableItems
-      .filter(item => item.dataset.pdf !== "true")
       .map(item => ({
         key: item.dataset.url,
         title: item.dataset.title ||
