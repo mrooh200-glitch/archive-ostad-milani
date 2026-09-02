@@ -8,7 +8,7 @@
  * آدرس چیزی شبیه این می‌شه: https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev
  */
 
-const WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
+const WORKER_URL = "https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev";
 
 let EMBEDDINGS = null; // کل داده‌های embeddings.json بعد از بارگذاری اینجا نگه داشته می‌شه
 
@@ -116,11 +116,11 @@ document.addEventListener("DOMContentLoaded", () => {
           aiSearchResults.innerHTML = results
             .map(
               (r) =>
-                `<div class="ai-search-result">
+                `<a class="ai-search-result" href="${encodeURI(r.source)}" target="_blank" rel="noopener">
                   <strong>${r.book}</strong>
                   <p>${r.text}</p>
-                  <small>میزان شباهت: ${(r.score * 100).toFixed(1)}٪</small>
-                </div>`
+                  <small>میزان شباهت: ${(r.score * 100).toFixed(1)}٪ — برای باز کردن کتاب کلیک کنید</small>
+                </a>`
             )
             .join("");
         } catch (err) {
@@ -144,10 +144,13 @@ document.addEventListener("DOMContentLoaded", () => {
       aiChatOutput.innerHTML = "در حال فکر کردن...";
       try {
         const { answer, sources } = await askQuestion(question);
+        const sourceLinks = sources
+          .map((s) => `<a href="${encodeURI(s.source)}" target="_blank" rel="noopener">${s.book}</a>`)
+          .join("، ");
         aiChatOutput.innerHTML = `
           <div class="ai-chat-answer">${answer}</div>
           <div class="ai-chat-sources">
-            منابع: ${sources.map((s) => s.book).join("، ")}
+            منابع: ${sourceLinks}
           </div>
         `;
       } catch (err) {
