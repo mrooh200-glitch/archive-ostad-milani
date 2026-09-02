@@ -116,7 +116,15 @@ async function embedBatch(texts) {
   return json.result.data;
 }
 
-// ---------- ۵. تابع اصلی ----------
+// ---------- ۵ب. فشرده‌سازی بردار به base64 (به‌جای آرایهٔ متنی اعداد) ----------
+// یک بردار ۱۰۲۴ عددی به‌صورت متن JSON خیلی حجیم می‌شه (هر عدد با کلی رقم اعشار).
+// با تبدیل به Float32Array و بعد base64، حجم حدود ۳ تا ۴ برابر کوچیک‌تر می‌شه.
+function vectorToBase64(vector) {
+  const floatArray = new Float32Array(vector);
+  return Buffer.from(floatArray.buffer).toString("base64");
+}
+
+// ---------- ۶. تابع اصلی ----------
 async function main() {
   console.log("در حال جست‌وجوی فایل‌های htm...");
   const files = findHtmFiles(REPO_ROOT);
@@ -152,7 +160,7 @@ async function main() {
         book: batch[j].book,
         source: batch[j].source,
         text: batch[j].text,
-        vector: vectors[j],
+        vector: vectorToBase64(vectors[j]),
       });
     }
   }
