@@ -872,6 +872,36 @@
       font: inherit;
     }
 
+    /* Item جدید: ردیف کادر متنیِ «شامل این کلمات نباشد» (NOT) در منوی
+       تنظیمات - برخلاف چک‌باکس/رادیوهای دیگر، این یکی یک کادر متنی
+       تمام‌عرض جدا از خودش لازم دارد. */
+    .settings-exclude-row {
+      padding: 7px 10px;
+    }
+
+    .settings-exclude-row .settings-field-label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.84rem;
+      color: #1f2937;
+    }
+
+    .settings-exclude-input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      font: inherit;
+      font-size: 0.84rem;
+    }
+
+    .settings-exclude-input:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
     .tabs {
       display: flex;
       gap: 8px;
@@ -953,19 +983,10 @@
     }
 
     .ai-search-result {
-      display: block;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
       padding: 12px 14px;
       background: #f8fafc;
-      text-decoration: none;
-      color: inherit;
-      transition: border-color 0.15s, background 0.15s;
-    }
-
-    .ai-search-result:hover {
-      border-color: #1d4ed8;
-      background: #eff6ff;
     }
 
     .ai-search-result strong {
@@ -1029,15 +1050,6 @@
       margin-top: 8px;
       color: #94a3b8;
       font-size: 0.78rem;
-    }
-
-    .ai-chat-sources a {
-      color: #1d4ed8;
-      text-decoration: none;
-    }
-
-    .ai-chat-sources a:hover {
-      text-decoration: underline;
     }
 
     .tree {
@@ -1326,30 +1338,45 @@
       display: block;
     }
 
-    .html-link::before {
-      content: "HTML";
-      display: inline-block;
-      margin-left: 9px;
-      padding: 1px 7px;
-      border-radius: 5px;
-      background: #dcfce7;
-      color: #166534;
-      font-size: 0.72rem;
-      font-weight: bold;
-      direction: ltr;
+    /* Item جدید: قبلاً برچسب فرمت («HTML»/«PDF») جلوی هر عنوان تکرار
+       می‌شد؛ حالا که فهرست دو ستونهٔ جدا برای HTML و PDF دارد (رجوع
+       کنید به .book-columns)، همان تیتر بالای ستون این نقش را ایفا
+       می‌کند و تکرار برچسب روی تک‌تک آیتم‌ها لازم نیست. */
+
+    /* Item جدید: چیدمان دو ستونهٔ HTML/PDF کنار هم، با فاصلهٔ معقول
+       بین‌شان و تیتر مشخص بالای هر ستون. */
+    .book-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
     }
 
-    .pdf-link::before {
-      content: "PDF";
-      display: inline-block;
-      margin-left: 9px;
-      padding: 1px 7px;
-      border-radius: 5px;
-      background: #fee2e2;
-      color: #b91c1c;
-      font-size: 0.72rem;
+    .book-column-title {
+      margin: 0;
+      padding: 17px 20px 12px;
+      border-bottom: 2px solid #dbe3ee;
+      color: #173b63;
+      font-size: 1.05rem;
       font-weight: bold;
-      direction: ltr;
+    }
+
+    /* Item جدید: شمارهٔ ردیف، کنار چک‌باکسِ «مطالعهٔ کنار هم» و قبل از
+       خودِ عنوان - عنوان‌ها به ترتیب الفبا مرتب و شماره‌گذاری می‌شوند
+       (رجوع کنید به sortAndNumberBookColumns در اسکریپت پایین صفحه). */
+    .book-index {
+      flex-shrink: 0;
+      min-width: 24px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 0.82rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 760px) {
+      .book-columns {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
     }
 
     .text-search-results {
@@ -1652,142 +1679,161 @@
 
       <section class="tree" aria-label="فهرست منابع">
 
-      <details class="main-branch" open>
-        <summary></summary>
+      <div class="book-columns">
 
-        <div class="branch-content">
-          <ul class="book-list">
+        <div class="main-branch book-column">
+          <div class="book-column-title">نسخهٔ HTML</div>
 
-            <li
-              class="searchable-item"
-              data-title="آقای جوادی و حدوث"
-              data-url="Aghaye-Javadi-va-Hodous.htm">
-              <a
-                class="html-link"
-                href="Aghaye-Javadi-va-Hodous.htm"
-                target="_blank"
-                rel="noopener">
-                آقای جوادی و حدوث
-              </a>
-            </li>
+          <div class="branch-content">
+            <ul class="book-list">
 
-            <li
-              class="searchable-item"
-              data-title="اثبات توحید و بطلان وحدت وجود"
-              data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
-              <a
-                class="html-link"
-                href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
-                target="_blank"
-                rel="noopener">
-                اثبات توحید و بطلان وحدت وجود
-              </a>
-            </li>
+              <li
+                class="searchable-item"
+                data-title="آقای جوادی و حدوث"
+                data-url="Aghaye-Javadi-va-Hodous.htm">
+                <a
+                  class="html-link"
+                  href="Aghaye-Javadi-va-Hodous.htm"
+                  target="_blank"
+                  rel="noopener">
+                  آقای جوادی و حدوث
+                </a>
+              </li>
 
-            <li
-              class="searchable-item"
-              data-title="اصول المعارف الالهیة"
-              data-url="Osoul-al-Maaref-al-Elahiyya.htm">
-              <a
-                class="html-link"
-                href="Osoul-al-Maaref-al-Elahiyya.htm"
-                target="_blank"
-                rel="noopener">
-                اصول المعارف الالهیة
-              </a>
-            </li>
+              <li
+                class="searchable-item"
+                data-title="اثبات توحید و بطلان وحدت وجود"
+                data-url="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm">
+                <a
+                  class="html-link"
+                  href="Esbat-e-Towhid-va-Botlan-e-Vahdat-e-Vojoud.htm"
+                  target="_blank"
+                  rel="noopener">
+                  اثبات توحید و بطلان وحدت وجود
+                </a>
+              </li>
 
-            <li
-              class="searchable-item"
-              data-title="الإعلان عن اسرار الفلسفة والعرفان"
-              data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
-              <a
-                class="html-link"
-                href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
-                target="_blank"
-                rel="noopener">
-                الإعلان عن اسرار الفلسفة والعرفان
-              </a>
-            </li>
+              <li
+                class="searchable-item"
+                data-title="اصول المعارف الالهیة"
+                data-url="Osoul-al-Maaref-al-Elahiyya.htm">
+                <a
+                  class="html-link"
+                  href="Osoul-al-Maaref-al-Elahiyya.htm"
+                  target="_blank"
+                  rel="noopener">
+                  اصول المعارف الالهیة
+                </a>
+              </li>
 
-            <li
-              class="searchable-item"
-              data-title="فراتر از عرفان"
-              data-url="Faratar-az-Erfan.htm">
-              <a
-                class="html-link"
-                href="Faratar-az-Erfan.htm"
-                target="_blank"
-                rel="noopener">
-                فراتر از عرفان
-              </a>
-            </li>
+              <li
+                class="searchable-item"
+                data-title="الإعلان عن اسرار الفلسفة والعرفان"
+                data-url="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm">
+                <a
+                  class="html-link"
+                  href="al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm"
+                  target="_blank"
+                  rel="noopener">
+                  الإعلان عن اسرار الفلسفة والعرفان
+                </a>
+              </li>
 
-            <li
-              class="searchable-item"
-              data-title="متن درس معرفة الله محشی"
-              data-url="marefatollah-mohashsha.htm">
-              <a
-                class="html-link"
-                href="marefatollah-mohashsha.htm"
-                target="_blank"
-                rel="noopener">
-                متن درس معرفة الله (محشّی)
-              </a>
-            </li>
+              <li
+                class="searchable-item"
+                data-title="فراتر از عرفان"
+                data-url="Faratar-az-Erfan.htm">
+                <a
+                  class="html-link"
+                  href="Faratar-az-Erfan.htm"
+                  target="_blank"
+                  rel="noopener">
+                  فراتر از عرفان
+                </a>
+              </li>
 
-            <li
-              class="searchable-item"
-              data-title="الباب الحادی عشر"
-              data-url="Bab-ol-Hadi-Ashar.html">
-              <a
-                class="html-link"
-                href="Bab-ol-Hadi-Ashar.html"
-                target="_blank"
-                rel="noopener">
-                الباب الحادی عشر
-              </a>
-            </li>
+              <li
+                class="searchable-item"
+                data-title="متن درس معرفة الله محشی"
+                data-url="marefatollah-mohashsha.htm">
+                <a
+                  class="html-link"
+                  href="marefatollah-mohashsha.htm"
+                  target="_blank"
+                  rel="noopener">
+                  متن درس معرفة الله (محشّی)
+                </a>
+              </li>
 
-          </ul>
+            </ul>
+          </div>
         </div>
-      </details>
 
-      <details class="main-branch" open>
-        <summary>نسخه‌های PDF</summary>
+        <div class="main-branch book-column">
+          <div class="book-column-title">PDF</div>
 
-        <div class="branch-content">
-          <ul class="book-list">
-            <li
-              class="searchable-item"
-              data-title="معرفت الله تعالی"
-              data-url="Marefat-Taala-Allah-bellah.pdf"
-              data-pdf="true">
-              <a
-                class="pdf-link"
-                href="Marefat-Taala-Allah-bellah.pdf"
-                target="_blank"
-                rel="noopener">
-                معرفت الله تعالی
-              </a>
-            </li>
+          <div class="branch-content">
+            <ul class="book-list">
+              <li
+                class="searchable-item"
+                data-title="معرفة الله تعالی بالله"
+                data-url="Marefat-Taala-Allah-bellah.pdf"
+                data-pdf="true">
+                <a
+                  class="pdf-link"
+                  href="Marefat-Taala-Allah-bellah.pdf"
+                  target="_blank"
+                  rel="noopener">
+                  معرفة الله تعالی بالله
+                </a>
+              </li>
 
-            <li
-              class="searchable-item"
-              data-title="الباب الحادی عشر"
-              data-url="Bab-ol-Hadi-Ashar.pdf"
-              data-pdf="true">
-              <a
-                class="pdf-link"
-                href="Bab-ol-Hadi-Ashar.pdf"
-                target="_blank"
-                rel="noopener">
-                الباب الحادی عشر
-              </a>
-            </li>
-          </ul>
+              <li
+                class="searchable-item"
+                data-title="الباب الحادی عشر"
+                data-url="Bab-ol-Hadi-Ashar.pdf"
+                data-pdf="true">
+                <a
+                  class="pdf-link"
+                  href="Bab-ol-Hadi-Ashar.pdf"
+                  target="_blank"
+                  rel="noopener">
+                  الباب الحادی عشر
+                </a>
+              </li>
+
+              <li
+                class="searchable-item"
+                data-title="اصول المعارف الالهیة"
+                data-url="Osul-ol-Maaref-ol-Elahiyyah.pdf"
+                data-pdf="true">
+                <a
+                  class="pdf-link"
+                  href="Osul-ol-Maaref-ol-Elahiyyah.pdf"
+                  target="_blank"
+                  rel="noopener">
+                  اصول المعارف الالهیة
+                </a>
+              </li>
+
+              <li
+                class="searchable-item"
+                data-title="فراتر از عرفان"
+                data-url="Faratar-az-Erfan.pdf"
+                data-pdf="true">
+                <a
+                  class="pdf-link"
+                  href="Faratar-az-Erfan.pdf"
+                  target="_blank"
+                  rel="noopener">
+                  فراتر از عرفان
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
-      </details>
+
+      </div>
 
     </section>
     </div>
@@ -1928,7 +1974,10 @@
     <div id="aiPanel" class="tab-panel">
       <div class="ai-panel-inner">
         <section class="ai-section">
-          <h2 class="ai-section-title" title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">جست‌وجوی معنایی</h2>
+          <h2 class="ai-section-title">جست‌وجوی معنایی</h2>
+          <p class="ai-section-desc">
+            به‌جای جست‌وجوی کلمه‌به‌کلمه، مفهوم مورد نظرت رو بنویس؛ نتایج بر اساس نزدیکی معنایی نمایش داده می‌شن.
+          </p>
 
           <div class="search-box-wrap ai-search-box-wrap">
             <input
@@ -1936,9 +1985,8 @@
               class="search-box"
               type="search"
               autocomplete="off"
-              placeholder="برای نمونه: نسبت میان عرفان و فلسفه"
-              aria-label="جست‌وجوی معنایی"
-              title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">
+              placeholder="مثلاً: رابطهٔ عرفان و فلسفه"
+              aria-label="جست‌وجوی معنایی">
           </div>
 
           <p id="aiSearchStatus" class="ai-status" aria-live="polite"></p>
@@ -1949,7 +1997,7 @@
         <section class="ai-section">
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
           <p class="ai-section-desc">
-            پرسش پژوهشی خود را مطرح کنید؛ پاسخ منحصراً بر پایهٔ متون همین آرشیو تنظیم می‌شود.
+            سؤالت رو بپرس؛ پاسخ بر اساس متن کتاب‌های همین آرشیو ساخته می‌شه.
           </p>
 
           <form id="aiChatForm" class="ai-chat-form">
@@ -1958,10 +2006,10 @@
               class="search-box"
               type="text"
               autocomplete="off"
-              placeholder="پرسش خود را وارد کنید…"
+              placeholder="سؤال خودت رو بنویس…"
               aria-label="پرسش از دستیار هوشمند">
 
-            <button type="submit" class="ai-chat-submit">ارسال پرسش</button>
+            <button type="submit" class="ai-chat-submit">پرسیدن</button>
           </form>
 
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
@@ -2007,12 +2055,28 @@
     <div id="compareReadGrid" class="compare-read-grid"></div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script>
-    if (window.pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-    }
+    // ---- Item جدید: مرتب‌سازی الفبایی + شماره‌گذاری ستون‌های HTML/PDF --
+    // هر ستون (HTML و PDF) جدا بر اساس عنوان (data-title) به ترتیب
+    // الفبای فارسی مرتب و شماره‌گذاری می‌شود. این کار پیش از خواندن
+    // searchableItems انجام می‌شود تا بقیهٔ اسکریپت (از جمله فهرست
+    // دامنهٔ جست‌وجو) هم همین ترتیب را ببیند.
+    document.querySelectorAll(".book-column .book-list").forEach(list => {
+      const items = [...list.querySelectorAll(":scope > li.searchable-item")];
+
+      items.sort((a, b) =>
+        (a.dataset.title || "").localeCompare(b.dataset.title || "", "fa")
+      );
+
+      items.forEach((item, index) => {
+        const indexBadge = document.createElement("span");
+        indexBadge.className = "book-index";
+        indexBadge.textContent = `${index + 1}.`;
+        item.insertBefore(indexBadge, item.firstChild);
+
+        list.appendChild(item);
+      });
+    });
 
     const searchInput = document.getElementById("siteSearch");
     const searchResults = document.getElementById("searchResults");
@@ -2359,6 +2423,10 @@
     let currentProximityMode = false;
     let currentProximityWords = [];
     let currentProximityDistance = 5;
+    // Item جدید: کلماتی که در حالت «هر کدام از کلمات» (OR) با آن‌ها
+    // نتیجه پیدا شده - فقط برای هایلایت/برش پاراگراف در نمای نتایج و
+    // خروجی‌ها استفاده می‌شود؛ خالی یعنی حالت OR فعال نیست.
+    let currentOrWords = [];
 
     // Item ح: دامنهٔ جست‌وجو در متن اصلی/پاورقی. کلاس MsoFootnoteText در
     // خروجی Word هر پاراگراف پاورقی را مشخص می‌کند (رجوع کنید به
@@ -2366,6 +2434,26 @@
     // هم‌زمان خاموش نمی‌شوند (رجوع کنید به بخش رویدادهای منوی تنظیمات).
     let searchInMainText = true;
     let searchInFootnotes = true;
+
+    // ---- Item جدید: نوع تطبیق کلمات (عبارت دقیق / همهٔ کلمات / هر
+    // کدام از کلمات) + حذف نتایج شامل کلمات ناخواسته -----------------
+    // این‌ها فقط وقتی اثر دارند که نه جست‌وجوی مجاورتی و نه حالت
+    // ریشه‌ای روشن باشد (همان اولویت‌بندی قبلی: مجاورتی > ریشه‌ای >
+    // این‌جا) - رجوع کنید به renderResults.
+    // - "phrase": همان رفتار پیش‌فرض قبلی - کلمات باید عیناً پشت سر هم
+    //   بیایند (buildWholeWordPattern).
+    // - "and": همهٔ کلمات باید در پاراگراف باشند، بدون محدودیت ترتیب/
+    //   فاصله - برای این حالت از همان موتور جست‌وجوی مجاورتی
+    //   (findProximitySpan) با فاصلهٔ عملاً نامحدود استفاده می‌شود، چون
+    //   دقیقاً همان مسئله را (همهٔ کلمات، هر ترتیب) قبلاً حل کرده است.
+    // - "or": کافی است یکی از کلمات باشد.
+    let wordMatchMode = "phrase";
+    const UNLIMITED_PROXIMITY_DISTANCE = 1e6;
+
+    // کلماتی که کاربر می‌خواهد در نتایج نباشند - مستقل از wordMatchMode
+    // و مستقل از حالت ریشه‌ای/مجاورتی، همیشه به‌عنوان یک فیلتر نهایی
+    // روی نتایج اعمال می‌شود (رجوع کنید به paragraphHasExcludedWord).
+    let excludeWordsText = "";
 
     // Item جدید: مقایسهٔ نتایج یک عبارت در چند کتاب کنار هم - وقتی روشن
     // است، renderCurrentPage به‌جای فهرست صفحه‌بندی‌شدهٔ معمولی،
@@ -2516,6 +2604,16 @@
           cleanParagraph,
           start: matchedWord ? matchedWord.start : -1,
           end: matchedWord ? matchedWord.end : -1
+        };
+      }
+
+      if (currentOrWords.length > 0) {
+        const matchedWord = findFirstMatchingOrWord(cleanParagraph, currentOrWords);
+        const match = matchedWord ? findRawWholeWordMatch(cleanParagraph, matchedWord) : null;
+        return {
+          cleanParagraph,
+          start: match ? match.index : -1,
+          end: match ? match.index + match[0].length : -1
         };
       }
 
@@ -4229,6 +4327,31 @@
       return result;
     }
 
+    // Item جدید: هایلایت برای حالت «هر کدام از این کلمات» (OR) - همان
+    // تکنیک charClassFor/DIACRITIC_GAP که highlightText برای یک عبارت
+    // استفاده می‌کند، منتها این‌جا به‌صورت یک الگوی «یکی از این چند
+    // کلمه» (تناوب/alternation) ساخته می‌شود تا هرجای متن که هرکدام از
+    // کلمات آمده باشد (نه فقط اولین‌بار) هایلایت شود.
+    function highlightAnyWordText(text, words) {
+      const escapedText = escapeHtml(text);
+      const cleanWords = words.map(w => w.trim()).filter(Boolean);
+
+      if (cleanWords.length === 0) {
+        return escapedText;
+      }
+
+      const alternation = cleanWords
+        .map(word => word.split("").map(ch => charClassFor(ch) + DIACRITIC_GAP).join(""))
+        .join("|");
+
+      const pattern = new RegExp(
+        `(?<![${WORD_BOUNDARY_CHARS}])(?:${alternation})(?![${WORD_BOUNDARY_CHARS}])`,
+        "gi"
+      );
+
+      return escapedText.replace(pattern, match => `<mark>${match}</mark>`);
+    }
+
     // ---- Item ز: جست‌وجوی مجاورتی --------------------------------------
     // هم‌ارز highlightProximityMatches در in-page-search.js، منتها به‌جای
     // کار روی گره‌های متنی زندهٔ DOM، روی رشتهٔ پاراگراف کار می‌کند و
@@ -4329,6 +4452,34 @@
       );
     }
 
+    // ---- Item جدید: «هر کدام از این کلمات» (OR) --------------------
+    // برخلاف حالت مجاورتی/AND که باید همهٔ کلمات را پیدا کند، اینجا
+    // همین که یکی از کلمات پیدا شود کافی است - از findRawWholeWordMatch
+    // (همان موتور تطبیق کلمهٔ کامل که برای حالت عادی هم استفاده
+    // می‌شود) برای هر کلمه به‌ترتیب استفاده می‌کنیم و اولین کلمه‌ای که
+    // پیدا شود را برمی‌گردانیم؛ از همان‌جا به بعد (اسنیپت/فرگمنت/
+    // هایلایت) دقیقاً مثل یک جست‌وجوی تک‌کلمه‌ای عادی رفتار می‌کند.
+    function getOrQueryWords(query) {
+      return [...new Set(query.trim().split(/\s+/).filter(Boolean))];
+    }
+
+    function findFirstMatchingOrWord(cleanParagraph, orWords) {
+      for (const word of orWords) {
+        if (findRawWholeWordMatch(cleanParagraph, word)) {
+          return word;
+        }
+      }
+      return null;
+    }
+
+    // ---- Item جدید: «شامل این کلمات نباشد» (NOT) --------------------
+    // فیلتر نهایی و مستقل از نوع تطبیق اصلی - هر پاراگرافی که یکی از
+    // این کلمات را (به‌صورت کلمهٔ کامل) داشته باشد، از نتایج کنار
+    // گذاشته می‌شود.
+    function paragraphHasExcludedWord(cleanParagraph, excludeWords) {
+      return excludeWords.some(word => !!findRawWholeWordMatch(cleanParagraph, word));
+    }
+
     // ---- Item ب: مرتب‌سازی نتایج (بر اساس محل وقوع / پرتکرارترین) -----
     // هر نتیجه در لحظهٔ ساخته‌شدن یک sortKey می‌گیرد (شکل نرمال‌شدهٔ
     // همان متنی که پیدا شده)؛ فراوانی این کلید در کل نتایج جاری، معیار
@@ -4408,105 +4559,12 @@
           }
         });
 
-      const pdfJobs = searchableItems
-        .filter(item => item.dataset.pdf === "true")
-        .map(async item => {
-          const link = item.querySelector("a");
-          const title = item.dataset.title || link.textContent;
-          const pdfFile = item.dataset.url || link.getAttribute("href");
-
-          try {
-            if (!window.pdfjsLib) {
-              throw new Error("pdf.js not loaded");
-            }
-
-            const loadingTask = pdfjsLib.getDocument({
-              url: pdfFile,
-              disableFontFace: true
-            });
-
-            const pdf = await loadingTask.promise;
-            const paragraphs = [];
-            const pageNumbers = [];
-            // Item جدید: به‌ازای هر پاراگراف، اینکه چندمین پاراگراف
-            // *همان صفحه* است (نه کل سند) - برای نمایش «صفحهٔ ۷ -
-            // پاراگراف ۳» در بلوک نتایج.
-            const paragraphOnPage = [];
-
-            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-              const page = await pdf.getPage(pageNumber);
-              const textContent = await page.getTextContent();
-
-              // Item جدید: قبلاً کل متن یک صفحه با فاصله به هم چسبانده
-              // می‌شد (یک "پاراگراف" بزرگ به ازای هر صفحه). حالا با
-              // بررسی فاصلهٔ عمودیِ بین آیتم‌های متنی (مختصات y از
-              // transform هرکدام)، جایی که این فاصله به‌طور غیرعادی
-              // بزرگ باشد (یعنی یک خط خالی/فاصلهٔ پاراگراف واقعی)،
-              // پاراگراف جدید در نظر گرفته می‌شود - نه فقط شکستن خط
-              // معمولی.
-              const pageParagraphs = [];
-              let currentLines = [];
-              let lastY = null;
-
-              textContent.items.forEach(item => {
-                if (!item.str) {
-                  return;
-                }
-
-                const y = item.transform ? item.transform[5] : null;
-                const height = item.height || (item.transform ? Math.abs(item.transform[3]) : 0) || 10;
-
-                if (lastY !== null && y !== null && Math.abs(lastY - y) > height * 1.6) {
-                  const joined = currentLines.join(" ").replace(/\s+/g, " ").trim();
-
-                  if (joined) {
-                    pageParagraphs.push(joined);
-                  }
-
-                  currentLines = [];
-                }
-
-                currentLines.push(item.str);
-
-                if (y !== null) {
-                  lastY = y;
-                }
-              });
-
-              const lastJoined = currentLines.join(" ").replace(/\s+/g, " ").trim();
-
-              if (lastJoined) {
-                pageParagraphs.push(lastJoined);
-              }
-
-              pageParagraphs.forEach((paragraphText, indexOnPage) => {
-                paragraphs.push(paragraphText);
-                pageNumbers.push(pageNumber);
-                paragraphOnPage.push(indexOnPage + 1);
-              });
-            }
-
-            documents.push({
-              type: "pdf",
-              title: title,
-              pdfFile: pdfFile,
-              // Item جدید (تصمیم نهایی): دیگه نیازی به viewerBaseUrl
-              // نیست - buildResultUrl حالا مستقیم به pdfFile خودش لینک
-              // می‌دهد (رجوع کنید به توضیح آنجا: تنها موتوری که این
-              // فونت‌های قدیمی را درست می‌خواند، موتور خودِ مرورگره).
-              paragraphs: paragraphs,
-              // Item ح: مفهوم پاورقی در فایل PDF وجود ندارد؛ همه به‌عنوان
-              // متن اصلی در نظر گرفته می‌شوند.
-              footnoteFlags: paragraphs.map(() => false),
-              pageNumbers: pageNumbers,
-              paragraphOnPage: paragraphOnPage
-            });
-          } catch (error) {
-            console.warn("PDF not loaded:", pdfFile, error);
-          }
-        });
-
-      await Promise.all([...htmlJobs, ...pdfJobs]);
+      // Item جدید: PDFها دیگر برای جست‌وجوی متنی بارگذاری/استخراج
+      // نمی‌شوند - نه لینکی به آن‌ها در نتایج جست‌وجو ساخته می‌شود و نه
+      // در فهرست دامنهٔ جست‌وجو ظاهر می‌شوند. کاربر برای PDFها مستقیماً
+      // از فهرست ستون PDF در تب «مطالعه» استفاده می‌کند و مرورگر خودش
+      // (نمایشگر پیش‌فرض PDF) آن را باز می‌کند.
+      await Promise.all(htmlJobs);
     }
 
     function pageButton(label, page, disabled = false, isCurrent = false) {
@@ -4654,7 +4712,9 @@
               highlightProximityText(result.snippet, currentProximityWords, currentProximityDistance) :
               currentRootMode ?
                 highlightStemText(result.snippet, getQueryStems(currentQuery)) :
-                highlightText(result.snippet, currentQuery)
+                currentOrWords.length > 0 ?
+                  highlightAnyWordText(result.snippet, currentOrWords) :
+                  highlightText(result.snippet, currentQuery)
           }</a>
         `).join("");
 
@@ -4738,7 +4798,9 @@
                 highlightProximityText(result.snippet, currentProximityWords, currentProximityDistance) :
                 currentRootMode ?
                   highlightStemText(result.snippet, getQueryStems(currentQuery)) :
-                  highlightText(result.snippet, currentQuery)
+                  currentOrWords.length > 0 ?
+                    highlightAnyWordText(result.snippet, currentOrWords) :
+                    highlightText(result.snippet, currentQuery)
             }</a>
           </article>
         `;
@@ -5088,6 +5150,41 @@
         <div class="settings-separator"></div>
 
         <div class="settings-section-label">جست‌وجوی پیشرفته</div>
+
+        <label
+          class="settings-radio"
+          title="کلمات عبارت جست‌وجو باید عیناً پشت سر هم بیایند (رفتار پیش‌فرض)">
+          <input type="radio" name="siteWordMatchMode" value="phrase" ${wordMatchMode === "phrase" ? "checked" : ""}>
+          عبارت دقیق
+        </label>
+        <label
+          class="settings-radio"
+          title="همهٔ کلمات باید در پاراگراف باشند، اما لازم نیست پشت سر هم یا نزدیک هم بیایند">
+          <input type="radio" name="siteWordMatchMode" value="and" ${wordMatchMode === "and" ? "checked" : ""}>
+          همهٔ این کلمات باشد (بدون ترتیب)
+        </label>
+        <label
+          class="settings-radio"
+          title="کافی است یکی از کلمات عبارت جست‌وجو در پاراگراف باشد">
+          <input type="radio" name="siteWordMatchMode" value="or" ${wordMatchMode === "or" ? "checked" : ""}>
+          هر کدام از این کلمات باشد
+        </label>
+
+        <div class="settings-exclude-row">
+          <label class="settings-field-label" for="siteMenuExcludeWords">
+            شامل این کلمات نباشد:
+          </label>
+          <input
+            type="text"
+            id="siteMenuExcludeWords"
+            class="settings-exclude-input"
+            placeholder="مثلاً: فلسفه عرفان"
+            title="نتایجی که هر یک از این کلمات را داشته باشند، از فهرست نتایج کنار گذاشته می‌شوند"
+            value="${escapeHtml(excludeWordsText)}">
+        </div>
+
+        <div class="settings-separator"></div>
+
         <label
           class="settings-checkbox"
           title="کلمات عبارت جست‌وجو لازم نیست کنار هم بیایند؛ کافی است در فاصلهٔ مشخص‌شده از هم قرار داشته باشند">
@@ -5209,6 +5306,43 @@
           renderCurrentPage();
         });
       });
+
+      // Item جدید: نوع تطبیق کلمات (عبارت دقیق/همهٔ کلمات/هر کدام از
+      // کلمات) - مثل مرتب‌سازی، یک رادیوگروپ ساده که با هر تغییر
+      // نتایج را دوباره از صفر می‌سازد.
+      menu.querySelectorAll('input[name="siteWordMatchMode"]').forEach(radio => {
+        radio.addEventListener("change", () => {
+          if (!radio.checked) {
+            return;
+          }
+
+          wordMatchMode = radio.value;
+
+          if (searchInput.value.trim()) {
+            renderResults(searchInput.value);
+          }
+        });
+      });
+
+      // Item جدید: کادر «شامل این کلمات نباشد» (NOT) - مثل کادر فاصلهٔ
+      // جست‌وجوی مجاورتی، جلوی بسته‌شدن منو با کلیک را می‌گیرد (چون
+      // خودِ منو با کلیک روی هر جای دیگرش می‌بندد) و با هر تغییر
+      // نتایج را دوباره می‌سازد.
+      const excludeWordsInput = menu.querySelector("#siteMenuExcludeWords");
+
+      if (excludeWordsInput) {
+        excludeWordsInput.addEventListener("click", event => {
+          event.stopPropagation();
+        });
+
+        excludeWordsInput.addEventListener("input", () => {
+          excludeWordsText = excludeWordsInput.value;
+
+          if (searchInput.value.trim()) {
+            renderResults(searchInput.value);
+          }
+        });
+      }
 
       const proximityToggle = menu.querySelector("#siteMenuProximityToggle");
       const proximityDistanceInput = menu.querySelector("#siteMenuProximityDistance");
@@ -5348,22 +5482,10 @@
     }
 
     function buildResultUrl(document, paragraphIndex, query, rootMode, fragmentText, occurrenceIndex) {
-      if (document.type === "pdf") {
-        // Item جدید (تصمیم نهایی): بعد از بررسی مفصل معلوم شد این
-        // PDFهای خاص (فونت فارسی/عربیِ قدیمی، کدگذاری موقعیتی) با
-        // موتور pdf.js (چه سفارشی، چه رسمی) درست خوانده نمی‌شوند - نه
-        // به‌خاطر باگ در کد، بلکه چون دادهٔ درست اصلاً داخل خودِ فایل
-        // نیست. تنها موتوری که این فایل‌ها را درست می‌خواند، موتور
-        // داخلیِ خودِ مرورگر (PDFium در کروم/اج) است - و آن فقط از طریق
-        // بازکردنِ مستقیمِ خودِ فایل PDF فعال می‌شود، نه از طریق هیچ
-        // نمایشگر واسطه‌ای. پس اینجا مستقیم به خودِ فایل با #page=N
-        // اشاره می‌کنیم؛ پرش به خطِ دقیق از طریق لینک ممکن نیست (این
-        // قابلیتی است که هیچ مرورگری آن را از طریق URL در اختیار
-        // نمی‌گذارد) - کاربر با یک Ctrl+F دستی به کلمه می‌رسد.
-        const pageNumber = document.pageNumbers[paragraphIndex] || 1;
-        const absoluteBase = new URL(document.pdfFile, location.href).href;
-        return `${absoluteBase}#page=${pageNumber}`;
-      }
+      // Item جدید: قبلاً اینجا یک شاخهٔ جدا برای document.type === "pdf"
+      // بود که مستقیماً به فایل PDF با #page=N لینک می‌داد. چون PDFها
+      // دیگر وارد جست‌وجوی متنی نمی‌شوند (رجوع کنید به حذف pdfJobs)،
+      // آن شاخه دیگر هرگز اجرا نمی‌شد و حذف شده است.
 
       // Item جدید (مشکل طولانی‌بودن لینک در ایتا): در جست‌وجوی معمولی
       // (غیرریشه‌ای)، fragmentText معمولاً همان query است - نگه‌داشتنش
@@ -5451,13 +5573,22 @@
       // Item ز: جست‌وجوی مجاورتی روی حالت ریشه‌ای اولویت دارد - دقیقاً
       // مثل highlightMatches در in-page-search.js.
       const proximityWords = proximitySearchEnabled ? getProximityQueryWords(query) : [];
-      const wholeWordPattern = (!proximitySearchEnabled && !rootMode && cleanQuery) ?
+      // Item جدید: حالت‌های «همهٔ کلمات»/«هر کدام از کلمات» فقط وقتی
+      // فعال‌اند که نه مجاورتی و نه ریشه‌ای روشن باشد (همان اولویت
+      // قبلی، رجوع کنید به تعریف wordMatchMode بالای فایل).
+      const useAndMode = !proximitySearchEnabled && !rootMode && wordMatchMode === "and";
+      const useOrMode = !proximitySearchEnabled && !rootMode && wordMatchMode === "or";
+      const andOrWords = (useAndMode || useOrMode) ? getOrQueryWords(query) : [];
+      const wholeWordPattern = (!proximitySearchEnabled && !rootMode && !useAndMode && !useOrMode && cleanQuery) ?
         buildWholeWordPattern(cleanQuery) :
         null;
 
+      // Item جدید: کلمات حذفی (NOT) - مستقل از حالت تطبیق اصلی.
+      const excludeWords = getOrQueryWords(excludeWordsText);
+
       const hasQuery = proximitySearchEnabled ?
         proximityWords.length > 0 :
-        (rootMode ? queryStems.length > 0 : !!cleanQuery);
+        (rootMode ? queryStems.length > 0 : ((useAndMode || useOrMode) ? andOrWords.length > 0 : !!cleanQuery));
 
       selectedResultIndexes.clear();
       currentResultPointer = -1;
@@ -5467,6 +5598,7 @@
         currentQuery = "";
         currentRootMode = rootMode;
         currentProximityMode = false;
+        currentOrWords = [];
         currentPage = 1;
         rootBaseResults = [];
         activeDerivativeKeys.clear();
@@ -5487,6 +5619,7 @@
         currentQuery = query;
         currentRootMode = rootMode;
         currentProximityMode = proximitySearchEnabled;
+        currentOrWords = [];
         currentPage = 1;
         rootBaseResults = [];
         activeDerivativeKeys.clear();
@@ -5531,6 +5664,17 @@
 
           if (isFootnote ? !searchInFootnotes : !searchInMainText) {
             return;
+          }
+
+          // Item جدید: فیلتر «شامل این کلمات نباشد» (NOT) - مستقل از
+          // نوع تطبیق اصلی، هر پاراگرافی که یکی از کلمات حذفی را
+          // داشته باشد، کلاً از بررسی بعدی کنار گذاشته می‌شود.
+          if (excludeWords.length > 0) {
+            const cleanParagraphForExclusion = paragraph.replace(/\s+/g, " ").trim();
+
+            if (paragraphHasExcludedWord(cleanParagraphForExclusion, excludeWords)) {
+              return;
+            }
           }
 
           // Item جدید: برای نتایج PDF، شمارهٔ صفحه و شمارهٔ پاراگراف
@@ -5603,6 +5747,55 @@
                 )
               });
             }
+          } else if (useAndMode) {
+            // Item جدید: «همهٔ این کلمات» - همان موتور جست‌وجوی مجاورتی
+            // با فاصلهٔ عملاً نامحدود (رجوع کنید به تعریف wordMatchMode).
+            const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+            const span = findProximitySpan(cleanParagraph, andOrWords, UNLIMITED_PROXIMITY_DISTANCE);
+
+            if (span) {
+              const fragmentText =
+                getProximityFragmentText(paragraph, andOrWords, UNLIMITED_PROXIMITY_DISTANCE) ||
+                query.trim();
+              const occurrenceIndex = nextOccurrenceIndex(fragmentText);
+
+              allResults.push({
+                title: document.title,
+                paragraph: paragraph,
+                snippet: getProximitySentenceSnippet(paragraph, andOrWords, UNLIMITED_PROXIMITY_DISTANCE),
+                sortKey: normalize(fragmentText),
+                pdfPageNumber: pdfPageNumber,
+                pdfParagraphOnPage: pdfParagraphOnPage,
+                url: buildResultUrl(
+                  document, paragraphIndex, query, false,
+                  fragmentText, occurrenceIndex
+                )
+              });
+            }
+          } else if (useOrMode) {
+            // Item جدید: «هر کدام از این کلمات» - کافی است یکی از
+            // کلمات پیدا شود؛ از همان‌جا به بعد مثل یک جست‌وجوی
+            // تک‌کلمه‌ای معمولی رفتار می‌کند.
+            const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
+            const matchedWord = findFirstMatchingOrWord(cleanParagraph, andOrWords);
+
+            if (matchedWord) {
+              const fragmentText = getFragmentText(paragraph, matchedWord);
+              const occurrenceIndex = nextOccurrenceIndex(fragmentText);
+
+              allResults.push({
+                title: document.title,
+                paragraph: paragraph,
+                snippet: getSentenceSnippet(paragraph, matchedWord),
+                sortKey: normalize(fragmentText),
+                pdfPageNumber: pdfPageNumber,
+                pdfParagraphOnPage: pdfParagraphOnPage,
+                url: buildResultUrl(
+                  document, paragraphIndex, query, false,
+                  fragmentText, occurrenceIndex
+                )
+              });
+            }
           } else if (wholeWordPattern.test(normalize(paragraph))) {
             const fragmentText = getFragmentText(paragraph, query);
             const occurrenceIndex = nextOccurrenceIndex(fragmentText);
@@ -5628,6 +5821,7 @@
         currentQuery = query;
         currentRootMode = rootMode;
         currentProximityMode = proximitySearchEnabled;
+        currentOrWords = [];
         currentPage = 1;
         rootBaseResults = [];
         activeDerivativeKeys.clear();
@@ -5644,9 +5838,17 @@
       noResults.style.display = "none";
       currentQuery = query;
       currentRootMode = !proximitySearchEnabled && rootMode;
-      currentProximityMode = proximitySearchEnabled;
-      currentProximityWords = proximityWords;
-      currentProximityDistance = proximityDistance;
+      // Item جدید: حالت AND از موتور مجاورتی با فاصلهٔ نامحدود استفاده
+      // می‌کند - پس برای هایلایت/برش هم باید همان مسیر currentProximityMode
+      // را طی کند، با کلمات و فاصلهٔ درست.
+      currentProximityMode = proximitySearchEnabled || useAndMode;
+      currentProximityWords = proximitySearchEnabled ?
+        proximityWords :
+        (useAndMode ? andOrWords : []);
+      currentProximityDistance = proximitySearchEnabled ?
+        proximityDistance :
+        UNLIMITED_PROXIMITY_DISTANCE;
+      currentOrWords = useOrMode ? andOrWords : [];
       currentPage = 1;
       activeDerivativeKeys.clear();
 
@@ -6084,7 +6286,11 @@
     // نمی‌شود؛ هر بار که صفحه باز می‌شود، از نو با «همه» شروع می‌کند.
     // انتخاب/لغوانتخاب کاربر همچنان در همان بازدید (تا وقتی صفحه باز
     // است) به یاد می‌ماند، فقط با رفرش صفحه ریست می‌شود.
+    // Item جدید: فایل‌های PDF از این بلوک (دامنهٔ جست‌وجو در کتاب‌ها،
+    // در تب جست‌وجوی اصلی سایت) حذف شده‌اند - جست‌وجوی متنی دیگر روی
+    // PDFها انجام نمی‌شود (رجوع کنید به حذف pdfJobs در loadTextDocuments).
     const bookScopeEntries = searchableItems
+      .filter(item => item.dataset.pdf !== "true")
       .map(item => ({
         key: item.dataset.url,
         title: item.dataset.title ||
