@@ -12,7 +12,6 @@ const WORKER_URL = "https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev";
 
 let EMBEDDINGS = null; // کل داده‌های embeddings.json بعد از بارگذاری اینجا نگه داشته می‌شه
 
-<<<<<<< HEAD
 const DB_NAME = "milani-ai-cache";
 const STORE_NAME = "embeddings";
 const CACHE_KEY = "embeddings-data";
@@ -53,8 +52,6 @@ async function setCachedEmbeddings(record) {
   }
 }
 
-=======
->>>>>>> bd0018a2abb34e9a29bed33ed797562c48d4b35d
 // ---------- تبدیل رشتهٔ base64 به بردار عددی (Float32Array) ----------
 // چون build-embeddings.js بردارها رو فشرده (base64) ذخیره می‌کنه تا حجم فایل کم بشه،
 // اینجا باید دوباره به آرایهٔ عددی قابل‌استفاده تبدیلشون کنیم.
@@ -67,14 +64,10 @@ function base64ToVector(b64) {
   return new Float32Array(bytes.buffer);
 }
 
-<<<<<<< HEAD
 // ---------- بارگذاری embeddings.json با کش محلی ----------
 // اول یک درخواست سبک HEAD می‌زنیم تا ببینیم فایل از آخرین بار عوض شده یا نه.
 // اگه عوض نشده، از نسخهٔ ذخیره‌شده در مرورگر (IndexedDB) استفاده می‌کنیم؛
 // دیگه نه دانلود کامل لازمه، نه دوباره‌کدگذاری بردارها.
-=======
-// ---------- بارگذاری اولیهٔ فایل embeddings.json ----------
->>>>>>> bd0018a2abb34e9a29bed33ed797562c48d4b35d
 async function loadEmbeddings() {
   if (EMBEDDINGS) return EMBEDDINGS;
 
@@ -94,7 +87,6 @@ async function loadEmbeddings() {
 
   const res = await fetch("embeddings.json");
   const raw = await res.json();
-<<<<<<< HEAD
   const decoded = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
 
   EMBEDDINGS = decoded;
@@ -104,10 +96,6 @@ async function loadEmbeddings() {
     setCachedEmbeddings({ version, data: decoded }); // برای دفعات بعد ذخیره کن
   }
 
-=======
-  // بردار هر بخش رو یک‌بار (نه هر بار جست‌وجو) از base64 به عدد تبدیل می‌کنیم
-  EMBEDDINGS = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
->>>>>>> bd0018a2abb34e9a29bed33ed797562c48d4b35d
   return EMBEDDINGS;
 }
 
@@ -196,11 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 `<a class="ai-search-result" href="${encodeURI(r.source)}" target="_blank" rel="noopener">
                   <strong>${r.book}</strong>
                   <p>${r.text}</p>
-<<<<<<< HEAD
                   <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
-=======
-                  <small>میزان شباهت: ${(r.score * 100).toFixed(1)}٪ — برای باز کردن کتاب کلیک کنید</small>
->>>>>>> bd0018a2abb34e9a29bed33ed797562c48d4b35d
                 </a>`
             )
             .join("");
@@ -231,11 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
         aiChatOutput.innerHTML = `
           <div class="ai-chat-answer">${answer}</div>
           <div class="ai-chat-sources">
-<<<<<<< HEAD
             مآخذ: ${sourceLinks}
-=======
-            منابع: ${sourceLinks}
->>>>>>> bd0018a2abb34e9a29bed33ed797562c48d4b35d
           </div>
         `;
       } catch (err) {
