@@ -12,11 +12,25 @@ const WORKER_URL = "https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev";
 
 let EMBEDDINGS = null; // کل داده‌های embeddings.json بعد از بارگذاری اینجا نگه داشته می‌شه
 
+// ---------- تبدیل رشتهٔ base64 به بردار عددی (Float32Array) ----------
+// چون build-embeddings.js بردارها رو فشرده (base64) ذخیره می‌کنه تا حجم فایل کم بشه،
+// اینجا باید دوباره به آرایهٔ عددی قابل‌استفاده تبدیلشون کنیم.
+function base64ToVector(b64) {
+  const binaryString = atob(b64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new Float32Array(bytes.buffer);
+}
+
 // ---------- بارگذاری اولیهٔ فایل embeddings.json ----------
 async function loadEmbeddings() {
   if (EMBEDDINGS) return EMBEDDINGS;
   const res = await fetch("embeddings.json");
-  EMBEDDINGS = await res.json();
+  const raw = await res.json();
+  // بردار هر بخش رو یک‌بار (نه هر بار جست‌وجو) از base64 به عدد تبدیل می‌کنیم
+  EMBEDDINGS = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
   return EMBEDDINGS;
 }
 
