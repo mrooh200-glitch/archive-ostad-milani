@@ -717,7 +717,8 @@
     "Osoul-al-Maaref-al-Elahiyya.htm": "اصول المعارف الالهیة",
     "al-Elan-an-Asrar-al-Falsafa-wal-Erfan.htm":
       "الإعلان عن اسرار الفلسفة والعرفان",
-    "marefatollah-mohashsha.htm": "متن درس معرفة الله (محشّی)"
+    "marefatollah-mohashsha.htm": "متن درس معرفة الله (محشّی)",
+    "Bab-ol-Hadi-Ashar.html": "الباب الحادی عشر"
   };
 
   function getPageTitle() {
