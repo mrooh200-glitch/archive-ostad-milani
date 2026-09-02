@@ -1,5 +1,7 @@
 name: Build embeddings & Deploy Worker
 
+permissions:
+  contents: write 
 on:
   workflow_dispatch: # اجرای دستی از تب Actions در گیت‌هاب
   push:
