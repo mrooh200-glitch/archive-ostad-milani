@@ -75,31 +75,34 @@ async function askQuestion(question) {
   return { answer, sources: relevant };
 }
 
-// ---------- نمونهٔ اتصال به رابط کاربری (باید متناسب با HTML واقعی سایتت تنظیم بشه) ----------
-// این بخش رو با ساختار HTML موجود سایتت هماهنگ کن.
-// فرض شده سه عنصر با این id ها وجود دارن: searchInput, searchResults, و برای چت: chatInput, chatOutput
+// ---------- اتصال به رابط کاربری واقعی سایت (تب «دستیار هوشمند») ----------
+// این id ها عمداً با پیشوند ai نگه داشته شدن تا با سیستم جست‌وجوی کلمه‌ای
+// موجود سایت (که از id های searchInput/searchResults استفاده می‌کنه) تداخل نداشته باشن.
 
 document.addEventListener("DOMContentLoaded", () => {
-  const searchInput = document.getElementById("searchInput");
-  const searchResults = document.getElementById("searchResults");
+  const aiSearchInput = document.getElementById("aiSearchInput");
+  const aiSearchResults = document.getElementById("aiSearchResults");
+  const aiSearchStatus = document.getElementById("aiSearchStatus");
 
-  if (searchInput && searchResults) {
+  if (aiSearchInput && aiSearchResults) {
     let debounceTimer;
-    searchInput.addEventListener("input", () => {
+    aiSearchInput.addEventListener("input", () => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(async () => {
-        const query = searchInput.value.trim();
+        const query = aiSearchInput.value.trim();
         if (!query) {
-          searchResults.innerHTML = "";
+          aiSearchResults.innerHTML = "";
+          if (aiSearchStatus) aiSearchStatus.textContent = "";
           return;
         }
-        searchResults.innerHTML = "در حال جست‌وجو...";
+        if (aiSearchStatus) aiSearchStatus.textContent = "در حال جست‌وجو...";
         try {
           const results = await semanticSearch(query);
-          searchResults.innerHTML = results
+          if (aiSearchStatus) aiSearchStatus.textContent = "";
+          aiSearchResults.innerHTML = results
             .map(
               (r) =>
-                `<div class="search-result">
+                `<div class="ai-search-result">
                   <strong>${r.book}</strong>
                   <p>${r.text}</p>
                   <small>میزان شباهت: ${(r.score * 100).toFixed(1)}٪</small>
@@ -107,34 +110,34 @@ document.addEventListener("DOMContentLoaded", () => {
             )
             .join("");
         } catch (err) {
-          searchResults.innerHTML = "خطا در جست‌وجو. لطفاً دوباره امتحان کنید.";
+          if (aiSearchStatus) aiSearchStatus.textContent = "خطا در جست‌وجو. لطفاً دوباره امتحان کنید.";
           console.error(err);
         }
       }, 400); // debounce: صبر کن کاربر تایپش تموم بشه
     });
   }
 
-  const chatForm = document.getElementById("chatForm");
-  const chatInput = document.getElementById("chatInput");
-  const chatOutput = document.getElementById("chatOutput");
+  const aiChatForm = document.getElementById("aiChatForm");
+  const aiChatInput = document.getElementById("aiChatInput");
+  const aiChatOutput = document.getElementById("aiChatOutput");
 
-  if (chatForm && chatInput && chatOutput) {
-    chatForm.addEventListener("submit", async (e) => {
+  if (aiChatForm && aiChatInput && aiChatOutput) {
+    aiChatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const question = chatInput.value.trim();
+      const question = aiChatInput.value.trim();
       if (!question) return;
 
-      chatOutput.innerHTML = "در حال فکر کردن...";
+      aiChatOutput.innerHTML = "در حال فکر کردن...";
       try {
         const { answer, sources } = await askQuestion(question);
-        chatOutput.innerHTML = `
-          <div class="chat-answer">${answer}</div>
-          <div class="chat-sources">
-            <small>منابع: ${sources.map((s) => s.book).join("، ")}</small>
+        aiChatOutput.innerHTML = `
+          <div class="ai-chat-answer">${answer}</div>
+          <div class="ai-chat-sources">
+            منابع: ${sources.map((s) => s.book).join("، ")}
           </div>
         `;
       } catch (err) {
-        chatOutput.innerHTML = "خطا در دریافت پاسخ. لطفاً دوباره امتحان کنید.";
+        aiChatOutput.innerHTML = "خطا در دریافت پاسخ. لطفاً دوباره امتحان کنید.";
         console.error(err);
       }
     });

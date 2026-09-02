@@ -910,6 +910,118 @@
       display: block;
     }
 
+    /* بخش جدید: دستیار هوشمند (جست‌وجوی معنایی + گفت‌وگو) */
+    .ai-panel-inner {
+      display: grid;
+      gap: 28px;
+    }
+
+    .ai-section {
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 14px;
+      padding: 18px 20px 22px;
+    }
+
+    .ai-section-title {
+      margin: 0 0 6px;
+      color: #173b63;
+      font-size: 1.15rem;
+    }
+
+    .ai-section-desc {
+      margin: 0 0 14px;
+      color: #64748b;
+      font-size: 0.88rem;
+    }
+
+    .ai-search-box-wrap {
+      max-width: 100%;
+      flex: none;
+    }
+
+    .ai-status {
+      margin: 10px 0 0;
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+
+    .ai-search-results {
+      margin-top: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .ai-search-result {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #f8fafc;
+    }
+
+    .ai-search-result strong {
+      display: block;
+      color: #1d4ed8;
+      font-size: 0.92rem;
+      margin-bottom: 4px;
+    }
+
+    .ai-search-result p {
+      margin: 0 0 6px;
+      font-size: 0.92rem;
+      line-height: 1.85;
+    }
+
+    .ai-search-result small {
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    .ai-chat-form {
+      display: flex;
+      gap: 10px;
+    }
+
+    .ai-chat-form .search-box {
+      flex: 1;
+    }
+
+    .ai-chat-submit {
+      padding: 0 20px;
+      border: none;
+      border-radius: 10px;
+      background: #1d4ed8;
+      color: #fff;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .ai-chat-submit:hover {
+      background: #1e40af;
+    }
+
+    .ai-chat-output {
+      margin-top: 16px;
+    }
+
+    .ai-chat-answer {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+      line-height: 2;
+      font-size: 0.95rem;
+    }
+
+    .ai-chat-sources {
+      margin-top: 8px;
+      color: #94a3b8;
+      font-size: 0.78rem;
+    }
+
     .tree {
       background: #fff;
       border: 1px solid #dbe3ee;
@@ -1489,6 +1601,16 @@
         aria-controls="searchPanel">
         جست‌وجو
       </button>
+
+      <button
+        id="aiTabButton"
+        class="tab-button"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="aiPanel">
+        دستیار هوشمند
+      </button>
     </nav>
 
     <div id="browsePanel" class="tab-panel active-panel">
@@ -1785,6 +1907,52 @@
       </div>
     </div>
 
+    <div id="aiPanel" class="tab-panel">
+      <div class="ai-panel-inner">
+        <section class="ai-section">
+          <h2 class="ai-section-title">جست‌وجوی معنایی</h2>
+          <p class="ai-section-desc">
+            به‌جای جست‌وجوی کلمه‌به‌کلمه، مفهوم مورد نظرت رو بنویس؛ نتایج بر اساس نزدیکی معنایی نمایش داده می‌شن.
+          </p>
+
+          <div class="search-box-wrap ai-search-box-wrap">
+            <input
+              id="aiSearchInput"
+              class="search-box"
+              type="search"
+              autocomplete="off"
+              placeholder="مثلاً: رابطهٔ عرفان و فلسفه"
+              aria-label="جست‌وجوی معنایی">
+          </div>
+
+          <p id="aiSearchStatus" class="ai-status" aria-live="polite"></p>
+
+          <div id="aiSearchResults" class="ai-search-results" aria-live="polite"></div>
+        </section>
+
+        <section class="ai-section">
+          <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
+          <p class="ai-section-desc">
+            سؤالت رو بپرس؛ پاسخ بر اساس متن کتاب‌های همین آرشیو ساخته می‌شه.
+          </p>
+
+          <form id="aiChatForm" class="ai-chat-form">
+            <input
+              id="aiChatInput"
+              class="search-box"
+              type="text"
+              autocomplete="off"
+              placeholder="سؤال خودت رو بنویس…"
+              aria-label="پرسش از دستیار هوشمند">
+
+            <button type="submit" class="ai-chat-submit">پرسیدن</button>
+          </form>
+
+          <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
+        </section>
+      </div>
+    </div>
+
     <div id="archiveOverlay" class="archive-overlay">
       <div id="archivePanel" role="dialog" aria-label="آرشیو نتایج"></div>
     </div>
@@ -2056,23 +2224,36 @@
       compareReadCloseButton.addEventListener("click", closeCompareReadView);
     }
 
+    const aiTabButton = document.getElementById("aiTabButton");
+    const aiPanel = document.getElementById("aiPanel");
+
     function activateTab(tabName) {
-      const showSearch = tabName === "search";
+      const tabs = [
+        { name: "browse", button: browseTabButton, panel: browsePanel },
+        { name: "search", button: searchTabButton, panel: searchPanel },
+        { name: "ai", button: aiTabButton, panel: aiPanel }
+      ];
 
-      browseTabButton.classList.toggle("active-tab", !showSearch);
-      searchTabButton.classList.toggle("active-tab", showSearch);
-      browseTabButton.setAttribute("aria-selected", String(!showSearch));
-      searchTabButton.setAttribute("aria-selected", String(showSearch));
-      browsePanel.classList.toggle("active-panel", !showSearch);
-      searchPanel.classList.toggle("active-panel", showSearch);
+      tabs.forEach(tab => {
+        const isActive = tab.name === tabName;
+        tab.button.classList.toggle("active-tab", isActive);
+        tab.button.setAttribute("aria-selected", String(isActive));
+        tab.panel.classList.toggle("active-panel", isActive);
+      });
 
-      if (showSearch) {
+      if (tabName === "search") {
         searchInput.focus();
+      } else if (tabName === "ai") {
+        const aiSearchInputEl = document.getElementById("aiSearchInput");
+        if (aiSearchInputEl) aiSearchInputEl.focus();
       }
     }
 
     browseTabButton.addEventListener("click", () => activateTab("browse"));
     searchTabButton.addEventListener("click", () => activateTab("search"));
+    if (aiTabButton) {
+      aiTabButton.addEventListener("click", () => activateTab("ai"));
+    }
 
     // ---- Item جدید: حالت شب --------------------------------------------
     const DARK_MODE_KEY = "milaniDarkMode";
@@ -6027,5 +6208,7 @@
 
     loadTextDocuments();
   </script>
+
+  <script src="search-widget.js"></script>
 </body>
 </html>
