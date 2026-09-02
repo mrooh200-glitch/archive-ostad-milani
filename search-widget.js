@@ -8,7 +8,7 @@
  * آدرس چیزی شبیه این می‌شه: https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev
  */
 
-const WORKER_URL = "https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev";
+const WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
 
 let EMBEDDINGS = null; // کل داده‌های embeddings.json بعد از بارگذاری اینجا نگه داشته می‌شه
 
