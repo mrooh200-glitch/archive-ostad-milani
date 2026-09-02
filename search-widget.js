@@ -12,6 +12,46 @@ const WORKER_URL = "https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev";
 
 let EMBEDDINGS = null; // کل داده‌های embeddings.json بعد از بارگذاری اینجا نگه داشته می‌شه
 
+const DB_NAME = "milani-ai-cache";
+const STORE_NAME = "embeddings";
+const CACHE_KEY = "embeddings-data";
+
+// ---------- باز کردن (یا ساخت) پایگاه‌دادهٔ محلی مرورگر ----------
+function openCacheDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(STORE_NAME);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getCachedEmbeddings() {
+  try {
+    const db = await openCacheDB();
+    return await new Promise((resolve) => {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const req = tx.objectStore(STORE_NAME).get(CACHE_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null; // اگه IndexedDB در دسترس نبود، بی‌خیال کش می‌شیم، مشکلی نیست
+  }
+}
+
+async function setCachedEmbeddings(record) {
+  try {
+    const db = await openCacheDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).put(record, CACHE_KEY);
+  } catch {
+    // ذخیره‌نشدن کش خطای مهمی نیست، جست‌وجو همچنان کار می‌کنه
+  }
+}
+
 // ---------- تبدیل رشتهٔ base64 به بردار عددی (Float32Array) ----------
 // چون build-embeddings.js بردارها رو فشرده (base64) ذخیره می‌کنه تا حجم فایل کم بشه،
 // اینجا باید دوباره به آرایهٔ عددی قابل‌استفاده تبدیلشون کنیم.
@@ -24,13 +64,38 @@ function base64ToVector(b64) {
   return new Float32Array(bytes.buffer);
 }
 
-// ---------- بارگذاری اولیهٔ فایل embeddings.json ----------
+// ---------- بارگذاری embeddings.json با کش محلی ----------
+// اول یک درخواست سبک HEAD می‌زنیم تا ببینیم فایل از آخرین بار عوض شده یا نه.
+// اگه عوض نشده، از نسخهٔ ذخیره‌شده در مرورگر (IndexedDB) استفاده می‌کنیم؛
+// دیگه نه دانلود کامل لازمه، نه دوباره‌کدگذاری بردارها.
 async function loadEmbeddings() {
   if (EMBEDDINGS) return EMBEDDINGS;
+
+  let currentVersion = null;
+  try {
+    const headRes = await fetch("embeddings.json", { method: "HEAD" });
+    currentVersion = headRes.headers.get("etag") || headRes.headers.get("last-modified");
+  } catch {
+    // اگه HEAD جواب نداد، می‌ریم سراغ دانلود کامل معمولی
+  }
+
+  const cached = await getCachedEmbeddings();
+  if (cached && currentVersion && cached.version === currentVersion) {
+    EMBEDDINGS = cached.data; // از کش استفاده کن، نیازی به دانلود نیست
+    return EMBEDDINGS;
+  }
+
   const res = await fetch("embeddings.json");
   const raw = await res.json();
-  // بردار هر بخش رو یک‌بار (نه هر بار جست‌وجو) از base64 به عدد تبدیل می‌کنیم
-  EMBEDDINGS = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
+  const decoded = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
+
+  EMBEDDINGS = decoded;
+
+  const version = currentVersion || res.headers.get("etag") || res.headers.get("last-modified");
+  if (version) {
+    setCachedEmbeddings({ version, data: decoded }); // برای دفعات بعد ذخیره کن
+  }
+
   return EMBEDDINGS;
 }
 
@@ -109,22 +174,22 @@ document.addEventListener("DOMContentLoaded", () => {
           if (aiSearchStatus) aiSearchStatus.textContent = "";
           return;
         }
-        if (aiSearchStatus) aiSearchStatus.textContent = "در حال جست‌وجو...";
+        if (aiSearchStatus) aiSearchStatus.textContent = "در حال جست‌وجو…";
         try {
           const results = await semanticSearch(query);
           if (aiSearchStatus) aiSearchStatus.textContent = "";
           aiSearchResults.innerHTML = results
             .map(
               (r) =>
-                `<div class="ai-search-result">
+                `<a class="ai-search-result" href="${encodeURI(r.source)}" target="_blank" rel="noopener">
                   <strong>${r.book}</strong>
                   <p>${r.text}</p>
-                  <small>میزان شباهت: ${(r.score * 100).toFixed(1)}٪</small>
-                </div>`
+                  <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
+                </a>`
             )
             .join("");
         } catch (err) {
-          if (aiSearchStatus) aiSearchStatus.textContent = "خطا در جست‌وجو. لطفاً دوباره امتحان کنید.";
+          if (aiSearchStatus) aiSearchStatus.textContent = "در جست‌وجو خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
           console.error(err);
         }
       }, 400); // debounce: صبر کن کاربر تایپش تموم بشه
@@ -141,17 +206,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const question = aiChatInput.value.trim();
       if (!question) return;
 
-      aiChatOutput.innerHTML = "در حال فکر کردن...";
+      aiChatOutput.innerHTML = "در حال بررسی و تنظیم پاسخ…";
       try {
         const { answer, sources } = await askQuestion(question);
+        const sourceLinks = sources
+          .map((s) => `<a href="${encodeURI(s.source)}" target="_blank" rel="noopener">${s.book}</a>`)
+          .join("، ");
         aiChatOutput.innerHTML = `
           <div class="ai-chat-answer">${answer}</div>
           <div class="ai-chat-sources">
-            منابع: ${sources.map((s) => s.book).join("، ")}
+            مآخذ: ${sourceLinks}
           </div>
         `;
       } catch (err) {
-        aiChatOutput.innerHTML = "خطا در دریافت پاسخ. لطفاً دوباره امتحان کنید.";
+        aiChatOutput.innerHTML = "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
         console.error(err);
       }
     });

@@ -1928,10 +1928,7 @@
     <div id="aiPanel" class="tab-panel">
       <div class="ai-panel-inner">
         <section class="ai-section">
-          <h2 class="ai-section-title">جست‌وجوی معنایی</h2>
-          <p class="ai-section-desc">
-            به‌جای جست‌وجوی کلمه‌به‌کلمه، مفهوم مورد نظرت رو بنویس؛ نتایج بر اساس نزدیکی معنایی نمایش داده می‌شن.
-          </p>
+          <h2 class="ai-section-title" title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">جست‌وجوی معنایی</h2>
 
           <div class="search-box-wrap ai-search-box-wrap">
             <input
@@ -1939,8 +1936,9 @@
               class="search-box"
               type="search"
               autocomplete="off"
-              placeholder="مثلاً: رابطهٔ عرفان و فلسفه"
-              aria-label="جست‌وجوی معنایی">
+              placeholder="برای نمونه: نسبت میان عرفان و فلسفه"
+              aria-label="جست‌وجوی معنایی"
+              title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">
           </div>
 
           <p id="aiSearchStatus" class="ai-status" aria-live="polite"></p>
@@ -1951,7 +1949,7 @@
         <section class="ai-section">
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
           <p class="ai-section-desc">
-            سؤالت رو بپرس؛ پاسخ بر اساس متن کتاب‌های همین آرشیو ساخته می‌شه.
+            پرسش پژوهشی خود را مطرح کنید؛ پاسخ منحصراً بر پایهٔ متون همین آرشیو تنظیم می‌شود.
           </p>
 
           <form id="aiChatForm" class="ai-chat-form">
@@ -1960,10 +1958,10 @@
               class="search-box"
               type="text"
               autocomplete="off"
-              placeholder="سؤال خودت رو بنویس…"
+              placeholder="پرسش خود را وارد کنید…"
               aria-label="پرسش از دستیار هوشمند">
 
-            <button type="submit" class="ai-chat-submit">پرسیدن</button>
+            <button type="submit" class="ai-chat-submit">ارسال پرسش</button>
           </form>
 
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>

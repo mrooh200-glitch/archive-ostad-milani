@@ -82,12 +82,12 @@ async function handleChat(request, env) {
     .map((c, i) => `[بخش ${i + 1}]\n${c}`)
     .join("\n\n");
 
-  const systemPrompt = `تو دستیار آرشیو دیجیتال متون استاد میلانی هستی. فقط بر اساس متن‌های زیر که از کتاب‌ها استخراج شده، به سؤال کاربر پاسخ بده. اگه پاسخ در این متن‌ها نبود، صادقانه بگو که در منابع موجود پاسخی پیدا نشد؛ چیزی رو از خودت اضافه نکن.
+  const systemPrompt = `شما دستیار پژوهشی آرشیو دیجیتال متون استاد میلانی هستید. پاسخ خود را صرفاً بر اساس متن‌های زیر که از کتاب‌ها استخراج شده، به‌صورت دقیق، رسمی و علمی ارائه دهید. در صورتی که پاسخ در این متن‌ها یافت نشد، صادقانه اعلام کنید که در منابع موجود پاسخی یافت نشد؛ از افزودن مطلبی که مستند به متن نیست خودداری کنید.
 
 متن‌های مرتبط:
 ${contextText}`;
 
-  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${env.GEMINI_API_KEY}`;
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
   const geminiRes = await fetch(geminiUrl, {
     method: "POST",
