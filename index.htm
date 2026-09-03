@@ -2336,13 +2336,51 @@
         return;
       }
 
-      grid.innerHTML = [...compareReadSelection].map(url => `
+      const urls = [...compareReadSelection];
+      const isPdfUrl = url => url.toLowerCase().endsWith(".pdf");
+
+      // Item جدید (رفع اشکال ۱): وقتی یک فایل PDF داخل iframe باز
+      // می‌شود، ویوئر داخلی PDF مرورگر به‌صورت پیش‌فرض ستون
+      // کوچک‌نماهای صفحات را هم باز می‌کند - که در نمای مطالعهٔ کنار
+      // هم (که خودش فضای محدودی دارد) اضافی و مزاحم است. "#navpanes=0"
+      // یک پارامتر استاندارد (طبق مشخصات قدیمی Adobe برای باز کردن
+      // PDF) است که ویوئرهای مبتنی بر آن را از باز کردن خودکار این
+      // ستون منصرف می‌کند. توجه: پشتیبانی این پارامتر در نسخه‌های
+      // مختلف مرورگر می‌تواند متفاوت باشد - اگر مرورگر آن را نادیده
+      // بگیرد، ستون طبق روال قبل باز می‌شود.
+      const withPdfViewerParams = url => isPdfUrl(url) ? `${url}#navpanes=0` : url;
+
+      grid.innerHTML = urls.map(url => `
           <div class="compare-read-pane">
-            <iframe src="${escapeHtml(url)}" loading="lazy"></iframe>
+            <iframe src="${escapeHtml(withPdfViewerParams(url))}" loading="lazy"></iframe>
           </div>
         `).join("");
 
       view.classList.add("is-open");
+
+      // Item جدید (رفع اشکال ۲): Ctrl+F مرورگر روی هر فریمی که در آن
+      // لحظه فوکوس دارد اثر می‌کند - اگر آن فریم یک PDF باشد، مرورگر
+      // آن را به جست‌وجوی داخلی خودِ ویوئر PDF می‌سپارد؛ در غیر این
+      // صورت (فوکوس هنوز جای دیگری، معمولاً روی HTML چون اول لود
+      // می‌شود) فقط متن HTML جست‌وجو می‌شود. اینجا اگر در میان
+      // فایل‌های انتخاب‌شده حداقل یک PDF باشد، فوکوس به‌طور خودکار
+      // روی اولین iframeِ PDF گذاشته می‌شود تا Ctrl+F پیش‌فرض روی PDF
+      // فعال شود، نه HTML.
+      const firstPdfIndex = urls.findIndex(isPdfUrl);
+
+      if (firstPdfIndex !== -1) {
+        const pdfIframe = grid.querySelectorAll(".compare-read-pane iframe")[firstPdfIndex];
+
+        if (pdfIframe) {
+          // یک تأخیر کوتاه تا مرورگر واقعاً iframe را در DOM جای‌گذاری
+          // کرده باشد؛ صرفاً focus فوری بلافاصله بعد از تغییر
+          // innerHTML در برخی موارد اثر نمی‌کند. رویداد load هم برای
+          // اطمینان اضافه شده - بعضی مرورگرها هنگام تمام‌شدن بارگذاری
+          // خودِ سند داخل iframe، فوکوس را دوباره از آن می‌گیرند.
+          setTimeout(() => pdfIframe.focus(), 0);
+          pdfIframe.addEventListener("load", () => pdfIframe.focus());
+        }
+      }
     }
 
     function closeCompareReadView() {
