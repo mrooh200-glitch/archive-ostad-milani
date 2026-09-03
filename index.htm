@@ -2350,9 +2350,15 @@
       // بگیرد، ستون طبق روال قبل باز می‌شود.
       const withPdfViewerParams = url => isPdfUrl(url) ? `${url}#navpanes=0` : url;
 
+      // Item جدید (تقویت رفع اشکال ۲): "loading=lazy" حذف شد - چون این
+      // نما یک دیالوگ صریح است که کاربر همین الان بازش کرده (نه یک
+      // لیست بلند که نیاز به lazy-load داشته باشد)، و مهم‌تر از آن:
+      // اگر لود واقعیِ iframe به‌خاطر lazy بودن به تأخیر بیفتد، تلاش‌
+      // های focus زیر (که به رویداد load گره خورده‌اند) هم بی‌اثر
+      // می‌مانند.
       grid.innerHTML = urls.map(url => `
           <div class="compare-read-pane">
-            <iframe src="${escapeHtml(withPdfViewerParams(url))}" loading="lazy"></iframe>
+            <iframe src="${escapeHtml(withPdfViewerParams(url))}"></iframe>
           </div>
         `).join("");
 
@@ -2361,24 +2367,34 @@
       // Item جدید (رفع اشکال ۲): Ctrl+F مرورگر روی هر فریمی که در آن
       // لحظه فوکوس دارد اثر می‌کند - اگر آن فریم یک PDF باشد، مرورگر
       // آن را به جست‌وجوی داخلی خودِ ویوئر PDF می‌سپارد؛ در غیر این
-      // صورت (فوکوس هنوز جای دیگری، معمولاً روی HTML چون اول لود
-      // می‌شود) فقط متن HTML جست‌وجو می‌شود. اینجا اگر در میان
-      // فایل‌های انتخاب‌شده حداقل یک PDF باشد، فوکوس به‌طور خودکار
-      // روی اولین iframeِ PDF گذاشته می‌شود تا Ctrl+F پیش‌فرض روی PDF
-      // فعال شود، نه HTML.
+      // صورت فقط متن HTML جست‌وجو می‌شود. اینجا اگر در میان فایل‌های
+      // انتخاب‌شده حداقل یک PDF باشد، فوکوس به‌طور خودکار روی اولین
+      // iframeِ PDF گذاشته می‌شود تا Ctrl+F پیش‌فرض روی PDF فعال شود،
+      // نه HTML.
+      // یک بار تلاش (بلافاصله/با رویداد load) کافی نبود: ویوئر داخلی
+      // PDF مرورگر (که خودش یک فرآیند/رابط جدا از صفحهٔ اصلی است) در
+      // زمان نامشخصی بعد از شروع لود واقعاً «آمادهٔ گرفتن فوکوس»
+      // می‌شود - گاهی زودتر و گاهی دیرتر از رویداد load خودِ iframe.
+      // برای همین به‌جای یک تلاش، چند بار در یک بازهٔ کوتاه (تا ۱.۵
+      // ثانیه) دوباره focus صدا زده می‌شود تا هرکدام که واقعاً اثر
+      // کند را پوشش بدهد.
       const firstPdfIndex = urls.findIndex(isPdfUrl);
 
       if (firstPdfIndex !== -1) {
         const pdfIframe = grid.querySelectorAll(".compare-read-pane iframe")[firstPdfIndex];
 
         if (pdfIframe) {
-          // یک تأخیر کوتاه تا مرورگر واقعاً iframe را در DOM جای‌گذاری
-          // کرده باشد؛ صرفاً focus فوری بلافاصله بعد از تغییر
-          // innerHTML در برخی موارد اثر نمی‌کند. رویداد load هم برای
-          // اطمینان اضافه شده - بعضی مرورگرها هنگام تمام‌شدن بارگذاری
-          // خودِ سند داخل iframe، فوکوس را دوباره از آن می‌گیرند.
-          setTimeout(() => pdfIframe.focus(), 0);
-          pdfIframe.addEventListener("load", () => pdfIframe.focus());
+          const tryFocusPdfIframe = () => {
+            if (view.classList.contains("is-open")) {
+              pdfIframe.focus();
+            }
+          };
+
+          [0, 150, 400, 800, 1500].forEach(delay => {
+            setTimeout(tryFocusPdfIframe, delay);
+          });
+
+          pdfIframe.addEventListener("load", tryFocusPdfIframe);
         }
       }
     }
