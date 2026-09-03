@@ -1392,6 +1392,22 @@
       display: block;
     }
 
+    /* Item جدید (رفع اشکال ۲، به‌شکل قطعی): تلاش‌های خودکار برای
+       گذاشتن فوکوس روی iframeِ PDF (تا Ctrl+F پیش‌فرض روی آن فعال
+       شود) قابل‌اعتماد نبودند - ویوئر PDF ظاهراً فوکوسِ برنامه‌نویسی‌
+       شده را برای این منظور نمی‌پذیرد، فقط کلیک واقعی کاربر. به‌جای
+       حدس‌زدن زمان‌بندی، یک بنر راهنمای کوچک بالای هر پنل PDF نشان
+       داده می‌شود که همیشه و قطعی جواب می‌دهد.*/
+    .compare-read-pdf-hint {
+      flex: 0 0 auto;
+      padding: 6px 10px;
+      background: #fef9c3;
+      color: #713f12;
+      font-size: 0.78rem;
+      text-align: center;
+      border-bottom: 1px solid #fde68a;
+    }
+
     /* Item جدید: قبلاً برچسب فرمت («HTML»/«PDF») جلوی هر عنوان تکرار
        می‌شد؛ حالا که فهرست دو ستونهٔ جدا برای HTML و PDF دارد (رجوع
        کنید به .book-columns)، همان تیتر بالای ستون این نقش را ایفا
@@ -2350,53 +2366,28 @@
       // بگیرد، ستون طبق روال قبل باز می‌شود.
       const withPdfViewerParams = url => isPdfUrl(url) ? `${url}#navpanes=0` : url;
 
-      // Item جدید (تقویت رفع اشکال ۲): "loading=lazy" حذف شد - چون این
-      // نما یک دیالوگ صریح است که کاربر همین الان بازش کرده (نه یک
-      // لیست بلند که نیاز به lazy-load داشته باشد)، و مهم‌تر از آن:
-      // اگر لود واقعیِ iframe به‌خاطر lazy بودن به تأخیر بیفتد، تلاش‌
-      // های focus زیر (که به رویداد load گره خورده‌اند) هم بی‌اثر
-      // می‌مانند.
-      grid.innerHTML = urls.map(url => `
+      // Item جدید (رفع اشکال ۲، به‌شکل قطعی): به‌جای فوکوس خودکار (که
+      // امتحان شد و قابل‌اعتماد نبود - رجوع کنید به تاریخچهٔ این
+      // تابع)، برای هر پنل PDF یک بنر راهنمای کوچک اضافه می‌شود که از
+      // کاربر می‌خواهد یک‌بار داخل PDF کلیک کند. چون این یک کلیک
+      // واقعی است (نه فوکوس برنامه‌نویسی‌شده)، مرورگر همیشه Ctrl+F را
+      // درست به همان PDF می‌سپارد.
+      grid.innerHTML = urls.map(url => {
+        const pdfHint = isPdfUrl(url) ?
+          `<div class="compare-read-pdf-hint">` +
+            `برای جست‌وجوی متن (Ctrl+F) در این فایل PDF، لطفاً اول یک‌بار داخل آن کلیک کنید.` +
+          `</div>` :
+          "";
+
+        return `
           <div class="compare-read-pane">
+            ${pdfHint}
             <iframe src="${escapeHtml(withPdfViewerParams(url))}"></iframe>
           </div>
-        `).join("");
+        `;
+      }).join("");
 
       view.classList.add("is-open");
-
-      // Item جدید (رفع اشکال ۲): Ctrl+F مرورگر روی هر فریمی که در آن
-      // لحظه فوکوس دارد اثر می‌کند - اگر آن فریم یک PDF باشد، مرورگر
-      // آن را به جست‌وجوی داخلی خودِ ویوئر PDF می‌سپارد؛ در غیر این
-      // صورت فقط متن HTML جست‌وجو می‌شود. اینجا اگر در میان فایل‌های
-      // انتخاب‌شده حداقل یک PDF باشد، فوکوس به‌طور خودکار روی اولین
-      // iframeِ PDF گذاشته می‌شود تا Ctrl+F پیش‌فرض روی PDF فعال شود،
-      // نه HTML.
-      // یک بار تلاش (بلافاصله/با رویداد load) کافی نبود: ویوئر داخلی
-      // PDF مرورگر (که خودش یک فرآیند/رابط جدا از صفحهٔ اصلی است) در
-      // زمان نامشخصی بعد از شروع لود واقعاً «آمادهٔ گرفتن فوکوس»
-      // می‌شود - گاهی زودتر و گاهی دیرتر از رویداد load خودِ iframe.
-      // برای همین به‌جای یک تلاش، چند بار در یک بازهٔ کوتاه (تا ۱.۵
-      // ثانیه) دوباره focus صدا زده می‌شود تا هرکدام که واقعاً اثر
-      // کند را پوشش بدهد.
-      const firstPdfIndex = urls.findIndex(isPdfUrl);
-
-      if (firstPdfIndex !== -1) {
-        const pdfIframe = grid.querySelectorAll(".compare-read-pane iframe")[firstPdfIndex];
-
-        if (pdfIframe) {
-          const tryFocusPdfIframe = () => {
-            if (view.classList.contains("is-open")) {
-              pdfIframe.focus();
-            }
-          };
-
-          [0, 150, 400, 800, 1500].forEach(delay => {
-            setTimeout(tryFocusPdfIframe, delay);
-          });
-
-          pdfIframe.addEventListener("load", tryFocusPdfIframe);
-        }
-      }
     }
 
     function closeCompareReadView() {
