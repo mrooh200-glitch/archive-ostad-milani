@@ -1,5 +1,4 @@
 name: Build embeddings & Deploy Worker
-
 permissions:
   contents: write 
 on:
@@ -11,41 +10,34 @@ on:
       - "**.html"
       - "scripts/build-embeddings.js"
       - "worker/**"
-
 jobs:
   build-embeddings:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-
       - name: Install dependencies
         run: npm install cheerio
-
       - name: Build embeddings.json
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/build-embeddings.js
-
       - name: Commit embeddings.json back to repo
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "chore: به‌روزرسانی خودکار embeddings.json"
-          file_pattern: embeddings.json
-
+          file_pattern: "embeddings.json embeddings-version.json"
   deploy-worker:
     needs: build-embeddings
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
       - name: Deploy Worker to Cloudflare
         uses: cloudflare/wrangler-action@v3
         with:
