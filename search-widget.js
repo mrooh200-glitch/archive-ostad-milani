@@ -11,6 +11,7 @@
 const WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
 
 let EMBEDDINGS = null; // کل داده‌های embeddings.json بعد از بارگذاری اینجا نگه داشته می‌شه
+let embeddingsLoadingPromise = null; // جلوگیری از دانلود همزمان/تکراری وقتی چند جست‌وجو هم‌پوشانی دارن
 
 const DB_NAME = "milani-ai-cache";
 const STORE_NAME = "embeddings";
@@ -64,39 +65,58 @@ function base64ToVector(b64) {
   return new Float32Array(bytes.buffer);
 }
 
+// ---------- گرفتن نسخهٔ فعلی از فایل کوچک نسخه ----------
+// به‌جای تکیه به هدرهای HTTP (etag/last-modified) که روی GitHub Pages همیشه
+// قابل‌اعتماد نیستن، یک فایل کوچک جدا به اسم embeddings-version.json داریم که
+// خودِ build-embeddings.js هر بار با هش واقعی محتوای جدید می‌سازه.
+async function getRemoteVersion() {
+  try {
+    const res = await fetch("embeddings-version.json", { cache: "no-store" });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.version || null;
+  } catch {
+    return null;
+  }
+}
+
 // ---------- بارگذاری embeddings.json با کش محلی ----------
-// اول یک درخواست سبک HEAD می‌زنیم تا ببینیم فایل از آخرین بار عوض شده یا نه.
-// اگه عوض نشده، از نسخهٔ ذخیره‌شده در مرورگر (IndexedDB) استفاده می‌کنیم؛
-// دیگه نه دانلود کامل لازمه، نه دوباره‌کدگذاری بردارها.
+// اول فایل کوچک نسخه رو می‌خونیم. اگه با نسخهٔ ذخیره‌شده در مرورگر (IndexedDB)
+// یکی بود، از همون کش استفاده می‌کنیم؛ دیگه نه دانلود کامل لازمه، نه
+// دوباره‌کدگذاری بردارها. علاوه بر این، اگه چند جست‌وجو هم‌زمان (یا با هم‌پوشانی)
+// این تابع رو صدا بزنن، همه به یک Promise در حال اجرا وصل می‌شن تا فایل
+// حجیم embeddings.json به‌جای یک‌بار، چندبار موازی دانلود نشه.
 async function loadEmbeddings() {
   if (EMBEDDINGS) return EMBEDDINGS;
+  if (embeddingsLoadingPromise) return embeddingsLoadingPromise;
 
-  let currentVersion = null;
-  try {
-    const headRes = await fetch("embeddings.json", { method: "HEAD" });
-    currentVersion = headRes.headers.get("etag") || headRes.headers.get("last-modified");
-  } catch {
-    // اگه HEAD جواب نداد، می‌ریم سراغ دانلود کامل معمولی
-  }
+  embeddingsLoadingPromise = (async () => {
+    const currentVersion = await getRemoteVersion();
 
-  const cached = await getCachedEmbeddings();
-  if (cached && currentVersion && cached.version === currentVersion) {
-    EMBEDDINGS = cached.data; // از کش استفاده کن، نیازی به دانلود نیست
+    const cached = await getCachedEmbeddings();
+    if (cached && currentVersion && cached.version === currentVersion) {
+      EMBEDDINGS = cached.data; // از کش استفاده کن، نیازی به دانلود نیست
+      return EMBEDDINGS;
+    }
+
+    const res = await fetch("embeddings.json");
+    const raw = await res.json();
+    const decoded = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
+
+    EMBEDDINGS = decoded;
+
+    if (currentVersion) {
+      setCachedEmbeddings({ version: currentVersion, data: decoded }); // برای دفعات بعد ذخیره کن
+    }
+
     return EMBEDDINGS;
+  })();
+
+  try {
+    return await embeddingsLoadingPromise;
+  } finally {
+    embeddingsLoadingPromise = null; // اگه خطا داد، دفعهٔ بعد اجازهٔ تلاش دوباره بده
   }
-
-  const res = await fetch("embeddings.json");
-  const raw = await res.json();
-  const decoded = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
-
-  EMBEDDINGS = decoded;
-
-  const version = currentVersion || res.headers.get("etag") || res.headers.get("last-modified");
-  if (version) {
-    setCachedEmbeddings({ version, data: decoded }); // برای دفعات بعد ذخیره کن
-  }
-
-  return EMBEDDINGS;
 }
 
 // ---------- محاسبهٔ شباهت کسینوسی بین دو بردار ----------
@@ -165,8 +185,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (aiSearchInput && aiSearchResults) {
     let debounceTimer;
+    let searchToken = 0; // شمارندهٔ نسل: هر بار تایپ، شماره‌ای جدید می‌گیره
+
     aiSearchInput.addEventListener("input", () => {
       clearTimeout(debounceTimer);
+      const myToken = ++searchToken; // این تلاش، صاحب همین شماره‌ست
+
       debounceTimer = setTimeout(async () => {
         const query = aiSearchInput.value.trim();
         if (!query) {
@@ -177,6 +201,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (aiSearchStatus) aiSearchStatus.textContent = "در حال جست‌وجو…";
         try {
           const results = await semanticSearch(query);
+          // اگه در این فاصله کاربر متن رو پاک کرده یا چیز دیگه‌ای تایپ کرده،
+          // این جواب دیگه منسوخ شده و نباید روی وضعیت فعلی بشینه.
+          if (myToken !== searchToken) return;
           if (aiSearchStatus) aiSearchStatus.textContent = "";
           aiSearchResults.innerHTML = results
             .map(
@@ -189,6 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
             )
             .join("");
         } catch (err) {
+          if (myToken !== searchToken) return;
           if (aiSearchStatus) aiSearchStatus.textContent = "در جست‌وجو خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
           console.error(err);
         }
@@ -201,14 +229,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiChatOutput = document.getElementById("aiChatOutput");
 
   if (aiChatForm && aiChatInput && aiChatOutput) {
+    let chatToken = 0; // همون منطق نسل، برای پرسش‌های پشت‌سرهم در تب گفت‌وگو
+
     aiChatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const question = aiChatInput.value.trim();
       if (!question) return;
 
+      const myToken = ++chatToken;
       aiChatOutput.innerHTML = "در حال بررسی و تنظیم پاسخ…";
       try {
         const { answer, sources } = await askQuestion(question);
+        if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
         const sourceLinks = sources
           .map((s) => `<a href="${encodeURI(s.source)}" target="_blank" rel="noopener">${s.book}</a>`)
           .join("، ");
@@ -219,6 +251,7 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         `;
       } catch (err) {
+        if (myToken !== chatToken) return;
         aiChatOutput.innerHTML = "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
         console.error(err);
       }
