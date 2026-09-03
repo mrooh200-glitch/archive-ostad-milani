@@ -23,6 +23,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const cheerio = require("cheerio");
 
 const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -35,6 +36,9 @@ if (!ACCOUNT_ID || !API_TOKEN) {
 
 const REPO_ROOT = path.join(__dirname, ".."); // فرض: این اسکریپت در scripts/ داخل ریشهٔ مخزن قرار داره
 const OUTPUT_FILE = path.join(REPO_ROOT, "embeddings.json");
+// فایل کوچک نسخه که سمت مرورگر (search-widget.js) برای تشخیص «آیا embeddings.json
+// عوض شده یا نه» می‌خونه، به‌جای تکیه به هدرهای HTTP نامطمئن GitHub Pages.
+const VERSION_FILE = path.join(REPO_ROOT, "embeddings-version.json");
 
 // حداقل و حداکثر طول هر تکه متن (بر حسب کاراکتر، نه توکن -- تقریبی)
 const MIN_CHUNK_LENGTH = 100;
@@ -229,8 +233,16 @@ async function main() {
     }
   }
 
-  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(results));
-  console.log(`تمام شد! ${results.length} بردار در ${OUTPUT_FILE} ذخیره شد.`);
+  const resultsJson = JSON.stringify(results);
+  fs.writeFileSync(OUTPUT_FILE, resultsJson);
+
+  // نسخه = هش محتوای واقعی. یعنی اگه حتی یک کلمه از یک تکه عوض بشه،
+  // نسخه هم عوض می‌شه و مرورگرها کش قدیمی‌شون رو باطل می‌کنن؛ اگه هیچی
+  // عوض نشده باشه، نسخه هم یکی می‌مونه و کاربرها دوباره دانلود نمی‌کنن.
+  const versionHash = crypto.createHash("sha256").update(resultsJson).digest("hex").slice(0, 16);
+  fs.writeFileSync(VERSION_FILE, JSON.stringify({ version: versionHash, builtAt: new Date().toISOString() }));
+
+  console.log(`تمام شد! ${results.length} بردار در ${OUTPUT_FILE} ذخیره شد. نسخه: ${versionHash}`);
 }
 
 main().catch((err) => {
