@@ -2,6 +2,13 @@ name = "milani-archive-ai"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
 
+# کش مشترک بین کاربران برای عبارت‌های جست‌وجوی تکراری (KV namespace).
+# این خط باعث می‌شه بایندینگ حتی بعد از هر بار wrangler deploy (از طریق
+# GitHub Action) هم باقی بمونه و پاک نشه.
+kv_namespaces = [
+  { binding = "EMBEDDING_CACHE", id = "5f532c24edbc40d6823cf9ab4768c966" }
+]
+
 # اتصال به Workers AI (برای مدل BGE-M3) -- نیازی به کلید نداره
 [ai]
 binding = "AI"
