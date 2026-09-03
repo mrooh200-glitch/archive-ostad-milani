@@ -26,6 +26,11 @@
   let selectionTagPopoverElement = null;
   const selectedMatchIndexes = new Set();
   const activeDerivativeKeys = new Set();
+  // Item جدید (رفع اشکال: عدم تطابق عنوان مشتق انتخابی با کادر
+  // جست‌وجو): عبارت دقیقی که کاربر جست‌وجو کرده، مستقل از این‌که بعداً
+  // با انتخاب یک مشتق، متن کادر جست‌وجو موقتاً چه چیز دیگری نشان
+  // می‌دهد - هم‌ارز currentQuery در index.htm.
+  let lastSearchedQuery = "";
 
   // Item ط: bookmarks (free-form tags), on either a live text
   // selection anywhere on the page or a batch of selected search
@@ -86,6 +91,27 @@
   let searchInAyat = true;
   let searchInHadith = true;
   let searchInNormalText = true;
+
+  // ---- Item جدید (هماهنگی با کادر جست‌وجوی سایت): نوع تطبیق کلمات
+  // (عبارت دقیق / همهٔ کلمات / هر کدام از کلمات) + حذف نتایج شامل
+  // کلمات ناخواسته - هم‌ارز wordMatchMode/excludeWordsText در index.htm.
+  // این‌ها فقط وقتی اثر دارند که نه جست‌وجوی مجاورتی و نه حالت ریشه‌ای
+  // روشن باشد (همان اولویت‌بندی قبلی: مجاورتی > ریشه‌ای > این‌جا؛
+  // رجوع کنید به highlightMatches).
+  // - "phrase": همان رفتار پیش‌فرض قبلی - کلمات باید عیناً پشت سر هم
+  //   بیایند (highlightLiteralMatches).
+  // - "and": همهٔ کلمات باید در همان گرهٔ متنی باشند، بدون محدودیت
+  //   ترتیب/فاصله - برای این حالت از همان موتور جست‌وجوی مجاورتی
+  //   (highlightProximityMatches) با فاصلهٔ عملاً نامحدود استفاده
+  //   می‌شود، دقیقاً مثل index.htm.
+  // - "or": کافی است یکی از کلمات باشد (highlightAnyWordMatches).
+  let wordMatchMode = "phrase";
+  const UNLIMITED_PROXIMITY_DISTANCE = 1e6;
+
+  // کلماتی که کاربر می‌خواهد در نتایج نباشند - مستقل از wordMatchMode و
+  // مستقل از حالت ریشه‌ای/مجاورتی، همیشه به‌عنوان یک فیلتر نهایی روی
+  // نتایج اعمال می‌شود (رجوع کنید به containerHasExcludedWord).
+  let excludeWordsText = "";
 
   // ---- Item جدید: تنظیمات مطالعه (حالت شب + اندازهٔ متن) ---------------
   // با یک کلید مشترک در localStorage ذخیره می‌شوند تا ترجیح کاربر بین
@@ -1474,6 +1500,37 @@
         font: inherit;
       }
 
+      /* Item جدید (هماهنگی با کادر جست‌وجوی سایت): ردیف کادر متنیِ
+         «شامل این کلمات نباشد» (NOT) در منوی تنظیمات - برخلاف
+         چک‌باکس/رادیوهای دیگر، این یکی یک کادر متنی تمام‌عرض جدا از
+         خودش لازم دارد. */
+      .in-page-settings-exclude-row {
+        padding: 6px 9px;
+      }
+
+      .in-page-settings-exclude-row .in-page-settings-field-label {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 0.82rem;
+        color: #1f2937;
+      }
+
+      .in-page-settings-exclude-input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 6px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 7px;
+        font: inherit;
+        font-size: 0.82rem;
+      }
+
+      .in-page-settings-exclude-input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      }
+
       mark.in-page-search-match {
         padding: 1px 2px;
         border-radius: 2px;
@@ -2486,18 +2543,130 @@
     return createdMatches;
   }
 
+  // ---- Item جدید (هماهنگی با کادر جست‌وجوی سایت): «هر کدام از این
+  // کلمات» (OR) ----------------------------------------------------
+  // برخلاف حالت AND/مجاورتی که باید همهٔ کلمات را پیدا کند، اینجا همین
+  // که یکی از کلمات پیدا شود کافی است. برخلاف نسخهٔ سایت (که اولین
+  // کلمه‌ی فهرست را که جایی در پاراگراف پیدا شود برمی‌گرداند)، اینجا -
+  // هم‌راستا با رفتار literal/stem همین فایل که همیشه اولین رخداد در
+  // همان گرهٔ متنی را هایلایت می‌کنند - اولین رخداد از نظر موقعیت
+  // (هرکدام از کلمات که زودتر در متن بیاید) انتخاب می‌شود.
+  function buildAnyWordPattern(words) {
+    const cleanWords = words.map(w => w.trim()).filter(Boolean);
+
+    if (cleanWords.length === 0) {
+      return "";
+    }
+
+    const alternation = cleanWords
+      .map(word => word.split("").map(ch => charClassFor(ch) + DIACRITIC_GAP).join(""))
+      .join("|");
+
+    return (
+      `(?<![${WORD_BOUNDARY_CHARS}])(?:${alternation})(?![${WORD_BOUNDARY_CHARS}])`
+    );
+  }
+
+  function highlightAnyWordMatches(query) {
+    const words = query.trim().split(/\s+/).filter(Boolean);
+    const patternSource = buildAnyWordPattern(words);
+
+    if (!patternSource) {
+      return [];
+    }
+
+    const createdMatches = [];
+
+    getSearchableTextNodes().forEach(node => {
+      const originalText = node.nodeValue;
+      const pattern = new RegExp(patternSource, "gi");
+      const match = pattern.exec(originalText);
+
+      if (!match) {
+        return;
+      }
+
+      const ranges = [{ start: match.index, end: match.index + match[0].length }];
+      createdMatches.push(...wrapRanges(node, ranges));
+    });
+
+    return createdMatches;
+  }
+
+  // ---- Item جدید (هماهنگی با کادر جست‌وجوی سایت): «شامل این کلمات
+  // نباشد» (NOT) -----------------------------------------------------
+  // فیلتر نهایی و مستقل از نوع تطبیق اصلی - هر پاراگراف/بلوکِ
+  // دربرگیرندهٔ یک تطبیق (با همان getSnippetContainer که برای
+  // اسنیپت‌ها هم استفاده می‌شود) که یکی از این کلمات را داشته باشد،
+  // از نتایج کنار گذاشته می‌شود. چون هایلایت (wrap در <mark>) پیش از
+  // این فیلتر انجام شده، مواردی که کنار گذاشته می‌شوند باید به متن
+  // ساده برگردند (unwrap) تا اثری در صفحه نگذارند.
+  function containerHasExcludedWord(mark, excludeWords) {
+    const container = getSnippetContainer(mark);
+
+    if (!container) {
+      return false;
+    }
+
+    const text = container.textContent || "";
+
+    return excludeWords.some(word => {
+      const patternSource = buildQueryPattern(word);
+      return patternSource ? new RegExp(patternSource, "i").test(text) : false;
+    });
+  }
+
+  function unwrapMatch(mark) {
+    const parent = mark.parentNode;
+
+    if (!parent) {
+      return;
+    }
+
+    parent.replaceChild(document.createTextNode(mark.textContent), mark);
+    parent.normalize();
+  }
+
+  function filterOutExcludedMatches(createdMatches) {
+    const excludeWords = excludeWordsText.trim().split(/\s+/).filter(Boolean);
+
+    if (excludeWords.length === 0) {
+      return createdMatches;
+    }
+
+    return createdMatches.filter(mark => {
+      if (containerHasExcludedWord(mark, excludeWords)) {
+        unwrapMatch(mark);
+        return false;
+      }
+
+      return true;
+    });
+  }
+
   function highlightMatches(query) {
     if (!query.trim()) {
       return [];
     }
 
+    let createdMatches;
+
     if (proximitySearchEnabled) {
-      return highlightProximityMatches(query, proximityDistance);
+      createdMatches = highlightProximityMatches(query, proximityDistance);
+    } else if (isRootSearchEnabled()) {
+      createdMatches = highlightStemMatches(query);
+    } else if (wordMatchMode === "and") {
+      // همان ترفند index.htm: موتور مجاورتی موجود، با یک حداکثر فاصلهٔ
+      // عملاً نامحدود، دقیقاً همان «همهٔ کلمات، بدون محدودیت ترتیب» را
+      // حل می‌کند - بدون نیاز به موتور جداگانه.
+      createdMatches = highlightProximityMatches(query, UNLIMITED_PROXIMITY_DISTANCE);
+    } else if (wordMatchMode === "or") {
+      createdMatches = highlightAnyWordMatches(query);
+    } else {
+      createdMatches = highlightLiteralMatches(query);
     }
 
-    return isRootSearchEnabled() ?
-      highlightStemMatches(query) :
-      highlightLiteralMatches(query);
+    return filterOutExcludedMatches(createdMatches);
   }
 
   function updateButtons() {
@@ -4956,6 +5125,41 @@
       <div class="in-page-settings-separator"></div>
 
       <div class="in-page-settings-section-label">جست‌وجوی پیشرفته</div>
+
+      <label
+        class="in-page-settings-radio"
+        title="کلمات عبارت جست‌وجو باید عیناً پشت سر هم بیایند (رفتار پیش‌فرض)">
+        <input type="radio" name="inPageWordMatchMode" value="phrase" ${wordMatchMode === "phrase" ? "checked" : ""}>
+        عبارت دقیق
+      </label>
+      <label
+        class="in-page-settings-radio"
+        title="همهٔ کلمات باید در همین صفحه باشند، اما لازم نیست پشت سر هم یا نزدیک هم بیایند">
+        <input type="radio" name="inPageWordMatchMode" value="and" ${wordMatchMode === "and" ? "checked" : ""}>
+        همهٔ این کلمات باشد (بدون ترتیب)
+      </label>
+      <label
+        class="in-page-settings-radio"
+        title="کافی است یکی از کلمات عبارت جست‌وجو پیدا شود">
+        <input type="radio" name="inPageWordMatchMode" value="or" ${wordMatchMode === "or" ? "checked" : ""}>
+        هر کدام از این کلمات باشد
+      </label>
+
+      <div class="in-page-settings-exclude-row">
+        <label class="in-page-settings-field-label" for="inPageMenuExcludeWords">
+          شامل این کلمات نباشد:
+        </label>
+        <input
+          type="text"
+          id="inPageMenuExcludeWords"
+          class="in-page-settings-exclude-input"
+          placeholder="مثلاً: فلسفه عرفان"
+          title="نتایجی که هر یک از این کلمات را داشته باشند، از فهرست نتایج کنار گذاشته می‌شوند"
+          value="${escapeHtml(excludeWordsText)}">
+      </div>
+
+      <div class="in-page-settings-separator"></div>
+
       <label
         class="in-page-settings-checkbox"
         title="کلمات عبارت جست‌وجو لازم نیست کنار هم بیایند؛ کافی است در فاصله‌ی مشخص‌شده از هم قرار داشته باشند">
@@ -5078,6 +5282,44 @@
         }
       });
     });
+
+    // Item جدید (هماهنگی با کادر جست‌وجوی سایت): نوع تطبیق کلمات
+    // (عبارت دقیق/همهٔ کلمات/هر کدام از کلمات) - مثل مرتب‌سازی، یک
+    // رادیوگروپ ساده که با هر تغییر جست‌وجو را دوباره اجرا می‌کند.
+    menu.querySelectorAll('input[name="inPageWordMatchMode"]').forEach(radio => {
+      radio.addEventListener("change", () => {
+        if (!radio.checked) {
+          return;
+        }
+
+        wordMatchMode = radio.value;
+
+        const input = document.getElementById("inPageSearchInput");
+        if (input && input.value.trim()) {
+          performSearch();
+        }
+      });
+    });
+
+    // Item جدید: کادر «شامل این کلمات نباشد» (NOT) - مثل کادر فاصلهٔ
+    // جست‌وجوی مجاورتی، جلوی بسته‌شدن منو با کلیک را می‌گیرد و با هر
+    // تغییر جست‌وجو را دوباره اجرا می‌کند.
+    const excludeWordsInput = menu.querySelector("#inPageMenuExcludeWords");
+
+    if (excludeWordsInput) {
+      excludeWordsInput.addEventListener("click", event => {
+        event.stopPropagation();
+      });
+
+      excludeWordsInput.addEventListener("input", () => {
+        excludeWordsText = excludeWordsInput.value;
+
+        const input = document.getElementById("inPageSearchInput");
+        if (input && input.value.trim()) {
+          performSearch();
+        }
+      });
+    }
 
     const proximityToggle = menu.querySelector("#inPageMenuProximityToggle");
     const proximityDistanceInput = menu.querySelector("#inPageMenuProximityDistance");
@@ -5358,20 +5600,12 @@
     return mark ? activeDerivativeKeys.has(getMatchVisualKey(mark)) : false;
   }
 
-  function renderDerivativesBlock() {
-    const block = document.getElementById("inPageDerivativesBlock");
-
-    if (!block) {
-      return;
-    }
-
-    if (!isRootSearchEnabled() || !isDerivativesViewEnabled() || matches.length === 0) {
-      block.innerHTML = "";
-      block.classList.remove("is-visible");
-      updateStatusRowSpacing();
-      return;
-    }
-
+  // Item جدید: محاسبهٔ گروه‌های مشتق (شمارش + برچسب) - جدا شده از
+  // renderDerivativesBlock تا هم آنجا برای ساخت چیپ‌ها استفاده شود و
+  // هم در syncSearchBoxWithActiveDerivative برای پیدا کردن عنوان دقیق
+  // یک مشتق فعال، بدون تکرار همان حلقه در دو جا. هم‌ارز
+  // computeDerivativeGroups در index.htm.
+  function computeDerivativeGroups() {
     const grouped = new Map();
 
     matches.forEach(mark => {
@@ -5391,6 +5625,50 @@
 
       grouped.get(key).count += 1;
     });
+
+    return grouped;
+  }
+
+  // Item جدید (رفع اشکال: عدم تطابق عنوان مشتق انتخابی با کادر
+  // جست‌وجو) - هم‌ارز syncSearchBoxWithActiveDerivative در index.htm:
+  // وقتی دقیقاً یک مشتق فعال است، کادر جست‌وجو به همان عنوان مشتق
+  // تغییر می‌کند؛ در غیر این صورت (هیچ‌کدام یا چند مشتق هم‌زمان) به
+  // عبارت اصلی جست‌وجوشده (lastSearchedQuery) برمی‌گردد.
+  function syncSearchBoxWithActiveDerivative() {
+    const input = document.getElementById("inPageSearchInput");
+
+    if (!input) {
+      return;
+    }
+
+    if (activeDerivativeKeys.size === 1) {
+      const [activeKey] = activeDerivativeKeys;
+      const group = computeDerivativeGroups().get(activeKey);
+
+      if (group) {
+        input.value = group.label;
+        return;
+      }
+    }
+
+    input.value = lastSearchedQuery;
+  }
+
+  function renderDerivativesBlock() {
+    const block = document.getElementById("inPageDerivativesBlock");
+
+    if (!block) {
+      return;
+    }
+
+    if (!isRootSearchEnabled() || !isDerivativesViewEnabled() || matches.length === 0) {
+      block.innerHTML = "";
+      block.classList.remove("is-visible");
+      updateStatusRowSpacing();
+      return;
+    }
+
+    const grouped = computeDerivativeGroups();
 
     if (grouped.size === 0) {
       block.innerHTML = "";
@@ -5429,6 +5707,7 @@
 
         renderDerivativesBlock();
         renderResultsPanel();
+        syncSearchBoxWithActiveDerivative();
       };
 
       item.addEventListener("click", toggle);
@@ -5867,6 +6146,7 @@
     const input = document.getElementById("inPageSearchInput");
     const query = input.value.trim();
 
+    lastSearchedQuery = query;
     activeDerivativeKeys.clear();
     removeHighlights();
 
@@ -5894,6 +6174,7 @@
     const input = document.getElementById("inPageSearchInput");
 
     input.value = "";
+    lastSearchedQuery = "";
     activeDerivativeKeys.clear();
     removeHighlights();
     updateButtons();
