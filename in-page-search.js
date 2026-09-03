@@ -2711,8 +2711,25 @@
       return;
     }
 
+    // Item جدید (رفع اشکال): وقتی یک مشتق خاص فعال است، شمارش باید
+    // بر اساس همان زیرمجموعهٔ قابل‌مشاهده باشد (هم‌ارز currentResults
+    // در index.htm که خودش از قبل فیلترشده است) - نه کل آرایهٔ
+    // matches - وگرنه عدد نشان‌داده‌شده با آنچه در پنل نتایج/صفحه
+    // دیده می‌شود هم‌خوانی ندارد.
+    const visibleIndexes = matches
+      .map((_, index) => index)
+      .filter(index => isMatchVisible(index));
+
+    if (visibleIndexes.length === 0) {
+      status.textContent = "عبارتی پیدا نشد.";
+      updateStatusRowSpacing();
+      return;
+    }
+
+    const positionAmongVisible = visibleIndexes.indexOf(currentMatch) + 1;
+
     status.textContent =
-      `نتیجهٔ ${currentMatch + 1} از ${matches.length}`;
+      `نتیجهٔ ${positionAmongVisible > 0 ? positionAmongVisible : 1} از ${visibleIndexes.length}`;
     updateStatusRowSpacing();
   }
 
@@ -5600,6 +5617,47 @@
     return mark ? activeDerivativeKeys.has(getMatchVisualKey(mark)) : false;
   }
 
+  // Item جدید (رفع اشکال قدیمی، جدا از دو تغییر خواسته‌شده): دکمه‌های
+  // بعدی/قبلی (و Enter/Shift+Enter) قبلاً همیشه ساده +۱/−۱ روی
+  // آرایهٔ کامل matches حرکت می‌کردند - یعنی وقتی یک مشتق خاص فعال
+  // بود، به‌جای رفتن به رخداد بعدیِ همان مشتق، به رخداد بعدیِ *هر*
+  // شکلی از ریشه (حتی اگر مخفی/فیلترشده بود) می‌رفتند و صفحهٔ نمایش
+  // را به آن اسکرول می‌کردند - درحالی‌که پنل نتایج (که درست فیلتر
+  // می‌شود) روی مشتق انتخاب‌شده می‌ماند. این تابع، به‌جای +۱/−۱ ساده،
+  // در همان جهت می‌گردد تا اولین رخدادِ قابل‌مشاهده (isMatchVisible)
+  // را پیدا کند؛ با چرخش (wrap-around) دور آرایه.
+  function findAdjacentVisibleMatchIndex(fromIndex, direction) {
+    if (matches.length === 0) {
+      return -1;
+    }
+
+    let index = fromIndex;
+
+    for (let step = 0; step < matches.length; step++) {
+      index += direction;
+
+      if (index < 0) {
+        index = matches.length - 1;
+      } else if (index >= matches.length) {
+        index = 0;
+      }
+
+      if (isMatchVisible(index)) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  function stepToAdjacentMatch(direction) {
+    const nextIndex = findAdjacentVisibleMatchIndex(currentMatch, direction);
+
+    if (nextIndex !== -1) {
+      showMatch(nextIndex);
+    }
+  }
+
   // Item جدید: محاسبهٔ گروه‌های مشتق (شمارش + برچسب) - جدا شده از
   // renderDerivativesBlock تا هم آنجا برای ساخت چیپ‌ها استفاده شود و
   // هم در syncSearchBoxWithActiveDerivative برای پیدا کردن عنوان دقیق
@@ -5708,6 +5766,21 @@
         renderDerivativesBlock();
         renderResultsPanel();
         syncSearchBoxWithActiveDerivative();
+
+        // Item جدید (رفع اشکال): تا اینجا فقط کادر جست‌وجو و پنل نتایج
+        // با فیلتر مشتق هماهنگ می‌شدند، اما مورد فعلیِ هایلایت‌شدهٔ
+        // روی خودِ صفحه دست‌نخورده می‌ماند - یعنی اگر آن مورد دیگر با
+        // فیلتر جدید قابل‌مشاهده نبود، صفحه همچنان شکل قبلی (مثلاً
+        // «توحید») را نشان می‌داد درحالی‌که کادر/پنل شکل تازه (مثلاً
+        // «الواحد») را نشان می‌دادند. حالا: اگر مورد فعلی دیگر
+        // قابل‌مشاهده نیست، به اولین موردِ قابل‌مشاهدهٔ جدید می‌رویم.
+        if (currentMatch < 0 || !isMatchVisible(currentMatch)) {
+          const firstVisible = matches.findIndex((_, index) => isMatchVisible(index));
+
+          if (firstVisible !== -1) {
+            showMatch(firstVisible);
+          }
+        }
       };
 
       item.addEventListener("click", toggle);
@@ -6017,10 +6090,20 @@
       return;
     }
 
+    // Item جدید (رفع اشکال قدیمی): قبلاً «فعلی‌بودن» هر آیتم با
+    // موقعیتش در فهرستِ رندرشده (0، 1، 2، ...) با currentMatch (که
+    // شمارهٔ واقعی در آرایهٔ کامل matches است) مقایسه می‌شد. این دو
+    // فقط وقتی یکی هستند که پنل هیچ فیلتر/ترتیب متفاوتی نداشته باشد؛
+    // با فعال‌بودن یک مشتق خاص یا مرتب‌سازی «پرتکرارترین»، ترتیب
+    // نمایش با ترتیب واقعی فرق می‌کند و این مقایسه آیتم اشتباه (یا
+    // هیچ‌کدام) را فعال نشان می‌داد. حالا از همان data-index واقعیِ
+    // خود آیتم (که renderResultsPanel روی هر آیتم می‌گذارد) استفاده
+    // می‌شود.
     resultsPanelElement
       .querySelectorAll(".in-page-search-result-item")
-      .forEach((item, index) => {
-        item.classList.toggle("active", index === currentMatch);
+      .forEach(item => {
+        const itemIndex = parseInt(item.dataset.index, 10);
+        item.classList.toggle("active", itemIndex === currentMatch);
       });
 
     const activeItem = resultsPanelElement.querySelector(
@@ -6447,9 +6530,9 @@
         }
 
         if (event.shiftKey) {
-          showMatch(currentMatch - 1);
+          stepToAdjacentMatch(-1);
         } else {
-          showMatch(currentMatch + 1);
+          stepToAdjacentMatch(1);
         }
       }
 
@@ -6460,11 +6543,11 @@
     });
 
     previousButton.addEventListener("click", () => {
-      showMatch(currentMatch - 1);
+      stepToAdjacentMatch(-1);
     });
 
     nextButton.addEventListener("click", () => {
-      showMatch(currentMatch + 1);
+      stepToAdjacentMatch(1);
     });
 
     const voiceButton = document.getElementById("inPageVoiceInput");
