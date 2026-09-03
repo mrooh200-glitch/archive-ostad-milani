@@ -6080,22 +6080,11 @@
         "inline-flex" : "none";
     }
 
-    function renderDerivativesBlock() {
-      const block = document.getElementById("derivativesBlock");
-      const row = document.querySelector(".derivatives-status-row");
-
-      if (!block) {
-        return;
-      }
-
-      if (!currentRootMode || !isDerivativesViewEnabled() || rootBaseResults.length === 0) {
-        block.innerHTML = "";
-        block.classList.remove("is-visible");
-        if (row) row.classList.remove("has-content");
-        return;
-      }
-
-      // Group by visual key so visually-identical words merge into one chip.
+    // Item جدید: محاسبهٔ گروه‌های مشتق (شمارش + برچسب) - جدا شده از
+    // renderDerivativesBlock تا هم آنجا برای ساخت چیپ‌ها استفاده شود و
+    // هم در syncSearchBoxWithActiveDerivative برای پیدا کردن عنوان
+    // دقیق یک مشتق فعال، بدون تکرار همان حلقه در دو جا.
+    function computeDerivativeGroups() {
       const derivativeCounts = new Map();
       const derivativeLabels = new Map();
 
@@ -6116,6 +6105,54 @@
           }
         });
       });
+
+      return { derivativeCounts, derivativeLabels };
+    }
+
+    // Item جدید (رفع اشکال: عدم تطابق عنوان مشتق انتخابی با کادر
+    // جست‌وجو): تا پیش از این، با کلیک روی یک چیپ مشتق، نتایج فیلتر
+    // می‌شدند اما متن کادر جست‌وجو همچنان همان عبارت اصلی تایپ‌شده
+    // (مثلاً ریشه) باقی می‌ماند - یعنی چیزی که در کادر نوشته شده بود
+    // با عنوان مشتقی که واقعاً به‌عنوان فیلتر فعال است یکی نبود. حالا:
+    // وقتی دقیقاً یک مشتق فعال است، کادر به همان عنوان مشتق تغییر
+    // می‌کند؛ در غیر این صورت (هیچ‌کدام یا چند مشتق هم‌زمان) به عبارت
+    // اصلی جست‌وجوشده (currentQuery) برمی‌گردد.
+    function syncSearchBoxWithActiveDerivative() {
+      if (!searchInput) {
+        return;
+      }
+
+      if (activeDerivativeKeys.size === 1) {
+        const [activeKey] = activeDerivativeKeys;
+        const { derivativeLabels } = computeDerivativeGroups();
+        const label = derivativeLabels.get(activeKey);
+
+        if (label) {
+          searchInput.value = label;
+          return;
+        }
+      }
+
+      searchInput.value = currentQuery;
+    }
+
+    function renderDerivativesBlock() {
+      const block = document.getElementById("derivativesBlock");
+      const row = document.querySelector(".derivatives-status-row");
+
+      if (!block) {
+        return;
+      }
+
+      if (!currentRootMode || !isDerivativesViewEnabled() || rootBaseResults.length === 0) {
+        block.innerHTML = "";
+        block.classList.remove("is-visible");
+        if (row) row.classList.remove("has-content");
+        return;
+      }
+
+      // Group by visual key so visually-identical words merge into one chip.
+      const { derivativeCounts, derivativeLabels } = computeDerivativeGroups();
 
       const derivatives = [...derivativeCounts.keys()].sort(
         (a, b) => a.localeCompare(b, "fa")
@@ -6188,6 +6225,7 @@
       currentPage = 1;
       selectedResultIndexes.clear();
       currentResultPointer = -1;
+      syncSearchBoxWithActiveDerivative();
       renderDerivativesBlock();
       renderCurrentPage();
     }
