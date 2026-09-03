@@ -78,6 +78,15 @@
   let searchInMainText = true;
   let searchInFootnotes = true;
 
+  // Item جدید: سه‌گانهٔ متن‌عادی/آیات/روایات - هم‌ارز searchInMainText/
+  // searchInFootnotes از نظر مکانیزم (فیلتر روی TreeWalker)، اما مستقل
+  // از آن: یک گره متنی باید هم از نظر محل (متن/پاورقی) و هم از نظر نوع
+  // (عادی/آیه/روایت) قبول شود تا قابل جست‌وجو باشد. پیش‌فرض هر سه روشن،
+  // و مثل نمونهٔ index.htm هرگز هر سه هم‌زمان خاموش نمی‌شوند.
+  let searchInAyat = true;
+  let searchInHadith = true;
+  let searchInNormalText = true;
+
   // ---- Item جدید: تنظیمات مطالعه (حالت شب + اندازهٔ متن) ---------------
   // با یک کلید مشترک در localStorage ذخیره می‌شوند تا ترجیح کاربر بین
   // همهٔ کتاب‌های سایت یکسان بماند، نه فقط همین صفحه.
@@ -162,6 +171,23 @@
 
   function isFootnoteTextNode(node) {
     return !!(node.parentElement && node.parentElement.closest(".MsoFootnoteText"));
+  }
+
+  // Item جدید: آیه/روایت - هم‌ارز isFootnoteTextNode، اما برای دو کلاس
+  // نامرئیِ دیگری که ممکن است روی پاراگراف باشد (همان قرارداد index.htm:
+  // "quran-ayah" و "hadith-text"، رجوع کنید به getParagraphsFromHtml آنجا).
+  // مثل پاورقی، اینجا هم فقط closest لازم است چون این صفحه خودش زنده در
+  // DOM است، نه یک رشتهٔ HTML جدا که باید parse شود.
+  function isAyahTextNode(node) {
+    return !!(node.parentElement && node.parentElement.closest(".quran-ayah"));
+  }
+
+  function isHadithTextNode(node) {
+    return !!(
+      node.parentElement &&
+      !isAyahTextNode(node) &&
+      node.parentElement.closest(".hadith-text")
+    );
   }
 
   // Item جدید: قالب لینکِ مارک‌داون در متن ساده - هم‌ارز formatShareLink
@@ -2220,6 +2246,23 @@
           }
 
           if (!inFootnote && !searchInMainText) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          // Item جدید: فیلتر آیات/روایات - مستقل از فیلتر متن/پاورقی
+          // بالا؛ هر دو باید عبور کنند تا گره واقعاً قابل جست‌وجو شود.
+          const isAyah = isAyahTextNode(node);
+          const isHadith = !isAyah && isHadithTextNode(node);
+
+          if (isAyah && !searchInAyat) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          if (isHadith && !searchInHadith) {
+            return NodeFilter.FILTER_REJECT;
+          }
+
+          if (!isAyah && !isHadith && !searchInNormalText) {
             return NodeFilter.FILTER_REJECT;
           }
 
@@ -4940,6 +4983,24 @@
         <input type="checkbox" id="inPageMenuSearchFootnotes" ${searchInFootnotes ? "checked" : ""}>
         جست‌وجو در پاورقی
       </label>
+      <label
+        class="in-page-settings-checkbox"
+        title="فقط در صفحاتی اثر دارد که آیات قرآن در آن‌ها مشخص شده باشد">
+        <input type="checkbox" id="inPageMenuSearchAyat" ${searchInAyat ? "checked" : ""}>
+        جست‌وجو در آیات قرآن
+      </label>
+      <label
+        class="in-page-settings-checkbox"
+        title="فقط در صفحاتی اثر دارد که روایات در آن‌ها مشخص شده باشد">
+        <input type="checkbox" id="inPageMenuSearchHadith" ${searchInHadith ? "checked" : ""}>
+        جست‌وجو در روایات
+      </label>
+      <label
+        class="in-page-settings-checkbox"
+        title="جست‌وجو در متن عادی (غیر آیه و غیر روایت) صفحه انجام شود">
+        <input type="checkbox" id="inPageMenuSearchNormalText" ${searchInNormalText ? "checked" : ""}>
+        جست‌وجو در متن عادی
+      </label>
 
       <div class="in-page-settings-separator"></div>
 
@@ -5087,6 +5148,42 @@
         }
       });
     }
+
+    // Item جدید: سه‌گانهٔ متن‌عادی/آیات/روایات - همان محدودیت "هرگز هر
+    // سه هم‌زمان خاموش نشوند" که در index.htm پیاده شده (رجوع کنید به
+    // handleScopeTypeToggleChange آنجا)، اینجا هم‌ارز آن برای این صفحه.
+    const searchAyatToggle = menu.querySelector("#inPageMenuSearchAyat");
+    const searchHadithToggle = menu.querySelector("#inPageMenuSearchHadith");
+    const searchNormalTextToggle = menu.querySelector("#inPageMenuSearchNormalText");
+
+    function handleScopeTypeToggleChange(toggle, applyValue) {
+      if (!toggle) {
+        return;
+      }
+
+      toggle.addEventListener("change", () => {
+        if (
+          !toggle.checked &&
+          !(searchNormalTextToggle && searchNormalTextToggle.checked) &&
+          !(searchAyatToggle && searchAyatToggle.checked) &&
+          !(searchHadithToggle && searchHadithToggle.checked)
+        ) {
+          toggle.checked = true;
+          return;
+        }
+
+        applyValue(toggle.checked);
+
+        const input = document.getElementById("inPageSearchInput");
+        if (input && input.value.trim()) {
+          performSearch();
+        }
+      });
+    }
+
+    handleScopeTypeToggleChange(searchNormalTextToggle, value => { searchInNormalText = value; });
+    handleScopeTypeToggleChange(searchAyatToggle, value => { searchInAyat = value; });
+    handleScopeTypeToggleChange(searchHadithToggle, value => { searchInHadith = value; });
 
     bind("inPageReadingZoomOut", () => {
       readingPrefs.zoom = Math.max(READING_ZOOM_MIN, Math.round((readingPrefs.zoom - READING_ZOOM_STEP) * 100) / 100);
