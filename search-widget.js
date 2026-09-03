@@ -144,7 +144,18 @@ async function semanticSearch(query, topK = 5) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ query }),
   });
-  if (!embedRes.ok) throw new Error("خطا در دریافت بردار جست‌وجو");
+  if (!embedRes.ok) {
+    // اگه Worker یه پیام فارسی مشخص برگردونده (مثلاً سهمیهٔ روزانه تموم شده
+    // یا سرویس موقتاً شلوغه)، همون رو نشون بده؛ وگرنه پیام عمومی.
+    let message = "خطا در دریافت بردار جست‌وجو";
+    try {
+      const errBody = await embedRes.json();
+      if (errBody && errBody.error) message = errBody.error;
+    } catch {
+      // بدنهٔ خطا JSON نبود، از پیام پیش‌فرض استفاده کن
+    }
+    throw new Error(message);
+  }
   const { vector: queryVector } = await embedRes.json();
 
   // مقایسهٔ شباهت با همهٔ بخش‌های ذخیره‌شده
@@ -168,7 +179,16 @@ async function askQuestion(question) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ question, context: contextTexts }),
   });
-  if (!chatRes.ok) throw new Error("خطا در دریافت پاسخ از دستیار");
+  if (!chatRes.ok) {
+    let message = "خطا در دریافت پاسخ از دستیار";
+    try {
+      const errBody = await chatRes.json();
+      if (errBody && errBody.error) message = errBody.error;
+    } catch {
+      // بدنهٔ خطا JSON نبود، از پیام پیش‌فرض استفاده کن
+    }
+    throw new Error(message);
+  }
   const { answer } = await chatRes.json();
 
   return { answer, sources: relevant };
@@ -217,7 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
             .join("");
         } catch (err) {
           if (myToken !== searchToken) return;
-          if (aiSearchStatus) aiSearchStatus.textContent = "در جست‌وجو خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
+          if (aiSearchStatus) aiSearchStatus.textContent = err.message || "در جست‌وجو خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
           console.error(err);
         }
       }, 400); // debounce: صبر کن کاربر تایپش تموم بشه
@@ -252,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
         `;
       } catch (err) {
         if (myToken !== chatToken) return;
-        aiChatOutput.innerHTML = "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
+        aiChatOutput.innerHTML = err.message || "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
         console.error(err);
       }
     });
