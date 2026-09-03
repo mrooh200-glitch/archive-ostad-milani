@@ -1233,14 +1233,22 @@
     /* Item جدید: دکمهٔ دانلود مستقیم فایل کتاب (HTML یا PDF)، جدا از
        لینک اصلی «مطالعه». به‌صورت خودکار توسط جاوااسکریپت برای هر
        .searchable-item ساخته می‌شود (رجوع کنید به addBookDownloadButtons)
-       - نیازی به افزودن دستی آن در HTML نیست. */
-    .book-download-btn {
+       - نیازی به افزودن دستی آن در HTML نیست.
+       Item جدید (رفع اشکال ظاهری): این selector عمداً به‌صورت
+       ".book-list a.book-download-btn" (نه فقط ".book-download-btn")
+       نوشته شده - چون قانون کلی‌تر ".book-list a" (برای لینک اصلی
+       «مطالعه») از نظر specificity قوی‌تر از یک کلاس تنها بود و
+       flex:1 و padding بزرگ خودش را روی این دکمه هم تحمیل می‌کرد و آن
+       را به یک نوار کشیده (به‌جای یک آیکون کوچک مربعی) تبدیل می‌کرد. */
+    .book-list a.book-download-btn {
+      flex: 0 0 auto;
       flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       width: 32px;
       height: 32px;
+      padding: 0;
       margin: 0 2px;
       border: 1px solid #93c5fd;
       border-radius: 7px;
@@ -1252,9 +1260,10 @@
       cursor: pointer;
     }
 
-    .book-download-btn:hover {
+    .book-list a.book-download-btn:hover {
       background: #dbeafe;
       border-color: #60a5fa;
+      text-decoration: none;
     }
 
     /* Item جدید: تیک انتخاب برای «مطالعهٔ کنار هم» - کنار هر کتاب،
