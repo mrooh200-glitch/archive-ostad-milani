@@ -8,6 +8,12 @@
  * متغیر محیطی لازم (در wrangler.toml یا Cloudflare Dashboard تنظیم می‌شه):
  *  - GEMINI_API_KEY
  *  - AI (binding خودکار Workers AI، نیازی به کلید نداره)
+ *  - EMBEDDING_CACHE (یک KV namespace — اختیاری؛ اگه بایند نشده باشه، کد بدون کش کار می‌کنه)
+ *
+ * تغییر جدید: کش مشترک بین همه‌ی کاربران برای عبارت‌های جست‌وجوی تکراری.
+ * اگه کاربر A عبارتی رو جست‌وجو کنه، بردارش برای مدتی (یک ساعت) در KV ذخیره می‌شه؛
+ * اگه کاربر B دقیقاً همون عبارت رو جست‌وجو کنه، به‌جای زدن دوباره به مدل bge-m3
+ * (که سهمیه‌ی روزانه مصرف می‌کنه)، همون بردار کش‌شده مستقیم برگردونده می‌شه.
  */
 
 const CORS_HEADERS = {
@@ -16,11 +22,22 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+const EMBEDDING_CACHE_TTL_SECONDS = 60 * 60; // یک ساعت
+
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
+}
+
+// ---------- ساخت کلید کش از متن عبارت (نرمال‌سازی ساده: trim + یکسان‌سازی حروف) ----------
+async function embeddingCacheKey(text) {
+  const normalized = text.trim().toLowerCase();
+  const data = new TextEncoder().encode(normalized);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return "embed:" + hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export default {
@@ -49,7 +66,7 @@ export default {
   },
 };
 
-// ---------- /embed : ساخت بردار عبارت جست‌وجو ----------
+// ---------- /embed : ساخت بردار عبارت جست‌وجو (با کش مشترک بین کاربران) ----------
 async function handleEmbed(request, env) {
   const body = await request.json();
   const query = (body.query || "").trim();
@@ -58,14 +75,32 @@ async function handleEmbed(request, env) {
     return jsonResponse({ error: "پارامتر query لازمه" }, 400);
   }
 
+  // اول کش رو چک کن — اگه یک کاربر دیگه اخیراً دقیقاً همین عبارت رو جست‌وجو کرده،
+  // بردارش رو مستقیم برگردون، بدون تماس با مدل.
+  let cacheKey = null;
+  if (env.EMBEDDING_CACHE) {
+    cacheKey = await embeddingCacheKey(query);
+    const cached = await env.EMBEDDING_CACHE.get(cacheKey, "json");
+    if (cached) {
+      return jsonResponse({ vector: cached });
+    }
+  }
+
   const result = await env.AI.run("@cf/baai/bge-m3", { text: [query] });
   // result.data شکل [[...vector...]] داره چون یک متن فرستادیم
   const vector = result.data[0];
+
+  if (env.EMBEDDING_CACHE && cacheKey) {
+    await env.EMBEDDING_CACHE.put(cacheKey, JSON.stringify(vector), {
+      expirationTtl: EMBEDDING_CACHE_TTL_SECONDS,
+    });
+  }
 
   return jsonResponse({ vector });
 }
 
 // ---------- /chat : پاسخ‌سازی با Gemini بر اساس متن‌های مرتبط ----------
+// (بدون تغییر نسبت به نسخه‌ی فعلی — فعلاً کاری به این بخش نداریم)
 async function handleChat(request, env) {
   const body = await request.json();
   const question = (body.question || "").trim();
