@@ -1230,6 +1230,33 @@
       text-decoration: underline;
     }
 
+    /* Item جدید: دکمهٔ دانلود مستقیم فایل کتاب (HTML یا PDF)، جدا از
+       لینک اصلی «مطالعه». به‌صورت خودکار توسط جاوااسکریپت برای هر
+       .searchable-item ساخته می‌شود (رجوع کنید به addBookDownloadButtons)
+       - نیازی به افزودن دستی آن در HTML نیست. */
+    .book-download-btn {
+      flex-shrink: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      margin: 0 2px;
+      border: 1px solid #93c5fd;
+      border-radius: 7px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      text-decoration: none;
+      font-size: 0.95rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .book-download-btn:hover {
+      background: #dbeafe;
+      border-color: #60a5fa;
+    }
+
     /* Item جدید: تیک انتخاب برای «مطالعهٔ کنار هم» - کنار هر کتاب،
        سمت چپِ خودِ لینک. */
     .compare-read-checkbox {
@@ -2180,6 +2207,57 @@
     });
 
     renderReadingHistory();
+
+    // ---- Item جدید: دکمهٔ دانلود خودکار برای هر کتاب (HTML و PDF) ------
+    // این تابع روی همهٔ .searchable-item ها (همان لیست searchableItems
+    // که برای جست‌وجو هم استفاده می‌شود) اجرا می‌شود و از همان
+    // attributeهای موجود هر آیتم (data-url / data-title / data-pdf)
+    // یک دکمهٔ دانلود می‌سازد. یعنی برای اضافه/حذف‌کردن بعدیِ کتاب‌ها،
+    // فقط کافی است <li class="searchable-item" ...> مطابق الگوی فعلی
+    // اضافه یا حذف شود - این دکمه خودش، بدون هیچ ویرایش دستی جداگانه‌ای،
+    // برای آیتم جدید ظاهر یا با حذف آیتم از بین می‌رود.
+    function addBookDownloadButtons() {
+      searchableItems.forEach(item => {
+        // اگر قبلاً برای این آیتم دکمه ساخته شده (مثلاً در فراخوانی
+        // دوباره)، دوباره اضافه نکن.
+        if (item.querySelector(".book-download-btn")) {
+          return;
+        }
+
+        const link = item.querySelector("a");
+        const url = item.dataset.url || (link && link.getAttribute("href"));
+
+        if (!link || !url) {
+          return;
+        }
+
+        const title = item.dataset.title || link.textContent.trim();
+        const isPdf = item.dataset.pdf === "true";
+        const extension = isPdf ? ".pdf" : ".htm";
+        const filename = url.split("/").pop() || `${title}${extension}`;
+
+        const downloadBtn = document.createElement("a");
+        downloadBtn.className = "book-download-btn";
+        downloadBtn.href = url;
+        // ویژگی download باعث می‌شود مرورگر فایل را مستقیماً ذخیره کند
+        // به‌جای باز کردنش در تب جدید (رفتار لینک اصلی «مطالعه»).
+        downloadBtn.setAttribute("download", filename);
+        downloadBtn.title = `دانلود فایل ${isPdf ? "PDF" : "HTML"}`;
+        downloadBtn.setAttribute("aria-label", `دانلود «${title}»`);
+        downloadBtn.textContent = "⬇";
+
+        // جلوگیری از تداخل با رویدادهای کلیک روی کل ردیف/آیتم (مثلاً
+        // چک‌باکس «مطالعهٔ کنار هم» که با insertBefore به ابتدای همین
+        // آیتم اضافه می‌شود).
+        downloadBtn.addEventListener("click", event => {
+          event.stopPropagation();
+        });
+
+        link.insertAdjacentElement("afterend", downloadBtn);
+      });
+    }
+
+    addBookDownloadButtons();
 
     // ---- Item جدید (رفع اشکال): scroll latching -----------------------
     // مرورگر (به‌خصوص کروم) در طول یک حرکت پیوستهٔ اسکرول، همون بلوک
