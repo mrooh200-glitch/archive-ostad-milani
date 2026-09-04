@@ -1920,6 +1920,7 @@
       }
 
       #inPageArchivePanel {
+        position: relative;
         width: min(560px, 100%);
         max-height: 80vh;
         overflow-y: auto;
@@ -2037,6 +2038,7 @@
       }
 
       #inPageBookmarksPanel {
+        position: relative;
         width: min(560px, 100%);
         max-height: 80vh;
         overflow-y: auto;
@@ -2046,6 +2048,30 @@
         font-family: Tahoma, Arial, sans-serif;
         direction: rtl;
         text-align: right;
+      }
+
+      /* آیتم ۳: علامت × گوشهٔ پنل، به‌جای دکمهٔ متنی «بستن» - در هر سه
+         پنلِ نشانه/آرشیو (این دو، به‌علاوهٔ نسخه‌های index.htm و
+         آرشیو گفتگوهای دستیار هوشمند که همین کلاس رو استفاده می‌کنن). */
+      .panel-close-x {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 30px;
+        height: 30px;
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-size: 1.3rem;
+        line-height: 1;
+        cursor: pointer;
+        border-radius: 6px;
+        z-index: 1;
+      }
+
+      .panel-close-x:hover {
+        background: #f1f5f9;
+        color: #1f2937;
       }
 
       .bookmark-tag-filter {
@@ -2782,13 +2808,26 @@
   // (رجوع کنید به buildParagraphPlainText). وقتی همین متن تو یه بافت
   // HTML واقعی (Word/PDF/پنل زنده) نمایش داده می‌شه، باید این نشانه‌ها
   // به هایلایت واقعی تبدیل بشن - نه این‌که عیناً به‌صورت ** دیده بشن.
-  function renderBookmarkTextHtml(text) {
+  // Item جدید (رفع باگ: ستاره‌های ** خام تو خروجی Word/PDF نشانه‌ها):
+  // متن ذخیره‌شدهٔ یک نشانه (item.text) کلمهٔ هایلایت‌شده رو با
+  // **...** مشخص می‌کنه - این قرارداد فقط برای هدف‌های متن‌سادست
+  // (رجوع کنید به buildParagraphPlainText). وقتی همین متن تو یه بافت
+  // HTML واقعی نمایش داده می‌شه، باید این نشانه‌ها به شکل واقعی تبدیل
+  // بشن - نه این‌که عیناً به‌صورت ** دیده بشن.
+  //
+  // آیتم جدید (رنگی فقط تو پنل زنده): برای فایل‌های دریافتی
+  // (Word/PDF/متن-غنی کپی)، colored=false پاس داده می‌شه - یعنی فقط
+  // پررنگ (bold)، بدون هایلایت زرد؛ رنگی‌شدن واقعی فقط مخصوص خودِ
+  // پنل نشانه‌هاست.
+  function renderBookmarkTextHtml(text, options) {
+    const colored = !options || options.colored !== false;
     const escaped = escapeHtml(text || "");
     return escaped.replace(
       /\*\*(.+?)\*\*/g,
-      (_match, inner) =>
+      (_match, inner) => colored ?
         `<span style="background-color:#fde047;mso-highlight:yellow;color:#111827;` +
-        `padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${inner}</span>`
+        `padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${inner}</span>` :
+        `<strong>${inner}</strong>`
     );
   }
 
@@ -2824,18 +2863,59 @@
     return pageEl ? pageEl.getAttribute("data-page-number") : null;
   }
 
+  // Item جدید (رفع باگ: نشانه‌ی دوم به بعد رنگ نمی‌گیره - تلاش دوم):
+  // نشان‌های «🔖» که insertBookmarkMarker برای نشانه‌های قبلی همین
+  // پاراگراف اضافه کرده، موقتاً از DOM جدا می‌شن (نه فقط از یه کپی -
+  // چون تلاش قبلی که فقط طول رو کم می‌کرد نتیجه نداد)، محاسبه انجام
+  // می‌شه، و بلافاصله (همون تیک اجرا، قبل از هر رندر بعدی) دقیقاً به
+  // همون‌جا برمی‌گردن - با یه گره‌ی جای‌گزین (comment node) که موقعیت
+  // دقیقشون رو نگه می‌داره.
+  function withBookmarkMarkersDetached(container, callback) {
+    if (!container.querySelectorAll) {
+      return callback();
+    }
+
+    const markers = Array.from(container.querySelectorAll(".in-page-bookmark-marker"));
+
+    if (markers.length === 0) {
+      return callback();
+    }
+
+    const detached = markers.map(marker => {
+      const placeholder = document.createComment("bookmark-marker-placeholder");
+      marker.replaceWith(placeholder);
+      return { marker, placeholder };
+    });
+
+    try {
+      return callback();
+    } finally {
+      detached.forEach(({ marker, placeholder }) => {
+        placeholder.replaceWith(marker);
+      });
+    }
+  }
+
   function getTextOffsetBefore(container, node) {
-    const range = document.createRange();
+    return withBookmarkMarkersDetached(container, () => {
+      const range = document.createRange();
+      range.selectNodeContents(container);
+      range.setEndBefore(node);
+      return range.toString().length;
+    });
+  }
 
-    range.selectNodeContents(container);
-    range.setEndBefore(node);
-
-    return range.toString().length;
+  // Item جدید (همون رفع باگ بالا): متن یک container رو طوری برمی‌گردونه
+  // که انگار نشان‌های «🔖» نشانه‌های قبلی همین پاراگراف اصلاً وجود
+  // ندارن - چون این نشان‌ها جزو متن واقعی صفحه نیستن و نباید تو متن
+  // ذخیره‌شده/برش‌خوردهٔ یک نشانه یا نتیجهٔ جدید ظاهر بشن.
+  function getCleanContainerText(container) {
+    return withBookmarkMarkersDetached(container, () => container.textContent || "");
   }
 
   function getSnippetBounds(mark) {
     const container = getSnippetContainer(mark);
-    const rawText = container.textContent;
+    const rawText = getCleanContainerText(container);
     const startOffset = getTextOffsetBefore(container, mark);
     const endOffset = startOffset + mark.textContent.length;
 
@@ -3291,7 +3371,7 @@
   // produce broken/nested highlight markup.
   function buildParagraphExcerpt(group) {
     const { container, marks } = group;
-    const rawText = container.textContent || "";
+    const rawText = getCleanContainerText(container);
 
     const spans = marks
       .map(mark => getMatchOffsetsInContainer(mark, container))
@@ -3356,7 +3436,7 @@
       container = range.startContainer.parentElement || document.body;
     }
 
-    const rawText = container.textContent || "";
+    const rawText = getCleanContainerText(container);
     const startOffset = getTextOffsetBefore(container, range.startContainer) + range.startOffset;
     const endOffset = getTextOffsetBefore(container, range.endContainer) + range.endOffset;
 
@@ -3574,11 +3654,11 @@
       `).join("");
 
     panel.innerHTML = `
+      <button type="button" class="panel-close-x" id="inPageArchiveClose" title="بستن" aria-label="بستن">×</button>
       <div class="archive-header">
         <span>آرشیو نتایج (${items.length})</span>
         <div class="archive-header-actions">
           <button type="button" id="inPageArchiveClear">پاک‌کردن همه</button>
-          <button type="button" id="inPageArchiveClose">بستن</button>
         </div>
       </div>
       ${listHtml}
@@ -4117,7 +4197,7 @@
           return (
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-            `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text)}»</p>` +
+            `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>` +
             itemPageHtml +
             itemTagsHtml +
             `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
@@ -4173,7 +4253,7 @@
       const tagsHtml = group.tagGroups.map(tagGroup => {
         const entriesHtml = tagGroup.items.map((item, index) => `
           <div class="export-item">
-            <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text)}»</p>
+            <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>
             ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
             ${
               (item.tags && item.tags.length) ?
@@ -4462,6 +4542,7 @@
     const exportLabel = hasBookmarkSelection ? "انتخاب‌شده" : "نمایش‌داده‌شده";
 
     panel.innerHTML = `
+      <button type="button" class="panel-close-x" id="inPageBookmarksClose" title="بستن" aria-label="بستن">×</button>
       <div class="archive-header">
         <span>نشانه‌ها (${all.length})</span>
         <div class="archive-header-actions">
@@ -4494,7 +4575,6 @@
             id="inPageBookmarksText"
             title="دریافت نشانه‌های ${exportLabel} به‌صورت یک فایل متنی ساده"
             ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
-          <button type="button" id="inPageBookmarksClose">بستن</button>
         </div>
       </div>
       ${tagChipsHtml}

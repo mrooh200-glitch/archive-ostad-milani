@@ -464,11 +464,9 @@ function renderChatArchivePanelAi() {
         .join("");
 
   panel.innerHTML = `
+    <button type="button" class="panel-close-x" id="aiChatArchiveClose" title="بستن" aria-label="بستن">×</button>
     <div class="archive-header">
       <span>آرشیو گفتگوها (${conversations.length})</span>
-      <div class="archive-header-actions">
-        <button type="button" id="aiChatArchiveClose">بستن</button>
-      </div>
     </div>
     ${listHtml}
   `;
@@ -704,9 +702,9 @@ function createAiToolbar(getItems, emptyMessage) {
     <summary class="ai-toolbar-summary">⚙️ گزینه‌ها (کپی، خروجی، نشانه)</summary>
     <div class="ai-toolbar-buttons">
       <button type="button" class="ai-toolbar-btn" data-action="copy">📋 کپی</button>
-      <button type="button" class="ai-toolbar-btn" data-action="text">دریافت Text</button>
-      <button type="button" class="ai-toolbar-btn" data-action="word">دریافت Word</button>
-      <button type="button" class="ai-toolbar-btn" data-action="pdf">دریافت PDF</button>
+      <button type="button" class="ai-toolbar-btn" data-action="text">Text</button>
+      <button type="button" class="ai-toolbar-btn" data-action="word">Word</button>
+      <button type="button" class="ai-toolbar-btn" data-action="pdf">PDF</button>
       <button type="button" class="ai-toolbar-btn" data-action="bookmark">⭐ افزودن به نشانه</button>
       <button type="button" class="ai-toolbar-btn" data-action="view-bookmarks">🔖 مشاهدهٔ نشانه‌ها</button>
       <span class="ai-toolbar-status" aria-live="polite"></span>
