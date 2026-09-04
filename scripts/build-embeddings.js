@@ -76,64 +76,22 @@ function looksLikeToolArtifactTitle(title) {
   return junkPatterns.some((re) => re.test(title));
 }
 
-// ---------- ۳. بزرگ‌ترین اندازهٔ فونت استفاده‌شده تو یه پاراگراف (از style استخراج می‌شه) ----------
-function paragraphMaxFontSize($, el) {
-  let maxSize = 0;
-  $(el)
-    .find("span, font, b")
-    .addBack()
-    .each((_, node) => {
-      const style = $(node).attr("style") || "";
-      const match = style.match(/font-size\s*:\s*([\d.]+)pt/i);
-      if (match) {
-        const size = parseFloat(match[1]);
-        if (size > maxSize) maxSize = size;
-      }
-    });
-  return maxSize;
-}
-
-// ---------- ۴. پیداکردن عنوان از روی پاراگراف‌های بزرگ‌فونتِ ابتدای سند (صفحهٔ عنوان) ----------
-// وقتی <title> قابل‌اعتماد نیست، معمولاً عنوان واقعی کتاب همون چند پاراگراف اول سنده که
-// با بزرگ‌ترین فونت (نسبت به بقیهٔ صفحهٔ عنوان) نوشته شدن — حتی اگه هرکدوم تو یک <p> جدا باشن.
-function extractTitleFromLargeFontIntro($) {
-  const introParagraphs = $("p").slice(0, 60);
-  const sized = [];
-  let maxSizeSeen = 0;
-
-  introParagraphs.each((_, el) => {
-    const text = $(el).text().replace(/\s+/g, " ").trim();
-    if (!text) return; // پاراگراف‌های خالی (فاصله‌گذاری با nbsp) رو نادیده بگیر
-    const size = paragraphMaxFontSize($, el);
-    sized.push({ text, size });
-    if (size > maxSizeSeen) maxSizeSeen = size;
-  });
-
-  if (maxSizeSeen < 20) return null; // هیچ‌چیز به‌قدر کافی بزرگ نبود، این روش برای این فایل جواب نمی‌ده
-
-  const titleParts = sized
-    .filter((p) => p.size >= maxSizeSeen - 2)
-    .slice(0, 6)
-    .map((p) => p.text);
-
-  return titleParts.length > 0 ? titleParts.join(" ") : null;
-}
-
-// ---------- ۵. تعیین عنوان نهایی کتاب، با اولویت: <title> معتبر ← فونت بزرگ ← اسم فایل ----------
+// ---------- ۳. تعیین عنوان نهایی کتاب، با اولویت: <title> معتبر ← اسم فایل ----------
+// توجه: قبلاً اینجا یه heuristic هم بود که وقتی <title> معتبر نبود، سعی می‌کرد از
+// روی بزرگ‌ترین فونتِ پاراگراف‌های ابتدای سند عنوان رو حدس بزنه. اون روش حذف شد،
+// چون هم گاهی جمله‌های مهمِ متن اصلی (نه فقط عنوان) رو با فونت بزرگ اشتباه می‌گرفت،
+// هم تو بعضی فایل‌ها ترتیب حروف رو به‌هم می‌ریخت. الان اگه <title> معتبر نباشه،
+// فقط و فقط به اسم فایل برمی‌گردیم — امن‌ترین حالت، بدون هیچ حدس‌زدنی.
 function extractBookTitle($, filePath) {
   const titleTag = $("title").text().replace(/\s+/g, " ").trim();
   if (titleTag && !looksLikeToolArtifactTitle(titleTag)) {
     return titleTag;
   }
 
-  const fromLargeFont = extractTitleFromLargeFontIntro($);
-  if (fromLargeFont) return fromLargeFont;
-
-  // اگه هیچ‌کدوم جواب نداد، مثل قبل از اسم فایل استفاده کن (امن‌ترین حالت، بدون تغییر نسبت به قبل)
   return path.basename(filePath, path.extname(filePath));
 }
 
-// ---------- ۶. استخراج عنوان و پاراگراف‌های تمیز از هر فایل htm ----------
+// ---------- ۴. استخراج عنوان و پاراگراف‌های تمیز از هر فایل htm ----------
 function extractBookContent(filePath) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const $ = cheerio.load(raw);
@@ -162,7 +120,7 @@ function extractBookContent(filePath) {
   return { title, paragraphs };
 }
 
-// ---------- ۷. تبدیل پاراگراف‌ها به تکه‌های (chunk) با طول مناسب ----------
+// ---------- ۵. تبدیل پاراگراف‌ها به تکه‌های (chunk) با طول مناسب ----------
 function chunkParagraphs(paragraphs) {
   const chunks = [];
   let current = "";
