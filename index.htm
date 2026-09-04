@@ -980,29 +980,6 @@
       padding: 18px 20px 22px;
     }
 
-    /* Item جدید: دسترسی به «نشانه‌ها» از داخل بخش جست‌وجوی مفهومی/گفت‌وگو،
-       چون دکمهٔ چرخ‌دندهٔ اصلی (که این پنل را باز می‌کند) فقط داخل
-       searchPanel است و در تب aiPanel دیده نمی‌شود. */
-    .ai-bookmarks-access {
-      display: flex;
-      justify-content: flex-end;
-    }
-
-    .ai-bookmarks-btn {
-      border: 1px solid #93c5fd;
-      background: #eff6ff;
-      color: #1d4ed8;
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 0.85rem;
-      cursor: pointer;
-    }
-
-    .ai-bookmarks-btn:hover {
-      background: #dbeafe;
-      border-color: #60a5fa;
-    }
-
     .ai-section-title {
       margin: 0 0 6px;
       color: #173b63;
@@ -1013,6 +990,17 @@
       margin: 0 0 14px;
       color: #64748b;
       font-size: 0.88rem;
+    }
+
+    .ai-section-notice {
+      margin: 0 0 14px;
+      padding: 8px 12px;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      background: #fffbeb;
+      color: #92400e;
+      font-size: 0.8rem;
+      line-height: 1.8;
     }
 
     .ai-search-box-wrap {
@@ -1144,13 +1132,34 @@
       padding-left: 4px;
     }
 
-    .ai-chat-answer {
+    .ai-chat-turn {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .ai-chat-bubble {
+      max-width: 88%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 0.92rem;
+      line-height: 1.9;
+    }
+
+    .ai-chat-bubble-user {
+      align-self: flex-start;
+      background: #2563eb;
+      color: #ffffff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .ai-chat-bubble-assistant {
+      align-self: flex-end;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 14px 16px;
-      line-height: 2;
-      font-size: 0.95rem;
+      color: #1f2937;
+      border-bottom-left-radius: 4px;
     }
 
     .ai-chat-sources {
@@ -2144,16 +2153,6 @@
 
     <div id="aiPanel" class="tab-panel">
       <div class="ai-panel-inner">
-        <div class="ai-bookmarks-access">
-          <button
-            type="button"
-            id="aiOpenBookmarksButton"
-            class="ai-bookmarks-btn"
-            title="مشاهدهٔ نشانه‌های ذخیره‌شده">
-            🔖 نشانه‌ها
-          </button>
-        </div>
-
         <section class="ai-section">
           <h2 class="ai-section-title" title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">جست‌وجوی مفهومی</h2>
 
@@ -2177,6 +2176,9 @@
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
           <p class="ai-section-desc">
             پرسش پژوهشی خود را مطرح کنید؛ پاسخ منحصراً بر پایهٔ متون همین آرشیو تنظیم می‌شود. این گفتگو ادامه‌دار است و پرسش‌های بعدی شما با در نظر گرفتن سؤال‌های قبلی همین گفتگو پاسخ داده می‌شوند.
+          </p>
+          <p class="ai-section-notice">
+            ⚠️ پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.
           </p>
 
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
@@ -3922,15 +3924,6 @@
         if (event.target === bookmarksOverlayEl) {
           closeBookmarksPanel();
         }
-      });
-    }
-
-    // Item جدید: دکمهٔ «نشانه‌ها» داخل بخش جست‌وجوی مفهومی/گفت‌وگو، همان
-    // پنل نشانه‌های سراسری سایت را باز می‌کند - نیازی به پنل جدا نیست.
-    const aiOpenBookmarksButton = document.getElementById("aiOpenBookmarksButton");
-    if (aiOpenBookmarksButton) {
-      aiOpenBookmarksButton.addEventListener("click", () => {
-        openBookmarksPanel();
       });
     }
 

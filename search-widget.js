@@ -698,16 +698,19 @@ function openPrintableForItemsAi(items) {
 // {title, text, url} رو برمی‌گردونه — برای جست‌وجو: موارد تیک‌خورده؛
 // برای چت: همون یک پاسخ فعلی.
 function createAiToolbar(getItems, emptyMessage) {
-  const bar = document.createElement("div");
+  const bar = document.createElement("details");
   bar.className = "ai-result-toolbar";
   bar.innerHTML = `
-    <button type="button" class="ai-toolbar-btn" data-action="copy">📋 کپی</button>
-    <button type="button" class="ai-toolbar-btn" data-action="text">دریافت Text</button>
-    <button type="button" class="ai-toolbar-btn" data-action="word">دریافت Word</button>
-    <button type="button" class="ai-toolbar-btn" data-action="pdf">دریافت PDF</button>
-    <button type="button" class="ai-toolbar-btn" data-action="bookmark">⭐ افزودن به نشانه</button>
-    <button type="button" class="ai-toolbar-btn" data-action="view-bookmarks">🔖 مشاهدهٔ نشانه‌ها</button>
-    <span class="ai-toolbar-status" aria-live="polite"></span>
+    <summary class="ai-toolbar-summary">⚙️ گزینه‌ها (کپی، خروجی، نشانه)</summary>
+    <div class="ai-toolbar-buttons">
+      <button type="button" class="ai-toolbar-btn" data-action="copy">📋 کپی</button>
+      <button type="button" class="ai-toolbar-btn" data-action="text">دریافت Text</button>
+      <button type="button" class="ai-toolbar-btn" data-action="word">دریافت Word</button>
+      <button type="button" class="ai-toolbar-btn" data-action="pdf">دریافت PDF</button>
+      <button type="button" class="ai-toolbar-btn" data-action="bookmark">⭐ افزودن به نشانه</button>
+      <button type="button" class="ai-toolbar-btn" data-action="view-bookmarks">🔖 مشاهدهٔ نشانه‌ها</button>
+      <span class="ai-toolbar-status" aria-live="polite"></span>
+    </div>
   `;
 
   const status = bar.querySelector(".ai-toolbar-status");
@@ -795,15 +798,40 @@ function injectAiToolbarStyles() {
       min-width: 0;
     }
     .ai-result-toolbar {
+      margin: 10px 0;
+      padding: 6px 10px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .ai-toolbar-summary {
+      cursor: pointer;
+      list-style: none;
+      font-size: 0.82rem;
+      color: #64748b;
+      padding: 2px 0;
+      outline: none;
+      user-select: none;
+    }
+    .ai-toolbar-summary::-webkit-details-marker {
+      display: none;
+    }
+    .ai-toolbar-summary::before {
+      content: "▸ ";
+      display: inline-block;
+      transition: transform 0.15s ease;
+    }
+    .ai-result-toolbar[open] .ai-toolbar-summary::before {
+      transform: rotate(90deg);
+    }
+    .ai-toolbar-buttons {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 8px;
-      margin: 10px 0;
-      padding: 8px 10px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      background: #f8fafc;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #e2e8f0;
     }
     .ai-toolbar-btn {
       border: 1px solid #cbd5e1;
@@ -822,24 +850,10 @@ function injectAiToolbarStyles() {
       font-size: 0.82rem;
       color: #16a34a;
     }
-    /* Item جدید: گفتگوی ادامه‌دار - هر تبادل (سؤال+پاسخ) یه بلوک جدا،
-       زیر بلوک قبلی، بدون این‌که گفتگوی قبلی پاک بشه. */
-    .ai-chat-turn {
-      margin-bottom: 16px;
-      padding-bottom: 14px;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .ai-chat-turn:last-child {
-      border-bottom: none;
-    }
-    .ai-chat-question {
-      font-weight: bold;
-      color: #173b63;
-      margin-bottom: 6px;
-    }
-    .ai-chat-question::before {
-      content: "❓ ";
-    }
+    /* Item جدید: گفتگوی ادامه‌دار - .ai-chat-turn و حباب‌های سؤال/پاسخ
+       تو index.htm (کنار بقیهٔ استایل ثابت بخش گفتگو) تعریف شدن، نه
+       اینجا - چون این استایل‌ها به‌صورت پویا تزریق می‌شن و باید بعد از
+       بارگذاری صفحه هم پابرجا بمونن. */
     .ai-chat-pending {
       color: #64748b;
       font-size: 0.9rem;
@@ -976,9 +990,11 @@ document.addEventListener("DOMContentLoaded", () => {
         .map(
           (turn) => `
             <div class="ai-chat-turn">
-              <div class="ai-chat-question">${turn.question}</div>
-              <div class="ai-chat-answer">${turn.answer}</div>
-              <div class="ai-chat-sources">مآخذ: ${turn.sourceLinksHtml}</div>
+              <div class="ai-chat-bubble ai-chat-bubble-user">${turn.question}</div>
+              <div class="ai-chat-bubble ai-chat-bubble-assistant">
+                <div>${turn.answer}</div>
+                <div class="ai-chat-sources">مآخذ: ${turn.sourceLinksHtml}</div>
+              </div>
             </div>
           `
         )
