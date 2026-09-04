@@ -1923,7 +1923,7 @@
 
       #inPageArchivePanel {
         position: relative;
-        width: min(560px, 100%);
+        width: min(728px, 100%);
         max-height: 80vh;
         overflow-y: auto;
         background: #ffffff;
@@ -2041,7 +2041,7 @@
 
       #inPageBookmarksPanel {
         position: relative;
-        width: min(560px, 100%);
+        width: min(728px, 100%);
         max-height: 80vh;
         overflow-y: auto;
         background: #ffffff;
@@ -3758,7 +3758,7 @@
   // in the panel); the capped prefix is still a literal substring of
   // the real page text, so the browser's native text-fragment match
   // still finds it.
-  function buildSelectionBookmarkUrl(text) {
+  function buildSelectionBookmarkUrl(text, occurrenceIndex, page) {
     const base = location.origin + location.pathname;
     const trimmed = (text || "").trim();
 
@@ -3770,7 +3770,26 @@
       trimmed.slice(0, BOOKMARK_URL_FRAGMENT_MAX_LENGTH) :
       trimmed;
 
-    return `${base}#:~:text=${encodeURIComponent(fragment)}`;
+    // Item جدید (رفع باگ: هایلایت نشدن کلمه موقع «باز کردن» نشانه):
+    // این تابع قبلاً فقط #:~:text= می‌ساخت - بدون q/frag/occ. بدون q،
+    // applyIncomingQueryFromUrl() (که صفحه‌ی مقصد موقع بارگذاری صداش
+    // می‌کنه) زودتر از هرکاری برمی‌گشت، چون q رو خالی می‌دید - یعنی
+    // performSearch() اصلاً اجرا نمی‌شد و هیچ‌وقت هایلایت واقعیِ خودِ
+    // سایت (که رو q کار می‌کنه، نه رو #:~:text= بومی مرورگر) فعال
+    // نمی‌شد. الان دقیقاً هم‌ساختار buildMatchUrl، همون پارامترها رو
+    // می‌سازه - q رو هم به همون متن تنظیم می‌کنه تا performSearch این
+    // عبارت رو پیدا و هایلایت کنه.
+    const params = new URLSearchParams({
+      q: fragment,
+      frag: fragment,
+      occ: String(occurrenceIndex > 0 ? occurrenceIndex : 1)
+    });
+
+    if (page) {
+      params.set("page", page);
+    }
+
+    return `${base}?${params.toString()}#:~:text=${encodeURIComponent(fragment)}`;
   }
 
   function addBookmark({ text, url, tags, occurrenceIndex, links, page }) {
@@ -4888,7 +4907,7 @@
     if (pendingBookmarkMode === "selection") {
       addBookmark({
         text: pendingSelectionParagraphText || pendingSelectionText,
-        url: buildSelectionBookmarkUrl(pendingSelectionText),
+        url: buildSelectionBookmarkUrl(pendingSelectionText, pendingSelectionOccurrenceIndex, pendingSelectionPage),
         tags,
         occurrenceIndex: pendingSelectionOccurrenceIndex,
         links: pendingSelectionLinks,
@@ -6139,8 +6158,8 @@
         return (
           `<div class="in-page-search-result-item${activeClass}" data-index="${index}">` +
             `<div class="in-page-result-marker">` +
-              `<span class="in-page-result-number">${index + 1}</span>` +
               `<input type="checkbox" class="in-page-result-checkbox" data-index="${index}" ${checkedAttr} aria-label="انتخاب این نتیجه">` +
+              `<span class="in-page-result-number">${index + 1}</span>` +
               pageBadge +
             `</div>` +
             `<button type="button" class="in-page-search-result-jump" data-index="${index}">` +
@@ -6472,6 +6491,13 @@
       performSearch();
       pushSearchHistory(transcript);
       closeSearchHistoryDropdown();
+    });
+
+    inPageVoiceRecognition.addEventListener("error", event => {
+      if (button) {
+        button.title = `خطای جست‌وجوی صوتی: ${event.error}`;
+      }
+      console.error("خطای جست‌وجوی صوتی:", event.error);
     });
 
     inPageVoiceRecognition.addEventListener("end", () => {

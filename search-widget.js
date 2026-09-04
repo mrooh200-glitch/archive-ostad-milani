@@ -216,15 +216,17 @@ function textFragmentUrl(baseUrl, text) {
 // تاریخچه را به پرامپت Gemini اضافه کند) پاسخ بعدی واقعاً با در نظر
 // گرفتن سؤال‌های قبلی همین گفتگو ساخته شود - نه این‌که هر پرسش، بی‌خبر
 // از پرسش‌های قبلی، از صفر پاسخ داده شود.
-async function askQuestion(question, history = []) {
-  // اول مرتبط‌ترین بخش‌ها رو با همون جست‌وجوی معنایی پیدا کن
-  const relevant = await semanticSearch(question, 5);
+async function askQuestion(question, history = [], mode = "grounded") {
+  // Item جدید (پاسخ آزاد): تو این حالت، پاسخ قرار نیست به متون آرشیو
+  // محدود باشه - پس نیازی به جست‌وجوی معنایی (که یه تماس شبکه‌ی اضافه‌ست)
+  // نیست؛ context خالی می‌مونه و مآخذی هم نشون داده نمی‌شه.
+  const relevant = mode === "general" ? [] : await semanticSearch(question, 5);
   const contextTexts = relevant.map((r) => r.text);
 
   const chatRes = await fetch(`${WORKER_URL}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, context: contextTexts, history }),
+    body: JSON.stringify({ question, context: contextTexts, history, mode }),
   });
   if (!chatRes.ok) {
     let message = "خطا در دریافت پاسخ از دستیار";
@@ -469,6 +471,7 @@ function renderChatArchivePanelAi() {
               <div class="archive-item-title">${headerSources || "کتاب‌های نامشخص"}</div>
               ${turnsHtml}
               <div class="archive-item-actions">
+                <button type="button" data-chat-archive-continue="${escapeHtmlAi(conv.id)}">ادامهٔ گفتگو</button>
                 <button type="button" data-chat-archive-id="${escapeHtmlAi(conv.id)}">حذف</button>
               </div>
             </div>
@@ -492,6 +495,21 @@ function renderChatArchivePanelAi() {
   panel.querySelectorAll("[data-chat-archive-id]").forEach((button) => {
     button.addEventListener("click", () => {
       removeChatConversationAi(button.dataset.chatArchiveId);
+    });
+  });
+
+  // Item جدید (آرشیو گفتگو باز باشد): کاربر می‌تونه یه گفتگوی
+  // آرشیوشده رو دوباره فعال کنه و ادامه بده - به‌جای این‌که فقط
+  // بتونه ببینتش یا حذفش کنه.
+  panel.querySelectorAll("[data-chat-archive-continue]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const id = button.dataset.chatArchiveContinue;
+      const conversation = loadChatArchiveAi().find((c) => c.id === id);
+      if (!conversation) return;
+
+      document.dispatchEvent(new CustomEvent("ai-chat-continue-conversation", { detail: conversation }));
+      removeChatConversationAi(id);
+      closeChatArchivePanelAi();
     });
   });
 }
@@ -959,8 +977,8 @@ document.addEventListener("DOMContentLoaded", () => {
               (r, i) =>
                 `<div class="ai-search-result-row">
                   <div class="ai-result-marker">
-                    <span class="result-number">${i + 1}</span>
                     <input type="checkbox" class="result-checkbox ai-result-checkbox" data-ai-index="${i}" title="انتخاب برای کپی/خروجی/نشانه">
+                    <span class="result-number">${i + 1}</span>
                     ${r.page ? `<span class="ai-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${r.page}</span>` : ""}
                   </div>
                   <a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
@@ -1102,6 +1120,28 @@ document.addEventListener("DOMContentLoaded", () => {
       aiChatOutput.scrollTop = aiChatOutput.scrollHeight;
     }
 
+    // Item جدید (آرشیو گفتگو باز باشد): وقتی کاربر از پنل آرشیو
+    // «ادامهٔ گفتگو» رو می‌زنه، تبادل‌های اون گفتگوی آرشیوشده رو
+    // به‌عنوان گفتگوی فعال فعلی برمی‌گردونیم - اگه گفتگوی فعلی هم
+    // چیزی داشته باشه، اول خودش به آرشیو منتقل می‌شه تا از دست نره.
+    document.addEventListener("ai-chat-continue-conversation", (event) => {
+      archiveCurrentChatConversationAi(chatTurns);
+
+      chatTurns.length = 0;
+      (event.detail.turns || []).forEach((turn) => {
+        chatTurns.push({
+          question: turn.question,
+          answer: turn.answer,
+          sourceLinksHtml: formatSourcesInfoHtmlAi(turn.sourcesInfo),
+          sourcesText: (turn.sourcesInfo || []).map((s) => s.book).join("، "),
+          sourcesInfo: turn.sourcesInfo || [],
+        });
+      });
+
+      renderChatTurns();
+      aiChatInput.focus();
+    });
+
     aiChatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const question = aiChatInput.value.trim();
@@ -1122,7 +1162,9 @@ document.addEventListener("DOMContentLoaded", () => {
         // Item جدید (گفتگوی ادامه‌دار): تاریخچهٔ تبادل‌های قبلی همین
         // نشست، جدا از پرسش فعلی، به askQuestion فرستاده می‌شه.
         const history = chatTurns.map((turn) => ({ question: turn.question, answer: turn.answer }));
-        const { answer, sources } = await askQuestion(question, history);
+        const chatModeInput = document.querySelector('input[name="aiChatMode"]:checked');
+        const chatMode = chatModeInput ? chatModeInput.value : "grounded";
+        const { answer, sources } = await askQuestion(question, history, chatMode);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
 
         const sourceLinksHtml = sources

@@ -133,6 +133,13 @@
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
 
+    /* آیتم ۴: عبارت پس‌زمینه (placeholder) کادرهای جستجو باید محسوسا
+       کوچیک‌تر از خودِ متن کادر باشه - نه هم‌اندازه. */
+    .search-box::placeholder {
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
     /* Item 1: last-5 recent searches, shown on hover/focus while the
        box is empty. Shares localStorage (SEARCH_HISTORY_KEY) with the
        in-page book search, so a term searched on either surface shows
@@ -503,7 +510,7 @@
     #bookmarksPanel,
     #aiChatArchivePanel {
       position: relative;
-      width: min(560px, 100%);
+      width: min(728px, 100%);
       max-height: 80vh;
       overflow-y: auto;
       background: #ffffff;
@@ -619,7 +626,7 @@
     /* Item جدید: پنل «نشانه‌ها» - هم‌ساختار با #archivePanel بالا، به‌علاوهٔ
        فیلتر برچسب و گروه‌بندی بر اساس عنوان کتاب. */
     #bookmarksPanel {
-      width: min(560px, 100%);
+      width: min(728px, 100%);
       max-height: 80vh;
       overflow-y: auto;
       background: #ffffff;
@@ -1242,6 +1249,21 @@
       background: #f1f5f9;
       border-color: #94a3b8;
       color: #334155;
+    }
+
+    .ai-chat-mode-toggle {
+      display: flex;
+      gap: 16px;
+      margin: 0 0 10px;
+      font-size: 0.82rem;
+      color: #475569;
+    }
+
+    .ai-chat-mode-toggle label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
     }
 
     .ai-chat-tabs {
@@ -1960,7 +1982,7 @@
       <div class="book-columns">
 
         <div class="main-branch book-column">
-          <div class="book-column-title">اچ تی ام</div>
+          <div class="book-column-title">HTM</div>
 
           <div class="branch-content">
             <ul class="book-list">
@@ -2356,6 +2378,17 @@
 
         <section class="ai-section">
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
+
+          <div class="ai-chat-mode-toggle" role="radiogroup" aria-label="حالت پاسخ‌دهی">
+            <label>
+              <input type="radio" name="aiChatMode" value="grounded" checked>
+              پاسخ بر اساس متون آرشیو
+            </label>
+            <label>
+              <input type="radio" name="aiChatMode" value="general">
+              پاسخ آزاد (دانش عمومی)
+            </label>
+          </div>
 
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
 
@@ -4326,6 +4359,13 @@
         closeSearchHistoryDropdown();
       });
 
+      siteVoiceRecognition.addEventListener("error", event => {
+        if (button) {
+          button.title = describeVoiceError(event.error);
+        }
+        console.error("خطای جست‌وجوی صوتی:", event.error);
+      });
+
       siteVoiceRecognition.addEventListener("end", () => {
         if (button) {
           button.classList.remove("is-listening");
@@ -4336,6 +4376,26 @@
       });
 
       siteVoiceRecognition.start();
+    }
+
+    // Item جدید (رفع باگ: پاسخ صوتی «کار نمی‌کرد» بدون هیچ دلیلی): این
+    // پیام‌ها همون خطای واقعی مرورگر (رد شدن دسترسی میکروفون، نبود
+    // اینترنت، یا نشنیدن صدایی) رو قابل‌فهم می‌کنن - به‌جای اینکه دکمه
+    // بی‌سروصدا هیچ اتفاقی نیفته.
+    function describeVoiceError(error) {
+      switch (error) {
+        case "not-allowed":
+        case "permission-denied":
+          return "دسترسی به میکروفون رد شده - از تنظیمات مرورگر اجازه بدید";
+        case "no-speech":
+          return "صدایی شنیده نشد - دوباره امتحان کنید";
+        case "network":
+          return "خطای شبکه در جست‌وجوی صوتی - اتصال اینترنت را بررسی کنید";
+        case "audio-capture":
+          return "میکروفونی پیدا نشد";
+        default:
+          return `خطای جست‌وجوی صوتی: ${error}`;
+      }
     }
 
     const siteVoiceButton = document.getElementById("siteVoiceInput");
@@ -4390,6 +4450,13 @@
         // search-widget.js (که جست‌وجوی مفهومی رو انجام می‌ده) خودش
         // بگیردش - نیازی به دونستن جزئیات اون منطق اینجا نیست.
         input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+
+      aiVoiceRecognition.addEventListener("error", event => {
+        if (button) {
+          button.title = describeVoiceError(event.error);
+        }
+        console.error("خطای جست‌وجوی صوتی:", event.error);
       });
 
       aiVoiceRecognition.addEventListener("end", () => {
