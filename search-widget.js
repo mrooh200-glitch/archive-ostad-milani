@@ -364,22 +364,196 @@ function addItemsToBookmarksAi(items) {
   saveBookmarksAi(bookmarks);
 }
 
+// ---------- آرشیو گفتگوها (تاریخچهٔ کامل گفتگوهای پیشین با دستیار) ----------
+const AI_CHAT_ARCHIVE_STORAGE_KEY = "milaniChatConversationsArchive";
+
+function loadChatArchiveAi() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AI_CHAT_ARCHIVE_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveChatArchiveAi(items) {
+  try {
+    localStorage.setItem(AI_CHAT_ARCHIVE_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // ذخیره‌نشدن آرشیو گفتگو خطای مهمی نیست
+  }
+}
+
+// Item جدید: فهرست یکتای همهٔ کتاب‌هایی که در طول کل گفتگو (همهٔ
+// تبادل‌ها، نه فقط آخری) به‌عنوان منبع استفاده شدن، هرکدوم با شماره
+// صفحه‌اش - دقیقاً همون چیزی که برای عنوان آیتم آرشیوشده لازمه.
+function collectConversationSourcesAi(chatTurns) {
+  const seenBooks = new Set();
+  const sourcesInfo = [];
+  chatTurns.forEach((turn) => {
+    (turn.sourcesInfo || []).forEach((s) => {
+      if (seenBooks.has(s.book)) return;
+      seenBooks.add(s.book);
+      sourcesInfo.push(s);
+    });
+  });
+  return sourcesInfo;
+}
+
+// اگه گفتگوی فعلی خالی نباشه، کل آن رو به‌عنوان یک آیتم به آرشیو
+// گفتگوها اضافه می‌کنه؛ گفتگوی خالی (هیچ سؤالی پرسیده نشده) ذخیره نمی‌شه.
+function archiveCurrentChatConversationAi(chatTurns) {
+  if (!chatTurns || chatTurns.length === 0) return;
+
+  const archive = loadChatArchiveAi();
+  archive.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    turns: chatTurns.map((turn) => ({
+      question: turn.question,
+      answer: turn.answer,
+      sourcesInfo: turn.sourcesInfo || [],
+    })),
+    sourcesInfo: collectConversationSourcesAi(chatTurns),
+    savedAt: new Date().toISOString(),
+  });
+  saveChatArchiveAi(archive);
+}
+
+function removeChatConversationAi(id) {
+  saveChatArchiveAi(loadChatArchiveAi().filter((c) => c.id !== id));
+  renderChatArchivePanelAi();
+}
+
+// Item جدید: هر گفتگوی آرشیوشده، دقیقاً با همون قالب سؤال/پاسخ‌ازکتاب
+// که برای خروجی تک‌تبادلی ساختیم رندر می‌شه - فقط پشت‌سرهم، برای همهٔ
+// تبادل‌های همون گفتگو.
+function renderChatArchivePanelAi() {
+  const panel = document.getElementById("aiChatArchivePanel");
+  if (!panel) return;
+
+  const conversations = loadChatArchiveAi().slice().reverse();
+
+  const listHtml = conversations.length === 0
+    ? `<p class="archive-empty">هنوز گفتگویی در آرشیو ذخیره نشده است.</p>`
+    : conversations
+        .map((conv) => {
+          const headerSources = formatSourcesInfoLineAi(conv.sourcesInfo);
+          const turnsHtml = conv.turns
+            .map((turn) => {
+              const sourcesLine = formatSourcesInfoLineAi(turn.sourcesInfo);
+              return `
+                <div class="ai-chat-turn">
+                  <div class="ai-chat-question">${escapeHtmlAi(normalizeQuestionTextAi(turn.question))}</div>
+                  ${sourcesLine ? `<div class="ai-chat-sources">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}</div>` : ""}
+                  <div class="ai-chat-answer">${turn.answer}</div>
+                </div>
+              `;
+            })
+            .join("");
+
+          return `
+            <div class="archive-item">
+              <div class="archive-item-title">${headerSources ? escapeHtmlAi(headerSources) : "کتاب‌های نامشخص"}</div>
+              ${turnsHtml}
+              <div class="archive-item-actions">
+                <button type="button" data-chat-archive-id="${escapeHtmlAi(conv.id)}">حذف</button>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+  panel.innerHTML = `
+    <div class="archive-header">
+      <span>آرشیو گفتگوها (${conversations.length})</span>
+      <div class="archive-header-actions">
+        <button type="button" id="aiChatArchiveClose">بستن</button>
+      </div>
+    </div>
+    ${listHtml}
+  `;
+
+  const closeButton = panel.querySelector("#aiChatArchiveClose");
+  if (closeButton) {
+    closeButton.addEventListener("click", closeChatArchivePanelAi);
+  }
+
+  panel.querySelectorAll("[data-chat-archive-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      removeChatConversationAi(button.dataset.chatArchiveId);
+    });
+  });
+}
+
+function openChatArchivePanelAi() {
+  renderChatArchivePanelAi();
+  const overlay = document.getElementById("aiChatArchiveOverlay");
+  if (overlay) overlay.classList.add("open");
+}
+
+function closeChatArchivePanelAi() {
+  const overlay = document.getElementById("aiChatArchiveOverlay");
+  if (overlay) overlay.classList.remove("open");
+}
+
 // ---------- ساخت متن ساده / HTML غنی / سند Word / برگهٔ چاپی از یک لیست آیتم {title, text, url} ----------
+// Item جدید: سؤال گاهی به‌خاطر فاصله‌های اضافه یا خط‌جدیدهای نامرتب (مثلاً
+// از کپی‌پیست) به‌هم‌ریخته است؛ این تابع فقط همین فاصله‌گذاری رو یکسان و
+// مرتب می‌کنه - نه غلط‌گیری املایی یا بازنویسی معنایی سؤال.
+function normalizeQuestionTextAi(text) {
+  return String(text || "").replace(/\s+/g, " ").trim();
+}
+
+// Item جدید: خط «پاسخ از کتاب...» برای خروجی‌های گفتگو - هر کتاب یک‌بار،
+// با شماره صفحه‌اش کنارش (فقط اگه آن کتاب صفحه داشته باشه).
+function formatSourcesInfoLineAi(sourcesInfo) {
+  if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
+  return sourcesInfo
+    .map((s) => (s.page ? `${s.book} (صفحهٔ ${s.page})` : s.book))
+    .join("، ");
+}
+
 function buildPlainTextForItemsAi(items) {
   const divider = "─".repeat(32);
   return items
-    .map(
-      (item, i) =>
+    .map((item, i) => {
+      if (item.kind === "chat") {
+        const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        return (
+          `${i + 1}. سؤال: ${normalizeQuestionTextAi(item.question)}\n` +
+          (sourcesLine ? `   پاسخ از کتاب ${sourcesLine}:\n` : "   پاسخ:\n") +
+          `${divider}\n«${item.answer}»`
+        );
+      }
+
+      return (
         `${i + 1}. 📘 ${item.title}${item.page ? ` — صفحهٔ ${item.page}` : ""}\n${divider}\n«${item.text}»` +
         (item.url ? `\n🔗 لینک: ${item.url}` : "")
-    )
+      );
+    })
     .join("\n\n");
 }
 
 function buildRichHtmlForItemsAi(items) {
   return items
-    .map(
-      (item, i) =>
+    .map((item, i) => {
+      if (item.kind === "chat") {
+        const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        return (
+          `<div dir="ltr" style="margin:0 0 16px;text-align:right;">` +
+          `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
+          `font-weight:bold;color:#173b63;text-align:right;">${i + 1}. سؤال: ${escapeHtmlAi(normalizeQuestionTextAi(item.question))}</p>` +
+          (sourcesLine
+            ? `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:12px;` +
+              `color:#1d4ed8;text-align:right;">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}:</p>`
+            : "") +
+          `<p dir="ltr" style="margin:0;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
+          `line-height:1.9;color:#1f2937;text-align:right;">«${escapeHtmlAi(item.answer)}»</p>` +
+          `</div>`
+        );
+      }
+
+      return (
         `<div dir="ltr" style="margin:0 0 16px;text-align:right;">` +
         `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 8px;">` +
         `<tr><td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;` +
@@ -392,15 +566,32 @@ function buildRichHtmlForItemsAi(items) {
             `<a href="${escapeHtmlAi(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
           : "") +
         `</div>`
-    )
+      );
+    })
     .join("");
 }
 
 function buildWordDocForItemsAi(items) {
   const itemsHtml = items
-    .map(
-      (item, i) =>
-        `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:${i === 0 ? "0" : "18px"} 0 8px;">` +
+    .map((item, i) => {
+      const topMargin = i === 0 ? "0" : "18px";
+
+      if (item.kind === "chat") {
+        const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        return (
+          `<p dir="rtl" style="margin:${topMargin} 0 3px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
+          `font-weight:bold;color:#173b63;text-align:right;">${i + 1}. سؤال: ${escapeHtmlAi(normalizeQuestionTextAi(item.question))}</p>` +
+          (sourcesLine
+            ? `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:12px;` +
+              `color:#1d4ed8;text-align:right;">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}:</p>`
+            : "") +
+          `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
+          `line-height:1.9;color:#1f2937;text-align:right;">«${escapeHtmlAi(item.answer)}»</p>`
+        );
+      }
+
+      return (
+        `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:${topMargin} 0 8px;">` +
         `<tr><td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;` +
         `font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
         `📘\u00a0${escapeHtmlAi(item.title)}${item.page ? `\u00a0—\u00a0صفحهٔ ${escapeHtmlAi(String(item.page))}` : ""}</td></tr></table>` +
@@ -410,7 +601,8 @@ function buildWordDocForItemsAi(items) {
           ? `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:12px;text-align:right;">🔗 ` +
             `<a href="${escapeHtmlAi(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
           : "")
-    )
+      );
+    })
     .join("");
 
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -427,14 +619,24 @@ function buildWordDocForItemsAi(items) {
 
 function openPrintableForItemsAi(items) {
   const itemsHtml = items
-    .map(
-      (item, i) => `
+    .map((item, i) => {
+      if (item.kind === "chat") {
+        const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        return `
+      <div class="export-item">
+        <div class="export-book-title">${i + 1}. سؤال: ${escapeHtmlAi(normalizeQuestionTextAi(item.question))}</div>
+        ${sourcesLine ? `<p class="export-page">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}:</p>` : ""}
+        <p class="export-snippet">«${escapeHtmlAi(item.answer)}»</p>
+      </div>`;
+      }
+
+      return `
       <div class="export-item">
         <div class="export-book-title">📘 ${escapeHtmlAi(item.title)}${item.page ? ` — صفحهٔ ${escapeHtmlAi(String(item.page))}` : ""}</div>
         <p class="export-snippet"><strong>${i + 1}.</strong>&nbsp;«${escapeHtmlAi(item.text)}»</p>
         ${item.url ? `<p class="export-link">🔗 <a href="${escapeHtmlAi(item.url)}">لینک منبع</a></p>` : ""}
-      </div>`
-    )
+      </div>`;
+    })
     .join("");
 
   const doc = `<!DOCTYPE html>
@@ -448,6 +650,7 @@ function openPrintableForItemsAi(items) {
         .export-item { padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
         .export-book-title { margin: 0 0 6px; padding: 8px 12px; background: #eff6ff; border-right: 4px solid #2563eb; border-radius: 6px; font-size: 14px; font-weight: bold; color: #173b63; }
         .export-snippet { margin: 0 0 4px; font-size: 15px; line-height: 2; }
+        .export-page { margin: 0 0 4px; font-size: 12px; color: #1d4ed8; }
         .export-link { margin: 0; font-size: 12px; }
         .export-link a { color: #1d4ed8; text-decoration: none; }
         @media print { body { margin: 10mm; } }
@@ -729,9 +932,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const chatToolbar = createAiToolbar(
       () =>
         chatTurns.map((turn) => ({
+          kind: "chat",
           title: `پرسش: ${turn.question}`,
           text: turn.answer,
           url: turn.sourcesText,
+          question: turn.question,
+          answer: turn.answer,
+          sourcesInfo: turn.sourcesInfo,
         })),
       "ابتدا یک پاسخ دریافت کنید"
     );
@@ -779,11 +986,24 @@ document.addEventListener("DOMContentLoaded", () => {
           .map((s) => `<a href="${textFragmentUrl(encodeURI(s.source), s.text)}" target="_blank" rel="noopener">${s.book}</a>`)
           .join("، ");
 
+        // Item جدید: فهرست یکتای کتاب‌هایی که پاسخ از آن‌ها گرفته شده،
+        // هرکدوم با شماره صفحه‌اش (اگه داشت) - برای خط «پاسخ از کتاب...»
+        // در خروجی‌ها و آرشیو. اگه یک کتاب چند بار در منابع تکرار بشه
+        // (چند تکه از یک کتاب)، فقط یک‌بار (اولین صفحه‌اش) نگه داشته می‌شه.
+        const sourcesInfo = [];
+        const seenBooks = new Set();
+        sources.forEach((s) => {
+          if (seenBooks.has(s.book)) return;
+          seenBooks.add(s.book);
+          sourcesInfo.push({ book: s.book, page: s.page || null });
+        });
+
         chatTurns.push({
           question,
           answer,
           sourceLinksHtml,
           sourcesText: sources.map((s) => s.source).join("، "),
+          sourcesInfo,
         });
         renderChatTurns();
       } catch (err) {
@@ -799,14 +1019,30 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Item جدید: شروع گفتگوی تازه - چون گفتگو حالا ادامه‌دار و انباشتی
-    // شده، کاربر باید بتونه با اراده‌ی خودش تاریخچه رو خالی کنه، نه
-    // این‌که مجبور باشه هر بار همه‌چیز رو نگه داره.
+    // Item جدید: گفتگوی جدید - قبل از خالی‌کردن گفتگوی فعلی، کل آن
+    // (اگه خالی نبود) به‌عنوان یک آیتم کامل به آرشیو گفتگوها منتقل
+    // می‌شه - دقیقاً مثل محیط‌های چت معمولی که با «گفتگوی جدید» زدن،
+    // گفتگوی قبلی از دست نمی‌ره، فقط به تاریخچه/آرشیو می‌ره.
     const aiChatResetButton = document.getElementById("aiChatResetButton");
     if (aiChatResetButton) {
       aiChatResetButton.addEventListener("click", () => {
+        archiveCurrentChatConversationAi(chatTurns);
         chatTurns.length = 0;
         aiChatOutput.innerHTML = "";
+      });
+    }
+
+    const aiChatArchiveButton = document.getElementById("aiChatArchiveButton");
+    if (aiChatArchiveButton) {
+      aiChatArchiveButton.addEventListener("click", openChatArchivePanelAi);
+    }
+
+    const aiChatArchiveOverlayEl = document.getElementById("aiChatArchiveOverlay");
+    if (aiChatArchiveOverlayEl) {
+      aiChatArchiveOverlayEl.addEventListener("click", (event) => {
+        if (event.target === aiChatArchiveOverlayEl) {
+          closeChatArchivePanelAi();
+        }
       });
     }
   }

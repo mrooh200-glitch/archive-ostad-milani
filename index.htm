@@ -499,7 +499,9 @@
       display: flex;
     }
 
-    #archivePanel {
+    #archivePanel,
+    #bookmarksPanel,
+    #aiChatArchivePanel {
       width: min(560px, 100%);
       max-height: 80vh;
       overflow-y: auto;
@@ -508,7 +510,9 @@
       box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
     }
 
-    #archivePanel .archive-header {
+    #archivePanel .archive-header,
+    #bookmarksPanel .archive-header,
+    #aiChatArchivePanel .archive-header {
       position: sticky;
       top: 0;
       display: flex;
@@ -521,7 +525,9 @@
       font-weight: bold;
     }
 
-    #archivePanel .archive-header-actions {
+    #archivePanel .archive-header-actions,
+    #bookmarksPanel .archive-header-actions,
+    #aiChatArchivePanel .archive-header-actions {
       display: flex;
       align-items: center;
       gap: 8px;
@@ -557,7 +563,8 @@
 
     .archive-item-actions a,
     .archive-item-actions button,
-    #archivePanel .archive-header-actions button {
+    #archivePanel .archive-header-actions button,
+    #aiChatArchivePanel .archive-header-actions button {
       border: 1px solid #93c5fd;
       border-radius: 6px;
       background: #eff6ff;
@@ -571,7 +578,8 @@
 
     .archive-item-actions a:hover,
     .archive-item-actions button:hover,
-    #archivePanel .archive-header-actions button:hover {
+    #archivePanel .archive-header-actions button:hover,
+    #aiChatArchivePanel .archive-header-actions button:hover {
       background: #dbeafe;
     }
 
@@ -1082,8 +1090,17 @@
       border-color: #94a3b8;
     }
 
+    .ai-chat-tabs {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
     .ai-chat-output {
-      margin-top: 16px;
+      margin-top: 0;
+      max-height: 60vh;
+      overflow-y: auto;
+      padding-left: 4px;
     }
 
     .ai-chat-answer {
@@ -2157,6 +2174,8 @@
             پرسش پژوهشی خود را مطرح کنید؛ پاسخ منحصراً بر پایهٔ متون همین آرشیو تنظیم می‌شود. این گفتگو ادامه‌دار است و پرسش‌های بعدی شما با در نظر گرفتن سؤال‌های قبلی همین گفتگو پاسخ داده می‌شوند.
           </p>
 
+          <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
+
           <form id="aiChatForm" class="ai-chat-form">
             <input
               id="aiChatInput"
@@ -2167,12 +2186,18 @@
               aria-label="پرسش از دستیار هوشمند">
 
             <button type="submit" class="ai-chat-submit">ارسال پرسش</button>
-            <button type="button" id="aiChatResetButton" class="ai-chat-reset" title="پاک‌کردن تاریخچهٔ همین گفتگو و شروع از نو">شروع گفتگوی تازه</button>
           </form>
 
-          <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
+          <div class="ai-chat-tabs">
+            <button type="button" id="aiChatResetButton" class="ai-chat-reset" title="این گفتگو در آرشیو گفتگوها ذخیره می‌شود و یک گفتگوی تازه شروع می‌شود">➕ گفتگوی جدید</button>
+            <button type="button" id="aiChatArchiveButton" class="ai-chat-reset" title="مشاهدهٔ گفتگوهای قبلی ذخیره‌شده">🗂️ آرشیو گفتگوها</button>
+          </div>
         </section>
       </div>
+    </div>
+
+    <div id="aiChatArchiveOverlay" class="archive-overlay">
+      <div id="aiChatArchivePanel" role="dialog" aria-label="آرشیو گفتگوها"></div>
     </div>
 
     <div id="archiveOverlay" class="archive-overlay">
