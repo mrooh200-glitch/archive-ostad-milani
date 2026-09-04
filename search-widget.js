@@ -168,6 +168,26 @@ async function semanticSearch(query, topK = 5) {
   return scored.slice(0, topK);
 }
 
+// ---------- ساخت لینک به همان قطعهٔ متنی داخل صفحه (Text Fragment مرورگر) ----------
+// این یه ویژگی استاندارد مرورگرهاست: با اضافه‌کردن #:~:text=... به انتهای لینک،
+// مرورگر خودش صفحه رو تا اون متن اسکرول و هایلایتش می‌کنه — بدون نیاز به id یا
+// هیچ تغییری تو فایل‌های htm کتاب‌ها. چون متن‌های تکه‌ها می‌تونن طولانی باشن،
+// به‌جای کل متن، فقط چند کلمهٔ اول و چند کلمهٔ آخرش رو به‌عنوان «شروع» و «پایان»
+// بازه‌ی هایلایت می‌فرستیم؛ مرورگر خودش بین این دو رو کامل هایلایت می‌کنه.
+function textFragmentUrl(baseUrl, text) {
+  const words = (text || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return baseUrl;
+
+  const startWords = words.slice(0, 6).join(" ");
+  const endWords = words.length > 12 ? words.slice(-6).join(" ") : null;
+
+  const fragment = endWords
+    ? `${encodeURIComponent(startWords)},${encodeURIComponent(endWords)}`
+    : encodeURIComponent(startWords);
+
+  return `${baseUrl}#:~:text=${fragment}`;
+}
+
 // ---------- گفت‌وگو (پرسش‌وپاسخ بر اساس متن‌های مرتبط) ----------
 async function askQuestion(question) {
   // اول مرتبط‌ترین بخش‌ها رو با همون جست‌وجوی معنایی پیدا کن
@@ -228,7 +248,7 @@ document.addEventListener("DOMContentLoaded", () => {
           aiSearchResults.innerHTML = results
             .map(
               (r) =>
-                `<a class="ai-search-result" href="${encodeURI(r.source)}" target="_blank" rel="noopener">
+                `<a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
                   <strong>${r.book}</strong>
                   <p>${r.text}</p>
                   <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
@@ -262,7 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const { answer, sources } = await askQuestion(question);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
         const sourceLinks = sources
-          .map((s) => `<a href="${encodeURI(s.source)}" target="_blank" rel="noopener">${s.book}</a>`)
+          .map((s) => `<a href="${textFragmentUrl(encodeURI(s.source), s.text)}" target="_blank" rel="noopener">${s.book}</a>`)
           .join("، ");
         aiChatOutput.innerHTML = `
           <div class="ai-chat-answer">${answer}</div>
