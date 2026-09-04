@@ -2442,24 +2442,86 @@
       }
     }
 
-    // Item جدید: دانلود هم‌زمان همهٔ فایل‌های انتخاب‌شده (هم HTML، هم
-    // PDF). از همان دکمه‌های دانلود موجود هر آیتم (که addBookDownloadButtons
-    // ساخته) استفاده می‌کند - فقط به‌جای کلیک دستی کاربر، پشت‌سرهم و با
-    // کمی فاصلهٔ زمانی برایش شبیه‌سازی می‌شود، چون بیشتر مرورگرها چند
-    // دانلود کاملاً هم‌زمان از یک صفحه را مسدود یا بدون اجازه رد می‌کنند.
-    function downloadSelectedBooks() {
+    // Item جدید (بسته‌بندی zip): به‌جای چند دانلود پشت‌سرهم که مرورگر
+    // برای هرکدوم جدا تأیید می‌خواست، همهٔ فایل‌های انتخاب‌شده (هم HTML،
+    // هم PDF) با کتابخانهٔ JSZip یک‌جا داخل یک فایل zip بسته‌بندی و فقط
+    // با یک دانلود نهایی ذخیره می‌شوند - نیازی به تأیید تکراری کاربر نیست.
+    async function downloadSelectedBooks() {
       const urls = [...compareReadSelection];
+      if (urls.length === 0) return;
 
-      urls.forEach((url, index) => {
-        const item = searchableItems.find(el => {
-          const link = el.querySelector("a");
-          return (el.dataset.url || (link && link.getAttribute("href"))) === url;
-        });
-        const downloadBtn = item && item.querySelector(".book-download-btn");
-        if (downloadBtn) {
-          setTimeout(() => downloadBtn.click(), index * 400);
+      const downloadButton = document.getElementById("compareReadDownloadButton");
+      const originalLabel = downloadButton ? downloadButton.textContent : "";
+
+      if (typeof JSZip === "undefined") {
+        alert("کتابخانهٔ فشرده‌سازی (JSZip) بارگذاری نشد؛ اتصال اینترنت یا CDN را بررسی کنید.");
+        return;
+      }
+
+      if (downloadButton) {
+        downloadButton.disabled = true;
+        downloadButton.textContent = "در حال آماده‌سازی فایل فشرده…";
+      }
+
+      try {
+        const zip = new JSZip();
+        const usedNames = new Set();
+        let failedCount = 0;
+
+        for (const url of urls) {
+          const item = searchableItems.find(el => {
+            const link = el.querySelector("a");
+            return (el.dataset.url || (link && link.getAttribute("href"))) === url;
+          });
+          const downloadBtn = item && item.querySelector(".book-download-btn");
+          const rawFilename = (downloadBtn && downloadBtn.getAttribute("download")) || url.split("/").pop() || "file";
+
+          // جلوگیری از هم‌نام‌شدن دو فایل داخل همون zip (مثلاً دو کتاب
+          // مختلف که تصادفاً اسم فایل یکسانی داشته باشند).
+          let uniqueName = rawFilename;
+          let counter = 2;
+          while (usedNames.has(uniqueName)) {
+            const dot = rawFilename.lastIndexOf(".");
+            uniqueName = dot > -1 ?
+              `${rawFilename.slice(0, dot)} (${counter})${rawFilename.slice(dot)}` :
+              `${rawFilename} (${counter})`;
+            counter++;
+          }
+          usedNames.add(uniqueName);
+
+          try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            zip.file(uniqueName, blob);
+          } catch (fileError) {
+            failedCount++;
+            console.error(`دانلود «${uniqueName}» برای بسته‌بندی زیپ ناموفق بود:`, fileError);
+          }
         }
-      });
+
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const zipUrl = URL.createObjectURL(zipBlob);
+        const anchor = document.createElement("a");
+        anchor.href = zipUrl;
+        anchor.download = "کتاب‌های-انتخاب‌شده.zip";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(zipUrl), 5000);
+
+        if (failedCount > 0) {
+          alert(`دانلود ${failedCount} فایل از مجموعهٔ انتخاب‌شده ناموفق بود؛ بقیه در فایل zip قرار گرفتند.`);
+        }
+      } catch (error) {
+        alert("خطا در ساخت فایل فشرده. لطفاً دوباره تلاش کنید.");
+        console.error(error);
+      } finally {
+        if (downloadButton) {
+          downloadButton.disabled = compareReadSelection.size < 1;
+          downloadButton.textContent = originalLabel;
+        }
+      }
     }
 
     function openCompareReadView() {
@@ -6843,6 +6905,7 @@
     loadTextDocuments();
   </script>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="search-widget.js"></script>
 </body>
 </html>

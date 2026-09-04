@@ -234,9 +234,16 @@ async function askQuestion(question, history = []) {
 // برای جست‌وجوی متنی سایت (index.htm) ساخته شده. از همون کلید
 // localStorage استفاده می‌کنیم تا این نتایج هم توی همون پنل «نشانه‌ها»ی
 // سایت، کنار نتایج جست‌وجوی متنی، نشون داده بشن.
+//
+// رفع اشکال بحرانی: قبلاً این‌جا اشتباهاً از کلید آرشیو
+// ("milaniSearchResultsArchive") استفاده می‌شد، نه کلید واقعی نشانه‌ها
+// ("milaniBookmarks" — همون چیزی که in-page-search.js و دکمهٔ
+// «🔖 نشانه‌ها» می‌خونن). یعنی دکمهٔ «افزودن به نشانه» تو این بخش،
+// درواقع داشت آیتم رو تو آرشیو ذخیره می‌کرد، نه نشانه‌ها — برای همین
+// چیزی که اضافه می‌شد، هیچ‌وقت تو پنل «نشانه‌ها» دیده نمی‌شد.
 // ============================================================
 
-const AI_ARCHIVE_STORAGE_KEY = "milaniSearchResultsArchive";
+const AI_BOOKMARKS_STORAGE_KEY = "milaniBookmarks";
 
 function escapeHtmlAi(text) {
   return String(text || "")
@@ -319,35 +326,42 @@ async function copyRichTextAi(plainText, html) {
   }
 }
 
-function loadArchiveAi() {
+function loadBookmarksAi() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(AI_ARCHIVE_STORAGE_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(AI_BOOKMARKS_STORAGE_KEY) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function saveArchiveAi(items) {
+function saveBookmarksAi(items) {
   try {
-    localStorage.setItem(AI_ARCHIVE_STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(AI_BOOKMARKS_STORAGE_KEY, JSON.stringify(items));
   } catch {
     // ذخیره‌نشدن نشانه خطای مهمی نیست، کاربر می‌تونه دوباره امتحان کنه
   }
 }
 
-function addItemsToArchiveAi(items) {
-  const archive = loadArchiveAi();
+function addItemsToBookmarksAi(items) {
+  const bookmarks = loadBookmarksAi();
   items.forEach((item) => {
-    archive.push({
+    bookmarks.push({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title: item.title,
       text: item.text,
       url: item.url,
+      // این فیلدها رو هم‌شکل با نشانه‌های ساخته‌شده تو in-page-search.js
+      // نگه می‌داریم (حتی اگه اینجا همیشه خالی/پیش‌فرض باشن) تا پنل
+      // مشترک «نشانه‌ها» بدون فرض اضافه، هر دو نوع نشانه رو یکسان رندر کنه.
+      tags: [],
+      links: [],
+      occurrenceIndex: 1,
+      page: item.page || null,
       savedAt: new Date().toISOString(),
     });
   });
-  saveArchiveAi(archive);
+  saveBookmarksAi(bookmarks);
 }
 
 // ---------- ساخت متن ساده / HTML غنی / سند Word / برگهٔ چاپی از یک لیست آیتم {title, text, url} ----------
@@ -356,7 +370,8 @@ function buildPlainTextForItemsAi(items) {
   return items
     .map(
       (item, i) =>
-        `${i + 1}. 📘 ${item.title}\n${divider}\n«${item.text}»` + (item.url ? `\n🔗 لینک: ${item.url}` : "")
+        `${i + 1}. 📘 ${item.title}${item.page ? ` — صفحهٔ ${item.page}` : ""}\n${divider}\n«${item.text}»` +
+        (item.url ? `\n🔗 لینک: ${item.url}` : "")
     )
     .join("\n\n");
 }
@@ -369,7 +384,7 @@ function buildRichHtmlForItemsAi(items) {
         `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 8px;">` +
         `<tr><td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;` +
         `font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
-        `📘\u00a0${escapeHtmlAi(item.title)}</td></tr></table>` +
+        `📘\u00a0${escapeHtmlAi(item.title)}${item.page ? `\u00a0—\u00a0صفحهٔ ${escapeHtmlAi(String(item.page))}` : ""}</td></tr></table>` +
         `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
         `line-height:1.9;color:#1f2937;text-align:right;"><strong>${i + 1}.</strong>\u00a0«${escapeHtmlAi(item.text)}»</p>` +
         (item.url
@@ -388,7 +403,7 @@ function buildWordDocForItemsAi(items) {
         `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:${i === 0 ? "0" : "18px"} 0 8px;">` +
         `<tr><td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;` +
         `font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
-        `📘\u00a0${escapeHtmlAi(item.title)}</td></tr></table>` +
+        `📘\u00a0${escapeHtmlAi(item.title)}${item.page ? `\u00a0—\u00a0صفحهٔ ${escapeHtmlAi(String(item.page))}` : ""}</td></tr></table>` +
         `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
         `line-height:1.9;color:#1f2937;text-align:right;"><strong>${i + 1}.</strong>\u00a0«${escapeHtmlAi(item.text)}»</p>` +
         (item.url
@@ -415,7 +430,7 @@ function openPrintableForItemsAi(items) {
     .map(
       (item, i) => `
       <div class="export-item">
-        <div class="export-book-title">📘 ${escapeHtmlAi(item.title)}</div>
+        <div class="export-book-title">📘 ${escapeHtmlAi(item.title)}${item.page ? ` — صفحهٔ ${escapeHtmlAi(String(item.page))}` : ""}</div>
         <p class="export-snippet"><strong>${i + 1}.</strong>&nbsp;«${escapeHtmlAi(item.text)}»</p>
         ${item.url ? `<p class="export-link">🔗 <a href="${escapeHtmlAi(item.url)}">لینک منبع</a></p>` : ""}
       </div>`
@@ -461,6 +476,7 @@ function createAiToolbar(getItems, emptyMessage) {
     <button type="button" class="ai-toolbar-btn" data-action="word">دریافت Word</button>
     <button type="button" class="ai-toolbar-btn" data-action="pdf">دریافت PDF</button>
     <button type="button" class="ai-toolbar-btn" data-action="bookmark">⭐ افزودن به نشانه</button>
+    <button type="button" class="ai-toolbar-btn" data-action="view-bookmarks">🔖 مشاهدهٔ نشانه‌ها</button>
     <span class="ai-toolbar-status" aria-live="polite"></span>
   `;
 
@@ -475,13 +491,23 @@ function createAiToolbar(getItems, emptyMessage) {
     const btn = e.target.closest(".ai-toolbar-btn");
     if (!btn) return;
 
+    const action = btn.dataset.action;
+
+    // Item جدید: مشاهدهٔ نشانه‌ها به آیتم انتخاب‌شده نیازی نداره - برخلاف
+    // بقیهٔ دکمه‌ها، همیشه باید کار کنه، حتی وقتی چیزی انتخاب/تولید نشده.
+    if (action === "view-bookmarks") {
+      if (typeof openBookmarksPanel === "function") {
+        openBookmarksPanel();
+      }
+      return;
+    }
+
     const items = getItems();
     if (!items || items.length === 0) {
       setStatus(emptyMessage || "چیزی انتخاب نشده");
       return;
     }
 
-    const action = btn.dataset.action;
     if (action === "copy") {
       const ok = await copyRichTextAi(buildPlainTextForItemsAi(items), buildRichHtmlForItemsAi(items));
       setStatus(ok ? "کپی شد!" : "خطا در کپی");
@@ -492,7 +518,7 @@ function createAiToolbar(getItems, emptyMessage) {
     } else if (action === "pdf") {
       openPrintableForItemsAi(items);
     } else if (action === "bookmark") {
-      addItemsToArchiveAi(items);
+      addItemsToBookmarksAi(items);
       setStatus("به نشانه‌ها افزوده شد");
     }
   });
@@ -623,7 +649,7 @@ document.addEventListener("DOMContentLoaded", () => {
           .sort((a, b) => a - b)
           .map((i) => latestSearchResults[i])
           .filter(Boolean)
-          .map((r) => ({ title: r.book, text: r.text, url: r.source })),
+          .map((r) => ({ title: r.book, text: r.text, url: r.source, page: r.page })),
       "ابتدا یک یا چند نتیجه را با تیک انتخاب کنید"
     );
     aiSearchResults.insertAdjacentElement("afterend", searchToolbar);

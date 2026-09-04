@@ -3385,7 +3385,8 @@
         plainText: buildParagraphPlainText(excerpt),
         html: buildParagraphHtml(excerpt),
         url: buildMatchUrl(group.marks[0]),
-        links: excerpt.links
+        links: excerpt.links,
+        page: getPageNumberFromNode(group.marks[0])
       };
     });
   }
@@ -3991,7 +3992,7 @@
             "";
 
           return (
-            `   ${index + 1}. «${item.text}»${tagsLine}\n` +
+            `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}${tagsLine}\n` +
             `      🔗 لینک: ${item.url}` +
             buildLinksPlainTextSuffix(item.links, "      ")
           );
@@ -4027,10 +4028,16 @@
             `font-size:12px;color:#6d28d9;text-align:right;">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
             "";
 
+          const itemPageHtml = item.page ?
+            `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+            `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
+            "";
+
           return (
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
             `<strong>${index + 1}.</strong>\u00a0«${escapeHtml(item.text)}»</p>` +
+            itemPageHtml +
             itemTagsHtml +
             `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:12px;text-align:right;">🔗 ` +
@@ -4093,6 +4100,7 @@
         const entriesHtml = tagGroup.items.map((item, index) => `
           <div class="export-item">
             <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${escapeHtml(item.text)}»</p>
+            ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
             ${
               (item.tags && item.tags.length) ?
                 `<p class="export-link">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
@@ -4153,6 +4161,11 @@
             margin: 0 0 4px;
             font-size: 15px;
             line-height: 2;
+          }
+          .export-page {
+            margin: 0 0 4px;
+            font-size: 12px;
+            color: #1d4ed8;
           }
           .export-link {
             margin: 0 0 2px;
@@ -4858,7 +4871,7 @@
 
     const body = buildParagraphEntries(selected)
       .map((entry, index) => (
-        `${index + 1}. «${entry.plainText}»\n   🔗 ${formatShareLink("لینک منبع", entry.url)}` +
+        `${index + 1}. «${entry.plainText}»${entry.page ? `\n   📄 صفحهٔ ${entry.page}` : ""}\n   🔗 ${formatShareLink("لینک منبع", entry.url)}` +
         buildLinksPlainTextSuffix(entry.links, "   ")
       ))
       .join("\n\n");
@@ -4926,6 +4939,10 @@
         `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
         `<strong>${index + 1}.</strong>\u00a0«${entry.html}»</p>` +
+        (entry.page ?
+          `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(entry.page))}</p>` :
+          "") +
         `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:12px;text-align:right;">🔗 ` +
         `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>` +
@@ -4983,6 +5000,7 @@
       .map((entry, index) => `
         <div class="export-item">
           <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${entry.html}»</p>
+          ${entry.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(entry.page))}</p>` : ""}
           <p class="export-link">🔗 <a href="${escapeHtml(entry.url)}">لینک منبع</a></p>
           ${buildLinksPdfSuffix(entry.links)}
         </div>
@@ -5027,6 +5045,11 @@
             margin: 0 0 4px;
             font-size: 15px;
             line-height: 2;
+          }
+          .export-page {
+            margin: 0 0 4px;
+            font-size: 12px;
+            color: #1d4ed8;
           }
           .export-link {
             margin: 0;
@@ -6100,7 +6123,7 @@
 
     const textBody = entries
       .map((entry, index) => (
-        `${index + 1}. «${entry.plainText}»\n   🔗 ${formatShareLink("لینک منبع", entry.url)}` +
+        `${index + 1}. «${entry.plainText}»${entry.page ? `\n   📄 صفحهٔ ${entry.page}` : ""}\n   🔗 ${formatShareLink("لینک منبع", entry.url)}` +
         buildLinksPlainTextSuffix(entry.links, "   ")
       ))
       .join("\n\n");
@@ -6122,6 +6145,10 @@
         `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
         `<strong>${index + 1}.</strong>\u00a0«${entry.html}»</p>` +
+        (entry.page ?
+          `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+          `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(entry.page))}</p>` :
+          "") +
         `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
         `font-size:12px;text-align:right;">🔗 ` +
         `<a href="${escapeHtml(entry.url)}" style="color:#1d4ed8;text-decoration:none;">` +
