@@ -509,11 +509,24 @@ function injectAiToolbarStyles() {
       gap: 8px;
       margin-bottom: 10px;
     }
-    .ai-search-result-row .result-number {
+    .ai-search-result-row .ai-result-marker {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
       margin-top: 4px;
     }
-    .ai-search-result-row .ai-result-checkbox {
-      margin-top: 6px;
+    .ai-search-result-row .ai-result-marker .result-number {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    .ai-search-result-row .ai-result-marker .ai-result-page {
+      font-size: 0.72rem;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      white-space: nowrap;
     }
     .ai-search-result-row .ai-search-result {
       flex: 1;
@@ -607,8 +620,11 @@ document.addEventListener("DOMContentLoaded", () => {
             .map(
               (r, i) =>
                 `<div class="ai-search-result-row">
-                  <span class="result-number">${i + 1}</span>
-                  <input type="checkbox" class="result-checkbox ai-result-checkbox" data-ai-index="${i}" title="انتخاب برای کپی/خروجی/نشانه">
+                  <div class="ai-result-marker">
+                    <span class="result-number">${i + 1}</span>
+                    <input type="checkbox" class="result-checkbox ai-result-checkbox" data-ai-index="${i}" title="انتخاب برای کپی/خروجی/نشانه">
+                    ${r.page ? `<span class="ai-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${r.page}</span>` : ""}
+                  </div>
                   <a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
                     <strong>${r.book}</strong>
                     <p>${r.text}</p>

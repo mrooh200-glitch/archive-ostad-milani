@@ -128,6 +128,12 @@ function extractBookTitle($, filePath, titleIndex) {
 }
 
 // ---------- ۵. استخراج عنوان و پاراگراف‌های تمیز از هر فایل htm ----------
+// Item جدید (شمارهٔ صفحهٔ چاپی): برای فایل‌هایی که از پایپ‌لاین
+// صفحه‌بندی‌شده ساخته شده‌اند (مثل Osoul-al-Maaref-al-Elahiyya.htm)، هر
+// پاراگراف داخل <section class="pdf-page" data-page-number="N"> قرار
+// داره. اینجا همراه با متن هر پاراگراف، همون شماره صفحه (اگه وجود
+// داشته باشه) رو هم نگه می‌داریم تا بعداً تو embeddings.json ذخیره بشه.
+// برای فایل‌های خام Word که این ساختار رو ندارن، page همیشه null می‌مونه.
 function extractBookContent(filePath, titleIndex) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const $ = cheerio.load(raw);
@@ -138,7 +144,11 @@ function extractBookContent(filePath, titleIndex) {
   const paragraphs = [];
   $("p").each((_, el) => {
     const text = $(el).text().replace(/\s+/g, " ").trim();
-    if (text.length > 0) paragraphs.push(text);
+    if (text.length > 0) {
+      const pageSection = $(el).closest("section.pdf-page[data-page-number]");
+      const page = pageSection.length ? pageSection.attr("data-page-number") : null;
+      paragraphs.push({ text, page });
+    }
   });
 
   // اگه هیچ <p> پیدا نشد (ساختار متفاوت بود)، کل متن body رو بگیر و بر اساس خط جدید تقسیم کن
@@ -149,7 +159,8 @@ function extractBookContent(filePath, titleIndex) {
       paragraphs: bodyText
         .split(/\n+/)
         .map((t) => t.replace(/\s+/g, " ").trim())
-        .filter((t) => t.length > 0),
+        .filter((t) => t.length > 0)
+        .map((text) => ({ text, page: null })),
     };
   }
 
@@ -157,19 +168,25 @@ function extractBookContent(filePath, titleIndex) {
 }
 
 // ---------- ۶. تبدیل پاراگراف‌ها به تکه‌های (chunk) با طول مناسب ----------
+// Item جدید (شمارهٔ صفحهٔ چاپی): هر تکه، شمارهٔ صفحهٔ همون پاراگراف اولش
+// رو به‌عنوان شمارهٔ صفحهٔ کل تکه نگه می‌داره (چون یه تکه معمولاً داخل
+// یک صفحه یا نهایتاً مرز دو صفحهٔ پشت‌سرهم می‌مونه).
 function chunkParagraphs(paragraphs) {
   const chunks = [];
   let current = "";
+  let currentPage = null;
 
   for (const para of paragraphs) {
-    if ((current + " " + para).length > MAX_CHUNK_LENGTH && current.length >= MIN_CHUNK_LENGTH) {
-      chunks.push(current.trim());
-      current = para;
+    if ((current + " " + para.text).length > MAX_CHUNK_LENGTH && current.length >= MIN_CHUNK_LENGTH) {
+      chunks.push({ text: current.trim(), page: currentPage });
+      current = para.text;
+      currentPage = para.page;
     } else {
-      current = current ? current + " " + para : para;
+      if (!current) currentPage = para.page;
+      current = current ? current + " " + para.text : para.text;
     }
   }
-  if (current.trim().length > 0) chunks.push(current.trim());
+  if (current.trim().length > 0) chunks.push({ text: current.trim(), page: currentPage });
 
   return chunks;
 }
@@ -243,14 +260,14 @@ async function main() {
   const titleIndex = loadTitleIndexFromSiteIndex();
   console.log(`${titleIndex.size} عنوان از index.htm خونده شد.`);
 
-  const allChunks = []; // { book, source, text }
+  const allChunks = []; // { book, source, text, page }
 
   for (const file of files) {
     const { title: bookName, paragraphs } = extractBookContent(file, titleIndex);
     const chunks = chunkParagraphs(paragraphs);
     console.log(`  ${bookName}: ${paragraphs.length} پاراگراف → ${chunks.length} تکه`);
     for (const chunk of chunks) {
-      allChunks.push({ book: bookName, source: path.basename(file), text: chunk });
+      allChunks.push({ book: bookName, source: path.basename(file), text: chunk.text, page: chunk.page });
     }
   }
 
@@ -268,7 +285,7 @@ async function main() {
 
     if (prev && prev.vector) {
       // این تکه دقیقاً قبلاً هم بوده و متنش عوض نشده -- بردار قبلی رو نگه دار
-      results[i] = { book: chunk.book, source: chunk.source, text: chunk.text, vector: prev.vector };
+      results[i] = { book: chunk.book, source: chunk.source, text: chunk.text, page: chunk.page, vector: prev.vector };
     } else {
       toEmbed.push({ index: i, text: chunk.text });
     }
@@ -299,6 +316,7 @@ async function main() {
           book: chunk.book,
           source: chunk.source,
           text: chunk.text,
+          page: chunk.page,
           vector: vectorToBase64(vectors[j]),
         };
       }

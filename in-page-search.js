@@ -55,6 +55,10 @@
   // so it can be saved alongside the bookmark and later used to find the
   // exact same spot again (findRangeForBookmarkText).
   let pendingSelectionOccurrenceIndex = 1;
+  // Item جدید (شمارهٔ صفحهٔ چاپی): مثل بقیهٔ pendingSelection*، پیش از
+  // بسته‌شدن انتخاب زندهٔ صفحه گرفته می‌شود (رجوع کنید به
+  // handleDocumentSelectionChange) تا در addBookmark ذخیره شود.
+  let pendingSelectionPage = null;
   const bookmarkFilterTags = new Set();
   // Item جدید (انتخاب چندگانه): برخلاف bookmarkFilterTags که فقط
   // فهرست را فیلتر می‌کند، این مجموعه مشخص می‌کند کدام نشانه‌ها با
@@ -1760,6 +1764,22 @@
         text-align: center;
       }
 
+      /* Item جدید: نشان شمارهٔ صفحهٔ چاپی - فقط برای فایل‌هایی که این
+         شماره را دارند نمایش داده می‌شود (رجوع کنید به
+         getPageNumberFromNode)، هم‌ارز ظاهری .in-page-result-number. */
+      .in-page-result-page {
+        flex-shrink: 0;
+        min-width: 18px;
+        padding: 1px 5px;
+        border-radius: 9999px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        font-size: 0.65rem;
+        font-weight: bold;
+        text-align: center;
+        white-space: nowrap;
+      }
+
       .in-page-search-result-jump {
         flex: 1;
         min-width: 0;
@@ -2764,6 +2784,24 @@
     return mark.parentElement || document.body;
   }
 
+  // ---- Item جدید (شمارهٔ صفحهٔ چاپی) -----------------------------------
+  // فقط فایل‌های HTML‌ای که از همان پایپ‌لاین صفحه‌بندی‌شده ساخته شده‌اند
+  // (مثل Osoul-al-Maaref-al-Elahiyya.htm) هر بخش را داخل
+  // <section class="pdf-page" data-page-number="N"> نگه می‌دارند. برای
+  // بقیهٔ فایل‌ها (خروجی خام Word) این عنصر اصلاً وجود ندارد، پس تابع
+  // زیر به‌سادگی null برمی‌گرداند و هیچ‌جای دیگری از کد لازم نیست بداند
+  // فایل جاری صفحه‌بندی‌شده هست یا نه.
+  function getPageNumberFromNode(node) {
+    if (!node) {
+      return null;
+    }
+
+    const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    const pageEl = el && el.closest ? el.closest("section.pdf-page[data-page-number]") : null;
+
+    return pageEl ? pageEl.getAttribute("data-page-number") : null;
+  }
+
   function getTextOffsetBefore(container, node) {
     const range = document.createRange();
 
@@ -2901,6 +2939,11 @@
 
     if (isRootSearchEnabled()) {
       params.set("root", "1");
+    }
+
+    const pageNumber = getPageNumberFromNode(mark);
+    if (pageNumber) {
+      params.set("page", pageNumber);
     }
 
     return `${base}?${params.toString()}#:~:text=${encodeURIComponent(fragmentText)}`;
@@ -3389,6 +3432,7 @@
         title: title,
         text: getSnippetPlainText(mark),
         url: buildMatchUrl(mark),
+        page: getPageNumberFromNode(mark),
         savedAt: new Date().toISOString()
       });
     });
@@ -3431,7 +3475,7 @@
       `<p class="archive-empty">هنوز نتیجه‌ای در آرشیو ذخیره نشده است.</p>` :
       items.map(item => `
         <div class="archive-item">
-          <div class="archive-item-title">${escapeHtml(item.title || "")}</div>
+          <div class="archive-item-title">${escapeHtml(item.title || "")}${item.page ? ` <span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(item.page)}</span>` : ""}</div>
           <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
           <div class="archive-item-actions">
             <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
@@ -3547,7 +3591,7 @@
     return `${base}#:~:text=${encodeURIComponent(fragment)}`;
   }
 
-  function addBookmark({ text, url, tags, occurrenceIndex, links }) {
+  function addBookmark({ text, url, tags, occurrenceIndex, links, page }) {
     const trimmedText = (text || "").trim();
 
     if (!trimmedText) {
@@ -3571,6 +3615,9 @@
       // (in-text marker, same-page "بازکردن") even if the text repeats
       // elsewhere on the page.
       occurrenceIndex: occurrenceIndex > 0 ? occurrenceIndex : 1,
+      // Item جدید (شمارهٔ صفحهٔ چاپی): فقط برای فایل‌های صفحه‌بندی‌شده
+      // پر می‌شود؛ برای بقیه null می‌ماند.
+      page: page || null,
       savedAt: new Date().toISOString()
     });
 
@@ -4291,6 +4338,7 @@
                   ${selectedBookmarkIds.has(item.id) ? "checked" : ""}
                   aria-label="انتخاب این نشانه">
                 <div class="bookmark-item-content">
+                  ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(item.page)}</span>` : ""}
                   <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
                   <div class="archive-item-actions">
                     <a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">
@@ -4655,6 +4703,7 @@
     pendingBookmarkMode = null;
     pendingSelectionText = "";
     pendingSelectionLinks = [];
+    pendingSelectionPage = null;
 
     if (window.getSelection) {
       window.getSelection().removeAllRanges();
@@ -4671,7 +4720,8 @@
         url: buildSelectionBookmarkUrl(pendingSelectionText),
         tags,
         occurrenceIndex: pendingSelectionOccurrenceIndex,
-        links: pendingSelectionLinks
+        links: pendingSelectionLinks,
+        page: pendingSelectionPage
       });
     } else if (pendingBookmarkMode === "matches") {
       // Item جدید (رفع اشکال): قبلاً فقط snippet کوتاه ذخیره می‌شد؛ حالا
@@ -4692,7 +4742,8 @@
           url: buildMatchUrl(group.marks[0]),
           tags,
           occurrenceIndex: computeMatchOccurrenceIndex(group.marks[0]),
-          links: excerpt.links
+          links: excerpt.links,
+          page: getPageNumberFromNode(group.marks[0])
         });
       });
     }
@@ -4728,6 +4779,7 @@
       hideSelectionBookmarkButton();
       pendingSelectionText = "";
       pendingSelectionLinks = [];
+      pendingSelectionPage = null;
       return;
     }
 
@@ -4744,6 +4796,10 @@
       range.startOffset,
       selectedText
     );
+
+    // Item جدید (شمارهٔ صفحهٔ چاپی): باید همین‌جا، پیش از این‌که انتخاب
+    // صفحه از بین برود، محاسبه شود - درست مثل occurrenceIndex بالا.
+    pendingSelectionPage = getPageNumberFromNode(range.startContainer);
 
     // Item جدید (آدرس‌های داخل متن/پاورقی): همین‌جا هم، به همان دلیل -
     // پیش از آنکه انتخاب صفحه از بین برود - هر لینک واقعی داخل بازه‌ی
@@ -5879,12 +5935,17 @@
         const snippetHtml = buildSnippetHtml(mark);
         const activeClass = index === currentMatch ? " active" : "";
         const checkedAttr = selectedMatchIndexes.has(index) ? "checked" : "";
+        const pageNumber = getPageNumberFromNode(mark);
+        const pageBadge = pageNumber ?
+          `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(pageNumber)}</span>` :
+          "";
 
         return (
           `<div class="in-page-search-result-item${activeClass}" data-index="${index}">` +
             `<div class="in-page-result-marker">` +
               `<span class="in-page-result-number">${index + 1}</span>` +
               `<input type="checkbox" class="in-page-result-checkbox" data-index="${index}" ${checkedAttr} aria-label="انتخاب این نتیجه">` +
+              pageBadge +
             `</div>` +
             `<button type="button" class="in-page-search-result-jump" data-index="${index}">` +
               snippetHtml +
