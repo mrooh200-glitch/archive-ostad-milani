@@ -99,8 +99,30 @@ async function handleEmbed(request, env) {
   return jsonResponse({ vector });
 }
 
+// ---------- تلاش دوباره برای خطاهای موقتی Gemini (کد 503 / status UNAVAILABLE) ----------
+// این فقط دورِ خودِ تماس با Gemini رو می‌گیره؛ به بقیهٔ کد کاری نداره.
+// اگه بار اول موفق بشه (حالت معمول)، هیچ تأخیر اضافه‌ای ایجاد نمی‌کنه.
+async function fetchGeminiWithRetry(geminiUrl, requestBody, maxAttempts = 3) {
+  let lastRes;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    lastRes = await fetch(geminiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody,
+    });
+
+    if (lastRes.ok) return lastRes;
+
+    // فقط برای خطای 503 (شلوغی موقت مدل) دوباره تلاش کن؛ بقیهٔ خطاها
+    // (مثلاً کلید نامعتبر) با تلاش دوباره درست نمی‌شن، پس فوراً برگردون.
+    if (lastRes.status !== 503 || attempt === maxAttempts) return lastRes;
+
+    await new Promise((r) => setTimeout(r, 500 * attempt)); // کمی صبر قبل از تلاش بعدی
+  }
+  return lastRes;
+}
+
 // ---------- /chat : پاسخ‌سازی با Gemini بر اساس متن‌های مرتبط ----------
-// (بدون تغییر نسبت به نسخه‌ی فعلی — فعلاً کاری به این بخش نداریم)
 async function handleChat(request, env) {
   const body = await request.json();
   const question = (body.question || "").trim();
@@ -124,18 +146,16 @@ ${contextText}`;
 
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
-  const geminiRes = await fetch(geminiUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: `${systemPrompt}\n\nسؤال کاربر: ${question}` }],
-        },
-      ],
-    }),
+  const geminiRequestBody = JSON.stringify({
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: `${systemPrompt}\n\nسؤال کاربر: ${question}` }],
+      },
+    ],
   });
+
+  const geminiRes = await fetchGeminiWithRetry(geminiUrl, geminiRequestBody);
 
   if (!geminiRes.ok) {
     const errText = await geminiRes.text();
