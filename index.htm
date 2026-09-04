@@ -1287,42 +1287,6 @@
       text-decoration: underline;
     }
 
-    /* Item جدید: دکمهٔ دانلود مستقیم فایل کتاب (HTML یا PDF)، جدا از
-       لینک اصلی «مطالعه». به‌صورت خودکار توسط جاوااسکریپت برای هر
-       .searchable-item ساخته می‌شود (رجوع کنید به addBookDownloadButtons)
-       - نیازی به افزودن دستی آن در HTML نیست.
-       Item جدید (رفع اشکال ظاهری): این selector عمداً به‌صورت
-       ".book-list a.book-download-btn" (نه فقط ".book-download-btn")
-       نوشته شده - چون قانون کلی‌تر ".book-list a" (برای لینک اصلی
-       «مطالعه») از نظر specificity قوی‌تر از یک کلاس تنها بود و
-       flex:1 و padding بزرگ خودش را روی این دکمه هم تحمیل می‌کرد و آن
-       را به یک نوار کشیده (به‌جای یک آیکون کوچک مربعی) تبدیل می‌کرد. */
-    .book-list a.book-download-btn {
-      flex: 0 0 auto;
-      flex-shrink: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 32px;
-      height: 32px;
-      padding: 0;
-      margin: 0 2px;
-      border: 1px solid #93c5fd;
-      border-radius: 7px;
-      background: #eff6ff;
-      color: #1d4ed8;
-      text-decoration: none;
-      font-size: 0.95rem;
-      line-height: 1;
-      cursor: pointer;
-    }
-
-    .book-list a.book-download-btn:hover {
-      background: #dbeafe;
-      border-color: #60a5fa;
-      text-decoration: none;
-    }
-
     /* Item جدید: تیک انتخاب برای «مطالعهٔ کنار هم» - کنار هر کتاب،
        سمت چپِ خودِ لینک. */
     .compare-read-checkbox {
@@ -2357,48 +2321,6 @@
     // فقط کافی است <li class="searchable-item" ...> مطابق الگوی فعلی
     // اضافه یا حذف شود - این دکمه خودش، بدون هیچ ویرایش دستی جداگانه‌ای،
     // برای آیتم جدید ظاهر یا با حذف آیتم از بین می‌رود.
-    function addBookDownloadButtons() {
-      searchableItems.forEach(item => {
-        // اگر قبلاً برای این آیتم دکمه ساخته شده (مثلاً در فراخوانی
-        // دوباره)، دوباره اضافه نکن.
-        if (item.querySelector(".book-download-btn")) {
-          return;
-        }
-
-        const link = item.querySelector("a");
-        const url = item.dataset.url || (link && link.getAttribute("href"));
-
-        if (!link || !url) {
-          return;
-        }
-
-        const title = item.dataset.title || link.textContent.trim();
-        const isPdf = item.dataset.pdf === "true";
-        const extension = isPdf ? ".pdf" : ".htm";
-        const filename = url.split("/").pop() || `${title}${extension}`;
-
-        const downloadBtn = document.createElement("a");
-        downloadBtn.className = "book-download-btn";
-        downloadBtn.href = url;
-        // ویژگی download باعث می‌شود مرورگر فایل را مستقیماً ذخیره کند
-        // به‌جای باز کردنش در تب جدید (رفتار لینک اصلی «مطالعه»).
-        downloadBtn.setAttribute("download", filename);
-        downloadBtn.title = `دانلود فایل ${isPdf ? "PDF" : "HTML"}`;
-        downloadBtn.setAttribute("aria-label", `دانلود «${title}»`);
-        downloadBtn.textContent = "⬇";
-
-        // جلوگیری از تداخل با رویدادهای کلیک روی کل ردیف/آیتم (مثلاً
-        // چک‌باکس «مطالعهٔ کنار هم» که با insertBefore به ابتدای همین
-        // آیتم اضافه می‌شود).
-        downloadBtn.addEventListener("click", event => {
-          event.stopPropagation();
-        });
-
-        link.insertAdjacentElement("afterend", downloadBtn);
-      });
-    }
-
-    addBookDownloadButtons();
 
     // ---- Item جدید (رفع اشکال): scroll latching -----------------------
     // مرورگر (به‌خصوص کروم) در طول یک حرکت پیوستهٔ اسکرول، همون بلوک
@@ -2498,18 +2420,23 @@
             const link = el.querySelector("a");
             return (el.dataset.url || (link && link.getAttribute("href"))) === url;
           });
-          const downloadBtn = item && item.querySelector(".book-download-btn");
-          const rawFilename = (downloadBtn && downloadBtn.getAttribute("download")) || url.split("/").pop() || "file";
+
+          const link = item && item.querySelector("a");
+          const title = (item && item.dataset.title) || (link && link.textContent.trim()) || "کتاب";
+          const isPdf = item && item.dataset.pdf === "true";
+          const extension = isPdf ? ".pdf" : ".htm";
+          // Item جدید: اسم فایل داخل زیپ از عنوان فارسی/عربی خودِ کتاب
+          // (همون data-title تو index.htm) ساخته می‌شه، نه از اسم فایل
+          // لاتین روی دیسک - چون این زیپ برای مطالعهٔ کاربره، نه برای
+          // بارگذاری دوباره رو سایت.
+          const rawFilename = `${title}${extension}`;
 
           // جلوگیری از هم‌نام‌شدن دو فایل داخل همون zip (مثلاً دو کتاب
-          // مختلف که تصادفاً اسم فایل یکسانی داشته باشند).
+          // مختلف که تصادفاً عنوان یکسانی داشته باشند).
           let uniqueName = rawFilename;
           let counter = 2;
           while (usedNames.has(uniqueName)) {
-            const dot = rawFilename.lastIndexOf(".");
-            uniqueName = dot > -1 ?
-              `${rawFilename.slice(0, dot)} (${counter})${rawFilename.slice(dot)}` :
-              `${rawFilename} (${counter})`;
+            uniqueName = `${title} (${counter})${extension}`;
             counter++;
           }
           usedNames.add(uniqueName);
@@ -3629,13 +3556,6 @@
           <![endif]-->
         </head>
         <body dir="rtl" style="font-family:Tahoma,Arial,sans-serif;">
-          <table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 12px;">
-            <tr>
-              <td style="padding:9px 14px;background:#f5f3ff;border-right:4px solid #6d28d9;
-                font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;
-                color:#173b63;text-align:right;">🔖&nbsp;نشانه‌ها</td>
-            </tr>
-          </table>
           ${itemsHtml}
         </body>
       </html>`;

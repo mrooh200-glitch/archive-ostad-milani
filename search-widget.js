@@ -437,14 +437,14 @@ function renderChatArchivePanelAi() {
     ? `<p class="archive-empty">هنوز گفتگویی در آرشیو ذخیره نشده است.</p>`
     : conversations
         .map((conv) => {
-          const headerSources = formatSourcesInfoLineAi(conv.sourcesInfo);
+          const headerSources = formatSourcesInfoHtmlAi(conv.sourcesInfo);
           const turnsHtml = conv.turns
             .map((turn) => {
-              const sourcesLine = formatSourcesInfoLineAi(turn.sourcesInfo);
+              const sourcesLine = formatSourcesInfoHtmlAi(turn.sourcesInfo);
               return `
                 <div class="ai-chat-turn">
                   <div class="ai-chat-question">${escapeHtmlAi(normalizeQuestionTextAi(turn.question))}</div>
-                  ${sourcesLine ? `<div class="ai-chat-sources">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}</div>` : ""}
+                  ${sourcesLine ? `<div class="ai-chat-sources">پاسخ از کتاب ${sourcesLine}</div>` : ""}
                   <div class="ai-chat-answer">${turn.answer}</div>
                 </div>
               `;
@@ -453,7 +453,7 @@ function renderChatArchivePanelAi() {
 
           return `
             <div class="archive-item">
-              <div class="archive-item-title">${headerSources ? escapeHtmlAi(headerSources) : "کتاب‌های نامشخص"}</div>
+              <div class="archive-item-title">${headerSources || "کتاب‌های نامشخص"}</div>
               ${turnsHtml}
               <div class="archive-item-actions">
                 <button type="button" data-chat-archive-id="${escapeHtmlAi(conv.id)}">حذف</button>
@@ -505,12 +505,37 @@ function normalizeQuestionTextAi(text) {
 }
 
 // Item جدید: خط «پاسخ از کتاب...» برای خروجی‌های گفتگو - هر کتاب یک‌بار،
-// با شماره صفحه‌اش کنارش (فقط اگه آن کتاب صفحه داشته باشه).
+// با شماره صفحه‌اش کنارش (فقط اگه آن کتاب صفحه داشته باشه). این نسخه
+// فقط اسم کتاب‌ها رو برمی‌گردونه (برای متن ساده)؛ لینک‌ها جدا اضافه می‌شن.
 function formatSourcesInfoLineAi(sourcesInfo) {
   if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
   return sourcesInfo
     .map((s) => (s.page ? `${s.book} (صفحهٔ ${s.page})` : s.book))
     .join("، ");
+}
+
+// آیتم ۴ (لینک‌دهی مثل جست‌وجوی مفهومی): همون خط بالا، ولی هر اسم کتاب
+// خودش یه لینک واقعی به همون بخش از کتابه - برای خروجی‌های HTML/Word/PDF.
+function formatSourcesInfoHtmlAi(sourcesInfo) {
+  if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
+  return sourcesInfo
+    .map((s) => {
+      const label = s.page ? `${escapeHtmlAi(s.book)} (صفحهٔ ${escapeHtmlAi(String(s.page))})` : escapeHtmlAi(s.book);
+      return s.url
+        ? `<a href="${escapeHtmlAi(s.url)}" style="color:#1d4ed8;text-decoration:none;">${label}</a>`
+        : label;
+    })
+    .join("، ");
+}
+
+// نسخهٔ متن‌سادهٔ فهرست لینک‌ها - هر کتاب و آدرسش در یک خط، برای فایل
+// txt که اصلاً نمی‌تونه لینک قابل‌کلیک داشته باشه.
+function formatSourcesInfoLinksPlainTextAi(sourcesInfo, indent) {
+  if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
+  return sourcesInfo
+    .filter((s) => s.url)
+    .map((s) => `\n${indent}🔗 ${s.book}: ${s.url}`)
+    .join("");
 }
 
 function buildPlainTextForItemsAi(items) {
@@ -519,10 +544,12 @@ function buildPlainTextForItemsAi(items) {
     .map((item, i) => {
       if (item.kind === "chat") {
         const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        const linksSuffix = formatSourcesInfoLinksPlainTextAi(item.sourcesInfo, "   ");
         return (
           `${i + 1}. سؤال: ${normalizeQuestionTextAi(item.question)}\n` +
           (sourcesLine ? `   پاسخ از کتاب ${sourcesLine}:\n` : "   پاسخ:\n") +
-          `${divider}\n«${item.answer}»`
+          `${divider}\n«${item.answer}»` +
+          linksSuffix
         );
       }
 
@@ -538,14 +565,14 @@ function buildRichHtmlForItemsAi(items) {
   return items
     .map((item, i) => {
       if (item.kind === "chat") {
-        const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        const sourcesLine = formatSourcesInfoHtmlAi(item.sourcesInfo);
         return (
           `<div dir="ltr" style="margin:0 0 16px;text-align:right;">` +
           `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
           `font-weight:bold;color:#173b63;text-align:right;">${i + 1}. سؤال: ${escapeHtmlAi(normalizeQuestionTextAi(item.question))}</p>` +
           (sourcesLine
             ? `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:12px;` +
-              `color:#1d4ed8;text-align:right;">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}:</p>`
+              `color:#1d4ed8;text-align:right;">پاسخ از کتاب ${sourcesLine}:</p>`
             : "") +
           `<p dir="ltr" style="margin:0;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
           `line-height:1.9;color:#1f2937;text-align:right;">«${escapeHtmlAi(item.answer)}»</p>` +
@@ -577,13 +604,13 @@ function buildWordDocForItemsAi(items) {
       const topMargin = i === 0 ? "0" : "18px";
 
       if (item.kind === "chat") {
-        const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        const sourcesLine = formatSourcesInfoHtmlAi(item.sourcesInfo);
         return (
           `<p dir="rtl" style="margin:${topMargin} 0 3px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
           `font-weight:bold;color:#173b63;text-align:right;">${i + 1}. سؤال: ${escapeHtmlAi(normalizeQuestionTextAi(item.question))}</p>` +
           (sourcesLine
             ? `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:12px;` +
-              `color:#1d4ed8;text-align:right;">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}:</p>`
+              `color:#1d4ed8;text-align:right;">پاسخ از کتاب ${sourcesLine}:</p>`
             : "") +
           `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
           `line-height:1.9;color:#1f2937;text-align:right;">«${escapeHtmlAi(item.answer)}»</p>`
@@ -621,11 +648,11 @@ function openPrintableForItemsAi(items) {
   const itemsHtml = items
     .map((item, i) => {
       if (item.kind === "chat") {
-        const sourcesLine = formatSourcesInfoLineAi(item.sourcesInfo);
+        const sourcesLine = formatSourcesInfoHtmlAi(item.sourcesInfo);
         return `
       <div class="export-item">
         <div class="export-book-title">${i + 1}. سؤال: ${escapeHtmlAi(normalizeQuestionTextAi(item.question))}</div>
-        ${sourcesLine ? `<p class="export-page">پاسخ از کتاب ${escapeHtmlAi(sourcesLine)}:</p>` : ""}
+        ${sourcesLine ? `<p class="export-page">پاسخ از کتاب ${sourcesLine}:</p>` : ""}
         <p class="export-snippet">«${escapeHtmlAi(item.answer)}»</p>
       </div>`;
       }
@@ -995,7 +1022,11 @@ document.addEventListener("DOMContentLoaded", () => {
         sources.forEach((s) => {
           if (seenBooks.has(s.book)) return;
           seenBooks.add(s.book);
-          sourcesInfo.push({ book: s.book, page: s.page || null });
+          sourcesInfo.push({
+            book: s.book,
+            page: s.page || null,
+            url: textFragmentUrl(encodeURI(s.source), s.text),
+          });
         });
 
         chatTurns.push({

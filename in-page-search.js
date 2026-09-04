@@ -59,6 +59,12 @@
   // بسته‌شدن انتخاب زندهٔ صفحه گرفته می‌شود (رجوع کنید به
   // handleDocumentSelectionChange) تا در addBookmark ذخیره شود.
   let pendingSelectionPage = null;
+  // Item جدید (رفع رگرسیون - پاراگراف کامل حتی برای انتخاب یک کلمه):
+  // متن پاراگراف کامل (تا ۱۵۰۰ کاراکتر، با کلمهٔ انتخاب‌شده پررنگ‌شده)
+  // که دور انتخاب زندهٔ کاربر ساخته می‌شه - جدا از pendingSelectionText
+  // که فقط عین همون چیزیه که کاربر با موس انتخاب کرده (ممکنه یک کلمه
+  // باشه). این متن پاراگرافه که در نهایت به‌عنوان text نشانه ذخیره می‌شه.
+  let pendingSelectionParagraphText = "";
   const bookmarkFilterTags = new Set();
   // Item جدید (انتخاب چندگانه): برخلاف bookmarkFilterTags که فقط
   // فهرست را فیلتر می‌کند، این مجموعه مشخص می‌کند کدام نشانه‌ها با
@@ -3300,6 +3306,57 @@
     };
   }
 
+  // Item جدید (نشانه‌گذاری با انتخاب دستی): همون کاری که buildParagraphExcerpt
+  // برای مچ‌های <mark> جست‌وجو می‌کنه، ولی برای یک انتخاب خام (Range) که
+  // کاربر مستقیم روی متن صفحه کشیده - حتی اگه فقط یک کلمه باشه. نتیجه
+  // دقیقاً هم‌شکل خروجی buildParagraphExcerpt‌ـه، پس همون buildParagraphPlainText/
+  // buildParagraphHtml روش کار می‌کنن، بدون نیاز به تغییر اونا.
+  function buildParagraphExcerptFromRange(range) {
+    let el = range.startContainer.nodeType === Node.ELEMENT_NODE ?
+      range.startContainer :
+      range.startContainer.parentElement;
+    let container = null;
+
+    while (el && el !== document.body) {
+      if (SNIPPET_BLOCK_TAGS.has(el.tagName)) {
+        container = el;
+        break;
+      }
+      el = el.parentElement;
+    }
+
+    if (!container) {
+      container = range.startContainer.parentElement || document.body;
+    }
+
+    const rawText = container.textContent || "";
+    const startOffset = getTextOffsetBefore(container, range.startContainer) + range.startOffset;
+    const endOffset = getTextOffsetBefore(container, range.endContainer) + range.endOffset;
+
+    const mergedSpans = [{ start: startOffset, end: endOffset }];
+
+    let sliceStart = 0;
+    let sliceEnd = rawText.length;
+
+    if (rawText.length > PARAGRAPH_EXPORT_MAX_LENGTH) {
+      const spanLength = endOffset - startOffset;
+      const padding = Math.max(0, Math.floor((PARAGRAPH_EXPORT_MAX_LENGTH - spanLength) / 2));
+
+      sliceStart = Math.max(0, startOffset - padding);
+      sliceEnd = Math.min(rawText.length, endOffset + padding);
+    }
+
+    return {
+      rawText,
+      sliceStart,
+      sliceEnd,
+      spans: mergedSpans,
+      truncatedBefore: sliceStart > 0,
+      truncatedAfter: sliceEnd < rawText.length,
+      links: collectLinksInContainerRange(container, sliceStart, sliceEnd)
+    };
+  }
+
   // Plain-text targets have no bold/color, so the matched term(s) are
   // marked with a plain, unambiguous **term** wrapper instead - kept
   // deliberately simple rather than markdown-flavored, since this is
@@ -3981,9 +4038,6 @@
   }
 
   function buildBookmarkExportPlainText(items) {
-    const divider = "─".repeat(32);
-    const header = `🔖 نشانه‌ها\n${divider}`;
-
     const body = buildBookmarkExportGroups(items).map(group => {
       const tagsBody = group.tagGroups.map(tagGroup => {
         const itemsBody = tagGroup.items.map((item, index) => {
@@ -4004,7 +4058,7 @@
       return `${group.mainNumber} - ${group.bookTitle}\n\n${tagsBody}`;
     }).join("\n\n");
 
-    return `${header}\n\n${body}`;
+    return body;
   }
 
   function exportBookmarksAsText(items) {
@@ -4076,13 +4130,6 @@
         <![endif]-->
       </head>
       <body dir="rtl" style="font-family:Tahoma,Arial,sans-serif;">
-        <table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 12px;">
-          <tr>
-            <td style="padding:9px 14px;background:#f5f3ff;border-right:4px solid #6d28d9;
-              font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;
-              color:#173b63;text-align:right;">🔖&nbsp;نشانه‌ها</td>
-          </tr>
-        </table>
         ${itemsHtml}
       </body>
     </html>`;
@@ -4198,7 +4245,6 @@
         </style>
       </head>
       <body>
-        <div class="export-header">🔖 نشانه‌ها</div>
         ${itemsHtml}
         <script>window.onload = () => window.print();<\/script>
       </body>
@@ -4717,6 +4763,7 @@
     pendingSelectionText = "";
     pendingSelectionLinks = [];
     pendingSelectionPage = null;
+    pendingSelectionParagraphText = "";
 
     if (window.getSelection) {
       window.getSelection().removeAllRanges();
@@ -4729,7 +4776,7 @@
 
     if (pendingBookmarkMode === "selection") {
       addBookmark({
-        text: pendingSelectionText,
+        text: pendingSelectionParagraphText || pendingSelectionText,
         url: buildSelectionBookmarkUrl(pendingSelectionText),
         tags,
         occurrenceIndex: pendingSelectionOccurrenceIndex,
@@ -4793,6 +4840,7 @@
       pendingSelectionText = "";
       pendingSelectionLinks = [];
       pendingSelectionPage = null;
+      pendingSelectionParagraphText = "";
       return;
     }
 
@@ -4813,6 +4861,20 @@
     // Item جدید (شمارهٔ صفحهٔ چاپی): باید همین‌جا، پیش از این‌که انتخاب
     // صفحه از بین برود، محاسبه شود - درست مثل occurrenceIndex بالا.
     pendingSelectionPage = getPageNumberFromNode(range.startContainer);
+
+    // Item جدید (رفع رگرسیون - پاراگراف کامل حتی برای انتخاب یک کلمه):
+    // دقیقاً به همون دلیل بالا، همین‌جا و همین لحظه (پیش از این‌که
+    // انتخاب از بین برود) کل پاراگراف اطراف انتخاب (تا ۱۵۰۰ کاراکتر،
+    // با متن انتخاب‌شده پررنگ) ساخته می‌شه - نه فقط عین کلمه/عبارتی که
+    // کاربر انتخاب کرده.
+    try {
+      const paragraphExcerpt = buildParagraphExcerptFromRange(range);
+      pendingSelectionParagraphText = buildParagraphPlainText(paragraphExcerpt);
+    } catch (error) {
+      // اگه به هر دلیلی ساخت پاراگراف شکست خورد، همون متن خام انتخاب
+      // رو نگه می‌داریم - بهتر از هیچی، نه یه خطای غیرمنتظره.
+      pendingSelectionParagraphText = selectedText;
+    }
 
     // Item جدید (آدرس‌های داخل متن/پاورقی): همین‌جا هم، به همان دلیل -
     // پیش از آنکه انتخاب صفحه از بین برود - هر لینک واقعی داخل بازه‌ی
