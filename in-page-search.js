@@ -4612,6 +4612,10 @@
     const selectAllButton = panel.querySelector("#inPageBookmarksSelectAll");
     if (selectAllButton) {
       selectAllButton.addEventListener("click", () => {
+        // Item جدید (رفع باگ): اگه قبلاً با یه فیلتر برچسب دیگه چیزی
+        // انتخاب شده بود، اول پاک می‌شه - وگرنه «انتخاب همه» موارد
+        // فیلتر جدید رو روی انتخاب‌های قدیمیِ فیلتر قبلی اضافه می‌کرد.
+        selectedBookmarkIds.clear();
         items.forEach(item => selectedBookmarkIds.add(item.id));
         renderBookmarksPanel();
       });

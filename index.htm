@@ -588,6 +588,7 @@
     .archive-item-actions a,
     .archive-item-actions button,
     #archivePanel .archive-header-actions button,
+    #bookmarksPanel .archive-header-actions button,
     #aiChatArchivePanel .archive-header-actions button {
       border: 1px solid #93c5fd;
       border-radius: 6px;
@@ -603,6 +604,7 @@
     .archive-item-actions a:hover,
     .archive-item-actions button:hover,
     #archivePanel .archive-header-actions button:hover,
+    #bookmarksPanel .archive-header-actions button:hover,
     #aiChatArchivePanel .archive-header-actions button:hover {
       background: #dbeafe;
     }
@@ -1039,17 +1041,6 @@
       font-size: 0.88rem;
     }
 
-    .ai-section-notice {
-      margin: 0 0 14px;
-      padding: 8px 12px;
-      border: 1px solid #fde68a;
-      border-radius: 8px;
-      background: #fffbeb;
-      color: #92400e;
-      font-size: 0.8rem;
-      line-height: 1.8;
-    }
-
     .ai-search-box-wrap {
       max-width: 100%;
       flex: none;
@@ -1168,8 +1159,20 @@
 
     .ai-chat-tabs {
       display: flex;
+      align-items: center;
       gap: 8px;
       margin-top: 10px;
+      flex-wrap: nowrap;
+    }
+
+    .ai-chat-tabs-notice {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      color: #92400e;
+      font-size: 0.76rem;
     }
 
     .ai-chat-output {
@@ -1870,7 +1873,7 @@
       <div class="book-columns">
 
         <div class="main-branch book-column">
-          <div class="book-column-title">HTM </div>
+          <div class="book-column-title">اچ تی ام</div>
 
           <div class="branch-content">
             <ul class="book-list">
@@ -2221,12 +2224,6 @@
 
         <section class="ai-section">
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
-          <p class="ai-section-desc">
-            پرسش پژوهشی خود را مطرح کنید؛ پاسخ منحصراً بر پایهٔ متون همین آرشیو تنظیم می‌شود. این گفتگو ادامه‌دار است و پرسش‌های بعدی شما با در نظر گرفتن سؤال‌های قبلی همین گفتگو پاسخ داده می‌شوند.
-          </p>
-          <p class="ai-section-notice">
-            ⚠️ پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.
-          </p>
 
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
 
@@ -2236,7 +2233,7 @@
               class="search-box"
               type="text"
               autocomplete="off"
-              placeholder="پرسش خود را وارد کنید…"
+              placeholder="گفتگوی پژوهشی خود را شروع کنید…"
               aria-label="پرسش از دستیار هوشمند">
 
             <button type="submit" class="ai-chat-submit">ارسال پرسش</button>
@@ -2245,6 +2242,7 @@
           <div class="ai-chat-tabs">
             <button type="button" id="aiChatResetButton" class="ai-chat-reset" title="این گفتگو در آرشیو گفتگوها ذخیره می‌شود و یک گفتگوی تازه شروع می‌شود">➕ گفتگوی جدید</button>
             <button type="button" id="aiChatArchiveButton" class="ai-chat-reset" title="مشاهدهٔ گفتگوهای قبلی ذخیره‌شده">🗂️ آرشیو گفتگوها</button>
+            <span class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ با مأخذ تطبیق دهید.</span>
           </div>
         </section>
       </div>
@@ -3955,6 +3953,7 @@
       const selectAllButton = panel.querySelector("#bookmarksSelectAll");
       if (selectAllButton) {
         selectAllButton.addEventListener("click", () => {
+          selectedBookmarkIds.clear();
           items.forEach(item => selectedBookmarkIds.add(item.id));
           renderBookmarksPanel();
         });
