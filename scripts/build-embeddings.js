@@ -53,16 +53,47 @@ function findHtmFiles(dir) {
     if (entry.isDirectory()) {
       if (["node_modules", ".git", ".github", "scripts"].includes(entry.name)) continue;
       files = files.concat(findHtmFiles(path.join(dir, entry.name)));
+    } else if (entry.name.toLowerCase() === "index.htm" || entry.name.toLowerCase() === "index.html") {
+      // فایل index.htm/index.html که خود سایته رو رد کن، نه یه کتاب
+      continue;
     } else if (entry.name.toLowerCase().endsWith(".htm") || entry.name.toLowerCase().endsWith(".html")) {
-      // فایل index.html که خود سایته رو رد کن
-      if (entry.name.toLowerCase() === "index.html") continue;
       files.push(path.join(dir, entry.name));
     }
   }
   return files;
 }
 
-// ---------- ۲. تشخیص این‌که آیا تگ <title> واقعاً عنوان کتابه یا باقیمانده‌ی یه ابزار/افزونه ----------
+// ---------- ۲. خوندن نگاشت «اسم فایل → عنوان فارسی» از خودِ index.htm ----------
+// index.htm از قبل یه لیست دستی و دقیق از عنوان‌های فارسی/عربی هر کتاب داره
+// (همون data-title که جست‌وجوی متنی سایت هم ازش استفاده می‌کنه). به‌جای حدس‌زدن
+// عنوان از داخل خودِ فایل htm هر کتاب، همین‌جا رو منبع اصلی و قابل‌اعتماد می‌گیریم.
+function loadTitleIndexFromSiteIndex() {
+  const map = new Map();
+  const indexPath = path.join(REPO_ROOT, "index.htm");
+
+  if (!fs.existsSync(indexPath)) {
+    console.warn("هشدار: index.htm پیدا نشد؛ عنوان‌ها به تگ <title> یا اسم فایل برمی‌گردن.");
+    return map;
+  }
+
+  try {
+    const raw = fs.readFileSync(indexPath, "utf-8");
+    const $ = cheerio.load(raw);
+    $("li.searchable-item[data-url]").each((_, el) => {
+      const url = $(el).attr("data-url");
+      const title = $(el).attr("data-title");
+      if (url && title && !url.toLowerCase().endsWith(".pdf")) {
+        map.set(path.basename(url), title.trim());
+      }
+    });
+  } catch (err) {
+    console.warn("هشدار: خوندن index.htm ناموفق بود؛ عنوان‌ها به <title> یا اسم فایل برمی‌گردن.", err.message);
+  }
+
+  return map;
+}
+
+// ---------- ۳. تشخیص این‌که آیا تگ <title> واقعاً عنوان کتابه یا باقیمانده‌ی یه ابزار/افزونه ----------
 // بعضی از خروجی‌های Word (مثلاً افزونه‌های فارسی‌ساز فاصله‌گذاری) به‌جای عنوان واقعی،
 // اسم یه دستور یا ماکرو داخلی رو تو تگ <title> می‌ذارن. این تابع همچین حالت‌هایی رو تشخیص می‌ده.
 function looksLikeToolArtifactTitle(title) {
@@ -76,13 +107,18 @@ function looksLikeToolArtifactTitle(title) {
   return junkPatterns.some((re) => re.test(title));
 }
 
-// ---------- ۳. تعیین عنوان نهایی کتاب، با اولویت: <title> معتبر ← اسم فایل ----------
+// ---------- ۴. تعیین عنوان نهایی کتاب، با اولویت: ایندکس دستی سایت ← <title> معتبر ← اسم فایل ----------
 // توجه: قبلاً اینجا یه heuristic هم بود که وقتی <title> معتبر نبود، سعی می‌کرد از
 // روی بزرگ‌ترین فونتِ پاراگراف‌های ابتدای سند عنوان رو حدس بزنه. اون روش حذف شد،
 // چون هم گاهی جمله‌های مهمِ متن اصلی (نه فقط عنوان) رو با فونت بزرگ اشتباه می‌گرفت،
-// هم تو بعضی فایل‌ها ترتیب حروف رو به‌هم می‌ریخت. الان اگه <title> معتبر نباشه،
-// فقط و فقط به اسم فایل برمی‌گردیم — امن‌ترین حالت، بدون هیچ حدس‌زدنی.
-function extractBookTitle($, filePath) {
+// هم تو بعضی فایل‌ها ترتیب حروف رو به‌هم می‌ریخت. الان اولویت اول، همون عنوانیه که
+// خودِ شما تو index.htm برای این کتاب تعریف کردید (titleIndex) — چون قبلاً دستی و
+// دقیق تأیید شده، بدون هیچ حدسی. اگه کتاب تو titleIndex نبود، به <title> فایل و
+// در آخر به اسم فایل برمی‌گردیم.
+function extractBookTitle($, filePath, titleIndex) {
+  const fromSiteIndex = titleIndex.get(path.basename(filePath));
+  if (fromSiteIndex) return fromSiteIndex;
+
   const titleTag = $("title").text().replace(/\s+/g, " ").trim();
   if (titleTag && !looksLikeToolArtifactTitle(titleTag)) {
     return titleTag;
@@ -91,12 +127,12 @@ function extractBookTitle($, filePath) {
   return path.basename(filePath, path.extname(filePath));
 }
 
-// ---------- ۴. استخراج عنوان و پاراگراف‌های تمیز از هر فایل htm ----------
-function extractBookContent(filePath) {
+// ---------- ۵. استخراج عنوان و پاراگراف‌های تمیز از هر فایل htm ----------
+function extractBookContent(filePath, titleIndex) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const $ = cheerio.load(raw);
 
-  const title = extractBookTitle($, filePath);
+  const title = extractBookTitle($, filePath, titleIndex);
 
   // خروجی Word معمولاً متن رو داخل تگ‌های <p> می‌ذاره
   const paragraphs = [];
@@ -120,7 +156,7 @@ function extractBookContent(filePath) {
   return { title, paragraphs };
 }
 
-// ---------- ۵. تبدیل پاراگراف‌ها به تکه‌های (chunk) با طول مناسب ----------
+// ---------- ۶. تبدیل پاراگراف‌ها به تکه‌های (chunk) با طول مناسب ----------
 function chunkParagraphs(paragraphs) {
   const chunks = [];
   let current = "";
@@ -204,10 +240,13 @@ async function main() {
   const files = findHtmFiles(REPO_ROOT);
   console.log(`${files.length} فایل پیدا شد:`, files.map((f) => path.basename(f)));
 
+  const titleIndex = loadTitleIndexFromSiteIndex();
+  console.log(`${titleIndex.size} عنوان از index.htm خونده شد.`);
+
   const allChunks = []; // { book, source, text }
 
   for (const file of files) {
-    const { title: bookName, paragraphs } = extractBookContent(file);
+    const { title: bookName, paragraphs } = extractBookContent(file, titleIndex);
     const chunks = chunkParagraphs(paragraphs);
     console.log(`  ${bookName}: ${paragraphs.length} پاراگراف → ${chunks.length} تکه`);
     for (const chunk of chunks) {
