@@ -1065,6 +1065,23 @@
       background: #1e40af;
     }
 
+    .ai-chat-reset {
+      padding: 0 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      background: #fff;
+      color: #64748b;
+      font: inherit;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .ai-chat-reset:hover {
+      background: #f1f5f9;
+      border-color: #94a3b8;
+    }
+
     .ai-chat-output {
       margin-top: 16px;
     }
@@ -2137,7 +2154,7 @@
         <section class="ai-section">
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
           <p class="ai-section-desc">
-            پرسش پژوهشی خود را مطرح کنید؛ پاسخ منحصراً بر پایهٔ متون همین آرشیو تنظیم می‌شود.
+            پرسش پژوهشی خود را مطرح کنید؛ پاسخ منحصراً بر پایهٔ متون همین آرشیو تنظیم می‌شود. این گفتگو ادامه‌دار است و پرسش‌های بعدی شما با در نظر گرفتن سؤال‌های قبلی همین گفتگو پاسخ داده می‌شوند.
           </p>
 
           <form id="aiChatForm" class="ai-chat-form">
@@ -2150,6 +2167,7 @@
               aria-label="پرسش از دستیار هوشمند">
 
             <button type="submit" class="ai-chat-submit">ارسال پرسش</button>
+            <button type="button" id="aiChatResetButton" class="ai-chat-reset" title="پاک‌کردن تاریخچهٔ همین گفتگو و شروع از نو">شروع گفتگوی تازه</button>
           </form>
 
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
