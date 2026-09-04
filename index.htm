@@ -502,12 +502,36 @@
     #archivePanel,
     #bookmarksPanel,
     #aiChatArchivePanel {
+      position: relative;
       width: min(560px, 100%);
       max-height: 80vh;
       overflow-y: auto;
       background: #ffffff;
       border-radius: 14px;
       box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
+    }
+
+    /* آیتم ۳: علامت × گوشهٔ پنل، به‌جای دکمهٔ متنی «بستن» - هر سه پنل
+       (نشانه‌ها، آرشیو نتایج، آرشیو گفتگوها). */
+    .panel-close-x {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      width: 30px;
+      height: 30px;
+      border: none;
+      background: transparent;
+      color: #64748b;
+      font-size: 1.3rem;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 6px;
+      z-index: 1;
+    }
+
+    .panel-close-x:hover {
+      background: #f1f5f9;
+      color: #1f2937;
     }
 
     #archivePanel .archive-header,
@@ -687,6 +711,29 @@
       color: #6d28d9;
       font-size: 0.74rem;
       font-weight: bold;
+    }
+
+    /* آیتم جدید (انتخاب چندگانه، هم‌ارز in-page-search.js) */
+    .bookmark-item-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .in-page-bookmark-checkbox {
+      flex-shrink: 0;
+      margin: 3px 0 0;
+      cursor: pointer;
+    }
+
+    .bookmark-item-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    #bookmarksPanel .bookmark-selection-badge {
+      color: #64748b;
+      font-size: 0.72rem;
     }
 
     .in-page-result-page {
@@ -1823,7 +1870,7 @@
       <div class="book-columns">
 
         <div class="main-branch book-column">
-          <div class="book-column-title">HTML</div>
+          <div class="book-column-title">اچ تی ام</div>
 
           <div class="branch-content">
             <ul class="book-list">
@@ -3394,11 +3441,11 @@
         `).join("");
 
       panel.innerHTML = `
+        <button type="button" class="panel-close-x" id="archiveCloseButton" title="بستن" aria-label="بستن">×</button>
         <div class="archive-header">
           <span>آرشیو نتایج (${items.length})</span>
           <div class="archive-header-actions">
             <button type="button" id="archiveClearButton">پاک‌کردن همه</button>
-            <button type="button" id="archiveCloseButton">بستن</button>
           </div>
         </div>
         ${listHtml}
@@ -3472,6 +3519,10 @@
     }
 
     const bookmarkFilterTags = new Set();
+    // Item جدید (یکسان‌سازی با in-page-search.js): کدام نشانه‌ها با
+    // چک‌باکس علامت خورده‌اند - برای اینکه خروجی سه‌گانه فقط شامل
+    // زیرمجموعه‌ی انتخاب‌شده باشه، نه همیشه همه‌ی نشانه‌های نمایشی.
+    const selectedBookmarkIds = new Set();
 
     function addSelectedResultsToBookmarks(tags) {
       const selected = getSelectedResultsInOrder();
@@ -3596,7 +3647,7 @@
           return `${tagGroup.subNumber} - 🏷️ ${tagGroup.tagLabel}\n${itemsBody}`;
         }).join("\n\n");
 
-        return `${group.mainNumber} - 📘 ${group.bookTitle}\n\n${tagsBody}`;
+        return `${group.mainNumber} - ${group.bookTitle}\n\n${tagsBody}`;
       }).join("\n\n");
 
       downloadTextFile("نشانه‌ها.txt", body);
@@ -3612,7 +3663,7 @@
           const entriesHtml = tagGroup.items.map((item, index) => (
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-            `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text)}»</p>` +
+            `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>` +
             (item.page ?
               `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
               `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
@@ -3633,7 +3684,7 @@
         return (
           `<p dir="rtl" style="margin:16px 0 4px;font-family:Tahoma,Arial,sans-serif;` +
           `font-size:15px;font-weight:bold;color:#173b63;border-bottom:2px solid #173b63;` +
-          `padding-bottom:4px;text-align:right;">${group.mainNumber} - 📘 ${escapeHtml(group.bookTitle)}</p>` +
+          `padding-bottom:4px;text-align:right;">${group.mainNumber} - ${escapeHtml(group.bookTitle)}</p>` +
           tagsHtml
         );
       }).join("");
@@ -3668,7 +3719,7 @@
         const tagsHtml = group.tagGroups.map(tagGroup => {
           const entriesHtml = tagGroup.items.map((item, index) => `
             <div class="export-item">
-              <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text)}»</p>
+              <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>
               ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
               <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
             </div>
@@ -3681,7 +3732,7 @@
         }).join("");
 
         return `
-          <div class="export-group-book">${group.mainNumber} - 📘 ${escapeHtml(group.bookTitle)}</div>
+          <div class="export-group-book">${group.mainNumber} - ${escapeHtml(group.bookTitle)}</div>
           ${tagsHtml}
         `;
       }).join("");
@@ -3778,6 +3829,14 @@
         }
       });
 
+      // Item جدید (یکسان‌سازی): نشانه‌ای که حذف شده دیگه تو
+      // selectedBookmarkIds نمی‌مونه.
+      Array.from(selectedBookmarkIds).forEach(id => {
+        if (!all.some(item => item.id === id)) {
+          selectedBookmarkIds.delete(id);
+        }
+      });
+
       // Item ۲: چند برچسب هم‌زمان انتخاب‌شده یعنی اجتماع (union) نشانه‌های
       // آن‌ها نشان داده شود، نه فقط یکی.
       const items = bookmarkFilterTags.size > 0 ?
@@ -3817,15 +3876,25 @@
 
             const itemsHtml = tagMap.get(tagLabel).map(item => `
               <div class="archive-item">
-                ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(String(item.page))}</span>` : ""}
-                <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
-                <div class="archive-item-actions">
-                  <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
-                    بازکردن
-                  </a>
-                  <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
-                    حذف
-                  </button>
+                <div class="bookmark-item-row">
+                  <input
+                    type="checkbox"
+                    class="in-page-bookmark-checkbox"
+                    data-bookmark-select="${escapeHtml(item.id)}"
+                    ${selectedBookmarkIds.has(item.id) ? "checked" : ""}
+                    aria-label="انتخاب این نشانه">
+                  <div class="bookmark-item-content">
+                    ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(String(item.page))}</span>` : ""}
+                    <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
+                    <div class="archive-item-actions">
+                      <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
+                        بازکردن
+                      </a>
+                      <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
+                        حذف
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             `).join("");
@@ -3837,29 +3906,46 @@
           }).join("");
 
           return `
-            <div class="bookmark-group-book">${mainNumber} - 📘 ${escapeHtml(bookTitle || "بدون عنوان")}</div>
+            <div class="bookmark-group-book">${mainNumber} - ${escapeHtml(bookTitle || "بدون عنوان")}</div>
             ${tagsHtml}
           `;
         }).join("");
 
-      const exportRowHtml = items.length === 0 ? "" : `
-        <div class="bookmark-export-row">
-          <button type="button" id="bookmarksExportText">دریافت به‌صورت Text</button>
-          <button type="button" id="bookmarksExportWord">دریافت به‌صورت Word</button>
-          <button type="button" id="bookmarksExportPdf">دریافت به‌صورت PDF</button>
-        </div>
-      `;
+      // Item جدید (یکسان‌سازی): وقتی حداقل یک نشانه با چک‌باکس علامت
+      // خورده باشه، خروجی سه‌گانه فقط شامل همون زیرمجموعه‌ست؛ وگرنه
+      // تمام نشانه‌های فعلاً نمایش‌داده‌شده (با احتساب فیلتر برچسب).
+      const hasBookmarkSelection = selectedBookmarkIds.size > 0;
+      const exportItems = hasBookmarkSelection ?
+        items.filter(item => selectedBookmarkIds.has(item.id)) :
+        items;
 
       panel.innerHTML = `
+        <button type="button" class="panel-close-x" id="bookmarksCloseButton" title="بستن" aria-label="بستن">×</button>
         <div class="archive-header">
-          <span>نشانه‌ها (${items.length})</span>
+          <span>نشانه‌ها (${all.length})</span>
           <div class="archive-header-actions">
+            <button
+              type="button"
+              id="bookmarksSelectAll"
+              title="انتخاب تمام نشانه‌های نمایش‌داده‌شده در همین فهرست"
+              ${items.length === 0 ? "disabled" : ""}>انتخاب همه</button>
+            <button
+              type="button"
+              id="bookmarksClearSelection"
+              title="برداشتن علامت انتخاب از تمام نشانه‌هایی که تاکنون انتخاب کرده‌اید"
+              ${hasBookmarkSelection ? "" : "disabled"}>
+              پاک‌کردن انتخاب
+              ${hasBookmarkSelection ? `<span class="bookmark-selection-badge">(${selectedBookmarkIds.size})</span>` : ""}
+            </button>
             <button type="button" id="bookmarksClearButton">پاک‌کردن همه</button>
-            <button type="button" id="bookmarksCloseButton">بستن</button>
           </div>
         </div>
         ${tagChipsHtml}
-        ${exportRowHtml}
+        <div class="bookmark-export-row">
+          <button type="button" id="bookmarksExportText" ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
+          <button type="button" id="bookmarksExportWord" ${exportItems.length === 0 ? "disabled" : ""}>Word</button>
+          <button type="button" id="bookmarksExportPdf" ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
+        </div>
         ${listHtml}
       `;
 
@@ -3868,19 +3954,49 @@
         clearButton.addEventListener("click", clearBookmarks);
       }
 
+      const selectAllButton = panel.querySelector("#bookmarksSelectAll");
+      if (selectAllButton) {
+        selectAllButton.addEventListener("click", () => {
+          items.forEach(item => selectedBookmarkIds.add(item.id));
+          renderBookmarksPanel();
+        });
+      }
+
+      const clearSelectionButton = panel.querySelector("#bookmarksClearSelection");
+      if (clearSelectionButton) {
+        clearSelectionButton.addEventListener("click", () => {
+          selectedBookmarkIds.clear();
+          renderBookmarksPanel();
+        });
+      }
+
+      panel.querySelectorAll(".in-page-bookmark-checkbox").forEach(checkbox => {
+        checkbox.addEventListener("change", () => {
+          const id = checkbox.dataset.bookmarkSelect;
+
+          if (checkbox.checked) {
+            selectedBookmarkIds.add(id);
+          } else {
+            selectedBookmarkIds.delete(id);
+          }
+
+          renderBookmarksPanel();
+        });
+      });
+
       const exportTextButton = panel.querySelector("#bookmarksExportText");
       if (exportTextButton) {
-        exportTextButton.addEventListener("click", () => exportBookmarksAsText(items));
+        exportTextButton.addEventListener("click", () => exportBookmarksAsText(exportItems));
       }
 
       const exportWordButton = panel.querySelector("#bookmarksExportWord");
       if (exportWordButton) {
-        exportWordButton.addEventListener("click", () => exportBookmarksAsWord(items));
+        exportWordButton.addEventListener("click", () => exportBookmarksAsWord(exportItems));
       }
 
       const exportPdfButton = panel.querySelector("#bookmarksExportPdf");
       if (exportPdfButton) {
-        exportPdfButton.addEventListener("click", () => exportBookmarksAsPdf(items));
+        exportPdfButton.addEventListener("click", () => exportBookmarksAsPdf(exportItems));
       }
 
       const closeButton = panel.querySelector("#bookmarksCloseButton");
@@ -4392,13 +4508,15 @@
     // ممکنه علامت **...** داشته باشه (قرارداد متن‌سادهٔ آنجا). این
     // تابع همون علامت رو، وقتی تو یه بافت HTML واقعی نمایش داده می‌شه،
     // به هایلایت واقعی تبدیل می‌کنه.
-    function renderBookmarkTextHtml(text) {
+    function renderBookmarkTextHtml(text, options) {
+      const colored = !options || options.colored !== false;
       const escaped = escapeHtml(text || "");
       return escaped.replace(
         /\*\*(.+?)\*\*/g,
-        (_match, inner) =>
+        (_match, inner) => colored ?
           `<span style="background-color:#fde047;mso-highlight:yellow;color:#111827;` +
-          `padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${inner}</span>`
+          `padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${inner}</span>` :
+          `<strong>${inner}</strong>`
       );
     }
 
@@ -5545,7 +5663,7 @@
           id="siteMenuExportText"
           title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره"
           ${hasSelection ? "" : "disabled"}>
-          <span>دریافت به‌صورت Text</span>
+          <span>Text</span>
         </button>
         <button
           type="button"
@@ -5553,7 +5671,7 @@
           id="siteMenuExportWord"
           title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره"
           ${hasSelection ? "" : "disabled"}>
-          <span>دریافت به‌صورت Word</span>
+          <span>Word</span>
         </button>
         <button
           type="button"
@@ -5561,7 +5679,7 @@
           id="siteMenuExportPdf"
           title="دریافت موارد انتخاب‌شده به‌صورت یک فایل PDF قابل ذخیره"
           ${hasSelection ? "" : "disabled"}>
-          <span>دریافت به‌صورت PDF</span>
+          <span>PDF</span>
         </button>
 
         <div class="settings-separator"></div>
@@ -5948,6 +6066,25 @@
     document.addEventListener("keydown", event => {
       if (event.key === "Escape") {
         closeSettingsMenu();
+
+        const archiveOverlayEl = document.getElementById("archiveOverlay");
+        if (archiveOverlayEl && archiveOverlayEl.classList.contains("open")) {
+          closeArchivePanel();
+        }
+
+        const bookmarksOverlayForEsc = document.getElementById("bookmarksOverlay");
+        if (bookmarksOverlayForEsc && bookmarksOverlayForEsc.classList.contains("open")) {
+          closeBookmarksPanel();
+        }
+
+        const aiChatArchiveOverlayForEsc = document.getElementById("aiChatArchiveOverlay");
+        if (
+          aiChatArchiveOverlayForEsc &&
+          aiChatArchiveOverlayForEsc.classList.contains("open") &&
+          typeof closeChatArchivePanelAi === "function"
+        ) {
+          closeChatArchivePanelAi();
+        }
       }
     });
 
