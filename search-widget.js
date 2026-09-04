@@ -1088,6 +1088,84 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
+    // Item جدید (بند ج - دکمهٔ چرخ‌دنده جدا): بزرگ‌نمایی کل تب دستیار
+    // هوشمند + ترتیب نمایش نتایج - این دو، جدا از نوار عملیات ۹گانه‌ست.
+    const aiSettingsGearToggle = document.getElementById("aiSettingsGearToggle");
+    const aiSettingsGearPanel = document.getElementById("aiSettingsGearPanel");
+    if (aiSettingsGearToggle && aiSettingsGearPanel) {
+      aiSettingsGearToggle.addEventListener("click", () => {
+        const isOpen = aiSettingsGearPanel.style.display !== "none";
+        aiSettingsGearPanel.style.display = isOpen ? "none" : "block";
+        aiSettingsGearToggle.setAttribute("aria-expanded", String(!isOpen));
+      });
+
+      document.addEventListener("click", (event) => {
+        if (
+          aiSettingsGearPanel.style.display !== "none" &&
+          !aiSettingsGearPanel.contains(event.target) &&
+          event.target !== aiSettingsGearToggle
+        ) {
+          aiSettingsGearPanel.style.display = "none";
+          aiSettingsGearToggle.setAttribute("aria-expanded", "false");
+        }
+      });
+    }
+
+    // بزرگ‌نمایی: با CSS zoom روی کل تب دستیار هوشمند (aiPanel)، هم‌الگو
+    // با بزرگ‌نمایی صفحهٔ کتاب در in-page-search.js.
+    let aiZoomLevel = 1;
+    const aiPanelEl = document.getElementById("aiPanel");
+    const aiZoomLevelLabel = document.getElementById("aiZoomLevel");
+
+    function applyAiZoom() {
+      if (aiPanelEl) aiPanelEl.style.zoom = aiZoomLevel === 1 ? "" : String(aiZoomLevel);
+      if (aiZoomLevelLabel) aiZoomLevelLabel.textContent = `${Math.round(aiZoomLevel * 100)}٪`;
+    }
+
+    const aiZoomInButton = document.getElementById("aiZoomIn");
+    if (aiZoomInButton) {
+      aiZoomInButton.addEventListener("click", () => {
+        aiZoomLevel = Math.min(1.5, Math.round((aiZoomLevel + 0.1) * 10) / 10);
+        applyAiZoom();
+      });
+    }
+
+    const aiZoomOutButton = document.getElementById("aiZoomOut");
+    if (aiZoomOutButton) {
+      aiZoomOutButton.addEventListener("click", () => {
+        aiZoomLevel = Math.max(0.7, Math.round((aiZoomLevel - 0.1) * 10) / 10);
+        applyAiZoom();
+      });
+    }
+
+    const aiZoomResetButton = document.getElementById("aiZoomReset");
+    if (aiZoomResetButton) {
+      aiZoomResetButton.addEventListener("click", () => {
+        aiZoomLevel = 1;
+        applyAiZoom();
+      });
+    }
+
+    // ترتیب نمایش نتایج: پیش‌فرض (بر اساس امتیاز تطابق، از قبل مرتب‌شده)
+    // یا بر اساس عنوان کتاب (الفبایی فارسی).
+    const aiResultsSortOrder = document.getElementById("aiResultsSortOrder");
+    if (aiResultsSortOrder) {
+      aiResultsSortOrder.addEventListener("change", () => {
+        if (latestSearchResults.length === 0) return;
+
+        if (aiResultsSortOrder.value === "book") {
+          latestSearchResults = [...latestSearchResults].sort((a, b) => a.book.localeCompare(b.book, "fa"));
+        } else {
+          latestSearchResults = [...latestSearchResults].sort((a, b) => b.score - a.score);
+        }
+
+        searchSelectedIndexes.clear();
+        activeResultIndex = -1;
+        updateAiSearchNavButtons();
+        renderAiResultsHtml();
+      });
+    }
+
     // Item جدید: پیمایش بین نتایج شماره‌گذاری‌شده با دکمه‌های قبل/بعد -
     // نتیجهٔ فعال با اسکرول و یه کادر مشخص، هایلایت می‌شه.
     let activeResultIndex = -1;

@@ -1133,6 +1133,54 @@
       background: #f1f5f9;
     }
 
+    .ai-settings-gear-panel {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      z-index: 21;
+      margin-top: 6px;
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+      padding: 10px 12px;
+      min-width: 220px;
+      font-size: 0.85rem;
+    }
+
+    .ai-settings-gear-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 0;
+    }
+
+    .ai-settings-gear-row + .ai-settings-gear-row {
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .ai-zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ai-zoom-controls button {
+      width: 24px;
+      height: 24px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    #aiResultsSortOrder {
+      font: inherit;
+      font-size: 0.8rem;
+      padding: 2px 4px;
+    }
+
     .ai-section-desc {
       margin: 0 0 14px;
       color: #64748b;
@@ -2383,12 +2431,42 @@
               id="aiSearchOptionsToggle"
               type="button"
               class="ai-search-options-toggle"
-              title="گزینه‌ها (انتخاب همه، خروجی، نشانه)"
-              aria-label="گزینه‌ها"
+              title="عملیات نتایج (انتخاب همه، خروجی، نشانه)"
+              aria-label="عملیات نتایج"
               aria-haspopup="true"
               aria-expanded="false">
               ⋮
             </button>
+
+            <button
+              id="aiSettingsGearToggle"
+              type="button"
+              class="ai-search-options-toggle"
+              title="تنظیمات (بزرگ‌نمایی، ترتیب نتایج)"
+              aria-label="تنظیمات"
+              aria-haspopup="true"
+              aria-expanded="false">
+              ⚙️
+            </button>
+          </div>
+
+          <div id="aiSettingsGearPanel" class="ai-settings-gear-panel" style="display:none;">
+            <div class="ai-settings-gear-row">
+              <span>بزرگ‌نمایی این تب</span>
+              <div class="ai-zoom-controls">
+                <button type="button" id="aiZoomOut" title="کوچک‌تر">－</button>
+                <span id="aiZoomLevel">۱۰۰٪</span>
+                <button type="button" id="aiZoomIn" title="بزرگ‌تر">＋</button>
+                <button type="button" id="aiZoomReset" title="بازنشانی">↺</button>
+              </div>
+            </div>
+            <div class="ai-settings-gear-row">
+              <label for="aiResultsSortOrder">ترتیب نمایش نتایج</label>
+              <select id="aiResultsSortOrder">
+                <option value="relevance">مرتبط‌ترین (پیش‌فرض)</option>
+                <option value="book">بر اساس عنوان کتاب</option>
+              </select>
+            </div>
           </div>
 
           <div class="ai-search-results-dropdown" style="display:none;">
