@@ -99,7 +99,15 @@ async function loadEmbeddings() {
       return EMBEDDINGS;
     }
 
-    const res = await fetch("embeddings.json", { cache: "no-store" });
+    // شماره‌نسخه رو به‌عنوان query string به آدرس اضافه می‌کنیم تا وقتی محتوا عوض
+    // می‌شه، آدرس درخواست هم عوض بشه — این‌جوری نه کش مرورگر، نه کش سرویس‌دهندهٔ
+    // GitHub Pages (که با هدر cache به‌تنهایی کنترل نمی‌شه) نمی‌تونه جواب قدیمی
+    // برگردونه، چون از نظر فنی این یه URL کاملاً متفاوته. اگه گرفتن نسخه شکست
+    // خورده باشه (currentVersion خالیه)، مثل قبل بدون query string درخواست می‌دیم.
+    const embeddingsUrl = currentVersion
+      ? `embeddings.json?v=${encodeURIComponent(currentVersion)}`
+      : "embeddings.json";
+    const res = await fetch(embeddingsUrl, { cache: "no-store" });
     const raw = await res.json();
     const decoded = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
 
