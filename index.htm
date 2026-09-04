@@ -1030,10 +1030,35 @@
     }
 
     .ai-section {
+      position: relative;
       background: #fff;
       border: 1px solid #dbe3ee;
       border-radius: 14px;
       padding: 18px 20px 22px;
+    }
+
+    /* آیتم ۱۴: نتایج جستجوی مفهومی شناور می‌شن - زیر کادر جستجو
+       می‌شینن، روی محتوای پایینی (بخش گفتگو) اورلی می‌کنن، بدون
+       این‌که بقیهٔ صفحه رو به پایین هل بدن. */
+    .ai-search-results-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      left: 0;
+      z-index: 20;
+      margin-top: 6px;
+      max-height: 60vh;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 12px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+      padding: 10px 14px 14px;
+    }
+
+    .ai-search-results-dropdown:empty,
+    .ai-search-results-dropdown:has(#aiSearchResults:empty):has(#aiSearchStatus:empty) {
+      display: none;
     }
 
     .ai-section-title {
@@ -2366,14 +2391,11 @@
             </button>
           </div>
 
-          <p id="aiSearchStatus" class="ai-status" aria-live="polite"></p>
+          <div class="ai-search-results-dropdown" style="display:none;">
+            <p id="aiSearchStatus" class="ai-status" aria-live="polite"></p>
 
-          <div id="aiSearchSelectionBar" class="ai-search-selection-bar" style="display:none;">
-            <button type="button" id="aiSearchSelectAll">انتخاب همه</button>
-            <button type="button" id="aiSearchClearSelection">لغو انتخاب</button>
+            <div id="aiSearchResults" class="ai-search-results" aria-live="polite"></div>
           </div>
-
-          <div id="aiSearchResults" class="ai-search-results" aria-live="polite"></div>
         </section>
 
         <section class="ai-section">

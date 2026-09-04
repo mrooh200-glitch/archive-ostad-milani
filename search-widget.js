@@ -726,12 +726,27 @@ function openPrintableForItemsAi(items) {
 // getItems: تابعی که هروقت روی دکمه‌ای کلیک شد، لیست فعلی آیتم‌های
 // {title, text, url} رو برمی‌گردونه — برای جست‌وجو: موارد تیک‌خورده؛
 // برای چت: همون یک پاسخ فعلی.
-function createAiToolbar(getItems, emptyMessage) {
+function createAiToolbar(getItems, emptyMessage, selectionControls) {
   const bar = document.createElement("details");
   bar.className = "ai-result-toolbar";
+
+  // Item جدید (یکسان‌سازی چینش - بند ج): وقتی صدازننده کنترل‌های
+  // انتخاب رو بده (فقط برای نوار نتایج جست‌وجو، نه گفتگو)، همون سه‌تا
+  // («انتخاب همه»، «لغو انتخاب»، «حذف موارد انتخاب‌شده») هم به همین
+  // یه بلوکِ عملیات اضافه می‌شن - به‌جای این‌که یه ردیف جدا و جدا از
+  // این نوار باشن.
+  const selectionButtonsHtml = selectionControls
+    ? `
+      <button type="button" class="ai-toolbar-btn" data-action="select-all">☑️ انتخاب همه</button>
+      <button type="button" class="ai-toolbar-btn" data-action="clear-selection">⬜ لغو انتخاب</button>
+      <button type="button" class="ai-toolbar-btn" data-action="delete-selected">🗑️ حذف موارد انتخاب‌شده</button>
+    `
+    : "";
+
   bar.innerHTML = `
-    <summary class="ai-toolbar-summary">⚙️ گزینه‌ها (کپی، خروجی، نشانه)</summary>
+    <summary class="ai-toolbar-summary">☰ عملیات نتایج</summary>
     <div class="ai-toolbar-buttons">
+      ${selectionButtonsHtml}
       <button type="button" class="ai-toolbar-btn" data-action="copy">📋 کپی</button>
       <button type="button" class="ai-toolbar-btn" data-action="text">Text</button>
       <button type="button" class="ai-toolbar-btn" data-action="word">Word</button>
@@ -761,6 +776,21 @@ function createAiToolbar(getItems, emptyMessage) {
       if (typeof openBookmarksPanel === "function") {
         openBookmarksPanel();
       }
+      return;
+    }
+
+    // Item جدید (بند ج): سه دکمهٔ انتخاب هم به همون کنترل‌های صدازننده
+    // وصل می‌شن - این‌ها هم به آیتم انتخاب‌شده نیازی ندارن.
+    if (action === "select-all" && selectionControls) {
+      selectionControls.selectAll();
+      return;
+    }
+    if (action === "clear-selection" && selectionControls) {
+      selectionControls.clearSelection();
+      return;
+    }
+    if (action === "delete-selected" && selectionControls) {
+      selectionControls.deleteSelected();
       return;
     }
 
@@ -913,7 +943,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiSearchInput = document.getElementById("aiSearchInput");
   const aiSearchResults = document.getElementById("aiSearchResults");
   const aiSearchStatus = document.getElementById("aiSearchStatus");
-  const aiSearchSelectionBar = document.getElementById("aiSearchSelectionBar");
+  const aiSearchResultsDropdown = document.querySelector(".ai-search-results-dropdown");
 
   if (aiSearchInput && aiSearchResults) {
     let debounceTimer;
@@ -931,6 +961,33 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
+    function syncSearchCheckboxes() {
+      aiSearchResults.querySelectorAll(".ai-result-checkbox").forEach((checkbox) => {
+        const index = Number(checkbox.dataset.aiIndex);
+        checkbox.checked = searchSelectedIndexes.has(index);
+      });
+    }
+
+    function renderAiResultsHtml() {
+      aiSearchResults.innerHTML = latestSearchResults
+        .map(
+          (r, i) =>
+            `<div class="ai-search-result-row">
+              <div class="ai-result-marker">
+                <input type="checkbox" class="result-checkbox ai-result-checkbox" data-ai-index="${i}" title="انتخاب برای کپی/خروجی/نشانه" ${searchSelectedIndexes.has(i) ? "checked" : ""}>
+                <span class="result-number">${i + 1}</span>
+                ${r.page ? `<span class="ai-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${r.page}</span>` : ""}
+              </div>
+              <a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
+                <strong>${r.book}</strong>
+                <p>${r.text}</p>
+                <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
+              </a>
+            </div>`
+        )
+        .join("");
+    }
+
     // نوار ابزار یک‌بار ساخته و بعد از باکس نتایج قرار می‌گیره؛ هر بار
     // که نتایج جدید بیاد، همین نوار می‌مونه، فقط لیست انتخاب‌ها خالی می‌شه.
     const searchToolbar = createAiToolbar(
@@ -940,7 +997,33 @@ document.addEventListener("DOMContentLoaded", () => {
           .map((i) => latestSearchResults[i])
           .filter(Boolean)
           .map((r) => ({ title: r.book, text: r.text, url: textFragmentUrl(encodeURI(r.source), r.text), page: r.page })),
-      "ابتدا یک یا چند نتیجه را با تیک انتخاب کنید"
+      "ابتدا یک یا چند نتیجه را با تیک انتخاب کنید",
+      {
+        selectAll: () => {
+          searchSelectedIndexes.clear();
+          latestSearchResults.forEach((_, i) => searchSelectedIndexes.add(i));
+          syncSearchCheckboxes();
+        },
+        clearSelection: () => {
+          searchSelectedIndexes.clear();
+          syncSearchCheckboxes();
+        },
+        // Item جدید (بند ج - حذف موارد انتخاب‌شده): برخلاف «لغو انتخاب»
+        // (که فقط تیک برمی‌داره)، این دکمه خودِ نتیجه‌های تیک‌خورده رو
+        // از همین فهرست نتایج فعلی کنار می‌ذاره (فقط نمایش، نه چیزی که
+        // تو آرشیو/نشانه‌ها ذخیره شده باشه).
+        deleteSelected: () => {
+          if (searchSelectedIndexes.size === 0) return;
+          latestSearchResults = latestSearchResults.filter((_, i) => !searchSelectedIndexes.has(i));
+          searchSelectedIndexes.clear();
+          activeResultIndex = -1;
+          updateAiSearchNavButtons();
+          renderAiResultsHtml();
+          if (aiSearchResultsDropdown) {
+            aiSearchResultsDropdown.style.display = latestSearchResults.length > 0 ? "block" : "none";
+          }
+        },
+      }
     );
     aiSearchResults.insertAdjacentElement("afterend", searchToolbar);
 
@@ -955,7 +1038,7 @@ document.addEventListener("DOMContentLoaded", () => {
           latestSearchResults = [];
           searchSelectedIndexes.clear();
           if (aiSearchStatus) aiSearchStatus.textContent = "";
-          if (aiSearchSelectionBar) aiSearchSelectionBar.style.display = "none";
+          if (aiSearchResultsDropdown) aiSearchResultsDropdown.style.display = "none";
           activeResultIndex = -1;
           updateAiSearchNavButtons();
           return;
@@ -969,26 +1052,10 @@ document.addEventListener("DOMContentLoaded", () => {
           if (aiSearchStatus) aiSearchStatus.textContent = "";
           latestSearchResults = results;
           searchSelectedIndexes.clear();
-          if (aiSearchSelectionBar) aiSearchSelectionBar.style.display = results.length > 0 ? "flex" : "none";
+          if (aiSearchResultsDropdown) aiSearchResultsDropdown.style.display = results.length > 0 ? "block" : "none";
           activeResultIndex = -1;
           updateAiSearchNavButtons();
-          aiSearchResults.innerHTML = results
-            .map(
-              (r, i) =>
-                `<div class="ai-search-result-row">
-                  <div class="ai-result-marker">
-                    <input type="checkbox" class="result-checkbox ai-result-checkbox" data-ai-index="${i}" title="انتخاب برای کپی/خروجی/نشانه">
-                    <span class="result-number">${i + 1}</span>
-                    ${r.page ? `<span class="ai-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${r.page}</span>` : ""}
-                  </div>
-                  <a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
-                    <strong>${r.book}</strong>
-                    <p>${r.text}</p>
-                    <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
-                  </a>
-                </div>`
-            )
-            .join("");
+          renderAiResultsHtml();
         } catch (err) {
           if (myToken !== searchToken) return;
           if (aiSearchStatus) aiSearchStatus.textContent = err.message || "در جست‌وجو خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
@@ -1009,24 +1076,6 @@ document.addEventListener("DOMContentLoaded", () => {
         searchSelectedIndexes.delete(index);
       }
     });
-
-    // Item جدید (کار روی چند نتیجه با هم، مثل جست‌وجوی داخلی فایل):
-    const aiSearchSelectAllButton = document.getElementById("aiSearchSelectAll");
-    if (aiSearchSelectAllButton) {
-      aiSearchSelectAllButton.addEventListener("click", () => {
-        searchSelectedIndexes.clear();
-        latestSearchResults.forEach((_, i) => searchSelectedIndexes.add(i));
-        syncSearchCheckboxes();
-      });
-    }
-
-    const aiSearchClearSelectionButton = document.getElementById("aiSearchClearSelection");
-    if (aiSearchClearSelectionButton) {
-      aiSearchClearSelectionButton.addEventListener("click", () => {
-        searchSelectedIndexes.clear();
-        syncSearchCheckboxes();
-      });
-    }
 
     // Item جدید (یکسان‌سازی با جست‌وجوی داخلی فایل): دکمهٔ سه‌نقطه، همون
     // جعبهٔ گزینه‌های (کپی/خروجی/نشانه) رو باز و بسته می‌کنه - عیناً
