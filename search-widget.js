@@ -214,11 +214,342 @@ async function askQuestion(question) {
   return { answer, sources: relevant };
 }
 
+// ============================================================
+// Item جدید: کپی، خروجی‌های سه‌گانه (Text/Word/PDF)، و افزودن به نشانه‌ها
+// برای جست‌وجوی معنایی و گفت‌وگو — هم‌خانواده با قابلیت مشابهی که قبلاً
+// برای جست‌وجوی متنی سایت (index.htm) ساخته شده. از همون کلید
+// localStorage استفاده می‌کنیم تا این نتایج هم توی همون پنل «نشانه‌ها»ی
+// سایت، کنار نتایج جست‌وجوی متنی، نشون داده بشن.
+// ============================================================
+
+const ARCHIVE_STORAGE_KEY = "milaniSearchResultsArchive";
+
+function escapeHtmlAi(text) {
+  return String(text || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function downloadTextFileAi(filename, content, mimeType) {
+  const blob = new Blob([content], { type: mimeType || "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function copyTextToClipboardAi(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // به روش قدیمی‌تر زیر برمی‌گردیم
+  }
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+// کپی به‌صورت متن غنی، تا هرجا پیست بشه (جیمیل، Word، واتس‌اپ وب) یه
+// لینک کوتاه و کلیک‌پذیر «لینک منبع» نشون بده، نه آدرس کامل و طولانی.
+async function copyRichTextAi(plainText, html) {
+  try {
+    if (navigator.clipboard && window.isSecureContext && window.ClipboardItem) {
+      const item = new ClipboardItem({
+        "text/html": new Blob([html], { type: "text/html" }),
+        "text/plain": new Blob([plainText], { type: "text/plain" }),
+      });
+      await navigator.clipboard.write([item]);
+      return true;
+    }
+  } catch {
+    // به روش قدیمی‌تر زیر برمی‌گردیم
+  }
+  try {
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    container.style.position = "fixed";
+    container.style.opacity = "0";
+    container.style.direction = "rtl";
+    document.body.appendChild(container);
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    const ok = document.execCommand("copy");
+    selection.removeAllRanges();
+    document.body.removeChild(container);
+    return ok;
+  } catch {
+    return copyTextToClipboardAi(plainText);
+  }
+}
+
+function loadArchiveAi() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(ARCHIVE_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveArchiveAi(items) {
+  try {
+    localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // ذخیره‌نشدن نشانه خطای مهمی نیست، کاربر می‌تونه دوباره امتحان کنه
+  }
+}
+
+function addItemsToArchiveAi(items) {
+  const archive = loadArchiveAi();
+  items.forEach((item) => {
+    archive.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: item.title,
+      text: item.text,
+      url: item.url,
+      savedAt: new Date().toISOString(),
+    });
+  });
+  saveArchiveAi(archive);
+}
+
+// ---------- ساخت متن ساده / HTML غنی / سند Word / برگهٔ چاپی از یک لیست آیتم {title, text, url} ----------
+function buildPlainTextForItemsAi(items) {
+  const divider = "─".repeat(32);
+  return items
+    .map(
+      (item, i) =>
+        `${i + 1}. 📘 ${item.title}\n${divider}\n«${item.text}»` + (item.url ? `\n🔗 لینک: ${item.url}` : "")
+    )
+    .join("\n\n");
+}
+
+function buildRichHtmlForItemsAi(items) {
+  return items
+    .map(
+      (item, i) =>
+        `<div dir="ltr" style="margin:0 0 16px;text-align:right;">` +
+        `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:0 0 8px;">` +
+        `<tr><td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;` +
+        `font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
+        `📘\u00a0${escapeHtmlAi(item.title)}</td></tr></table>` +
+        `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
+        `line-height:1.9;color:#1f2937;text-align:right;"><strong>${i + 1}.</strong>\u00a0«${escapeHtmlAi(item.text)}»</p>` +
+        (item.url
+          ? `<p dir="ltr" style="margin:0;font-family:Tahoma,Arial,sans-serif;font-size:12px;text-align:right;">🔗 ` +
+            `<a href="${escapeHtmlAi(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+          : "") +
+        `</div>`
+    )
+    .join("");
+}
+
+function buildWordDocForItemsAi(items) {
+  const itemsHtml = items
+    .map(
+      (item, i) =>
+        `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;margin:${i === 0 ? "0" : "18px"} 0 8px;">` +
+        `<tr><td style="padding:9px 14px;background:#eff6ff;border-right:4px solid #2563eb;` +
+        `font-family:Tahoma,Arial,sans-serif;font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
+        `📘\u00a0${escapeHtmlAi(item.title)}</td></tr></table>` +
+        `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;font-size:14px;` +
+        `line-height:1.9;color:#1f2937;text-align:right;"><strong>${i + 1}.</strong>\u00a0«${escapeHtmlAi(item.text)}»</p>` +
+        (item.url
+          ? `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;font-size:12px;text-align:right;">🔗 ` +
+            `<a href="${escapeHtmlAi(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+          : "")
+    )
+    .join("");
+
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+      <meta charset="utf-8">
+      <title>خروجی دستیار هوشمند</title>
+      <!--[if gte mso 9]>
+      <xml><w:WordDocument><w:View>Print</w:View><w:DoNotOptimizeForBrowser/></w:WordDocument></xml>
+      <![endif]-->
+    </head>
+    <body dir="rtl" style="font-family:Tahoma,Arial,sans-serif;">${itemsHtml}</body>
+  </html>`;
+}
+
+function openPrintableForItemsAi(items) {
+  const itemsHtml = items
+    .map(
+      (item, i) => `
+      <div class="export-item">
+        <div class="export-book-title">📘 ${escapeHtmlAi(item.title)}</div>
+        <p class="export-snippet"><strong>${i + 1}.</strong>&nbsp;«${escapeHtmlAi(item.text)}»</p>
+        ${item.url ? `<p class="export-link">🔗 <a href="${escapeHtmlAi(item.url)}">لینک منبع</a></p>` : ""}
+      </div>`
+    )
+    .join("");
+
+  const doc = `<!DOCTYPE html>
+    <html lang="fa" dir="rtl">
+    <head>
+      <meta charset="utf-8">
+      <title>خروجی دستیار هوشمند</title>
+      <style>
+        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { font-family: Tahoma, Arial, sans-serif; direction: rtl; text-align: right; color: #1f2937; margin: 24px; }
+        .export-item { padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
+        .export-book-title { margin: 0 0 6px; padding: 8px 12px; background: #eff6ff; border-right: 4px solid #2563eb; border-radius: 6px; font-size: 14px; font-weight: bold; color: #173b63; }
+        .export-snippet { margin: 0 0 4px; font-size: 15px; line-height: 2; }
+        .export-link { margin: 0; font-size: 12px; }
+        .export-link a { color: #1d4ed8; text-decoration: none; }
+        @media print { body { margin: 10mm; } }
+      </style>
+    </head>
+    <body>${itemsHtml}<script>window.onload = () => window.print();<\/script></body>
+    </html>`;
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+  printWindow.document.open();
+  printWindow.document.write(doc);
+  printWindow.document.close();
+}
+
+// ---------- ساخت نوار ابزار (کپی / Text / Word / PDF / نشانه) ----------
+// getItems: تابعی که هروقت روی دکمه‌ای کلیک شد، لیست فعلی آیتم‌های
+// {title, text, url} رو برمی‌گردونه — برای جست‌وجو: موارد تیک‌خورده؛
+// برای چت: همون یک پاسخ فعلی.
+function createAiToolbar(getItems, emptyMessage) {
+  const bar = document.createElement("div");
+  bar.className = "ai-result-toolbar";
+  bar.innerHTML = `
+    <button type="button" class="ai-toolbar-btn" data-action="copy">📋 کپی</button>
+    <button type="button" class="ai-toolbar-btn" data-action="text">دریافت Text</button>
+    <button type="button" class="ai-toolbar-btn" data-action="word">دریافت Word</button>
+    <button type="button" class="ai-toolbar-btn" data-action="pdf">دریافت PDF</button>
+    <button type="button" class="ai-toolbar-btn" data-action="bookmark">⭐ افزودن به نشانه</button>
+    <span class="ai-toolbar-status" aria-live="polite"></span>
+  `;
+
+  const status = bar.querySelector(".ai-toolbar-status");
+  function setStatus(msg) {
+    if (!status) return;
+    status.textContent = msg;
+    setTimeout(() => { status.textContent = ""; }, 1800);
+  }
+
+  bar.addEventListener("click", async (e) => {
+    const btn = e.target.closest(".ai-toolbar-btn");
+    if (!btn) return;
+
+    const items = getItems();
+    if (!items || items.length === 0) {
+      setStatus(emptyMessage || "چیزی انتخاب نشده");
+      return;
+    }
+
+    const action = btn.dataset.action;
+    if (action === "copy") {
+      const ok = await copyRichTextAi(buildPlainTextForItemsAi(items), buildRichHtmlForItemsAi(items));
+      setStatus(ok ? "کپی شد!" : "خطا در کپی");
+    } else if (action === "text") {
+      downloadTextFileAi("خروجی-دستیار-هوشمند.txt", buildPlainTextForItemsAi(items));
+    } else if (action === "word") {
+      downloadTextFileAi("خروجی-دستیار-هوشمند.doc", buildWordDocForItemsAi(items), "application/msword;charset=utf-8");
+    } else if (action === "pdf") {
+      openPrintableForItemsAi(items);
+    } else if (action === "bookmark") {
+      addItemsToArchiveAi(items);
+      setStatus("به نشانه‌ها افزوده شد");
+    }
+  });
+
+  return bar;
+}
+
+// ---------- استایل کمی برای ردیف چک‌باکس و نوار ابزار جدید ----------
+// چون این کلاس‌ها تو stylesheet خودِ index.htm تعریف نشدن، همین‌جا با JS
+// تزریق می‌شن تا نیازی به دست‌کاری index.htm نباشه. از رنگ/فونت‌های
+// هماهنگ با ظاهر فعلی سایت استفاده شده.
+function injectAiToolbarStyles() {
+  if (document.getElementById("ai-toolbar-styles")) return; // فقط یک‌بار
+  const style = document.createElement("style");
+  style.id = "ai-toolbar-styles";
+  style.textContent = `
+    .ai-search-result-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .ai-search-result-row .result-number {
+      margin-top: 4px;
+    }
+    .ai-search-result-row .ai-result-checkbox {
+      margin-top: 6px;
+    }
+    .ai-search-result-row .ai-search-result {
+      flex: 1;
+      min-width: 0;
+    }
+    .ai-result-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0;
+      padding: 8px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    .ai-toolbar-btn {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      color: #1f2937;
+    }
+    .ai-toolbar-btn:hover {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+    .ai-toolbar-status {
+      font-size: 0.82rem;
+      color: #16a34a;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 // ---------- اتصال به رابط کاربری واقعی سایت (تب «دستیار هوشمند») ----------
 // این id ها عمداً با پیشوند ai نگه داشته شدن تا با سیستم جست‌وجوی کلمه‌ای
 // موجود سایت (که از id های searchInput/searchResults استفاده می‌کنه) تداخل نداشته باشن.
 
 document.addEventListener("DOMContentLoaded", () => {
+  injectAiToolbarStyles();
+
   const aiSearchInput = document.getElementById("aiSearchInput");
   const aiSearchResults = document.getElementById("aiSearchResults");
   const aiSearchStatus = document.getElementById("aiSearchStatus");
@@ -226,6 +557,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if (aiSearchInput && aiSearchResults) {
     let debounceTimer;
     let searchToken = 0; // شمارندهٔ نسل: هر بار تایپ، شماره‌ای جدید می‌گیره
+    let latestSearchResults = []; // نتایج جست‌وجوی آخر، برای نوار ابزار زیرش
+    const searchSelectedIndexes = new Set(); // ایندکس‌های تیک‌خورده در همین نتایج
+
+    // نوار ابزار یک‌بار ساخته و بعد از باکس نتایج قرار می‌گیره؛ هر بار
+    // که نتایج جدید بیاد، همین نوار می‌مونه، فقط لیست انتخاب‌ها خالی می‌شه.
+    const searchToolbar = createAiToolbar(
+      () =>
+        [...searchSelectedIndexes]
+          .sort((a, b) => a - b)
+          .map((i) => latestSearchResults[i])
+          .filter(Boolean)
+          .map((r) => ({ title: r.book, text: r.text, url: r.source })),
+      "ابتدا یک یا چند نتیجه را با تیک انتخاب کنید"
+    );
+    aiSearchResults.insertAdjacentElement("afterend", searchToolbar);
 
     aiSearchInput.addEventListener("input", () => {
       clearTimeout(debounceTimer);
@@ -235,6 +581,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const query = aiSearchInput.value.trim();
         if (!query) {
           aiSearchResults.innerHTML = "";
+          latestSearchResults = [];
+          searchSelectedIndexes.clear();
           if (aiSearchStatus) aiSearchStatus.textContent = "";
           return;
         }
@@ -245,14 +593,20 @@ document.addEventListener("DOMContentLoaded", () => {
           // این جواب دیگه منسوخ شده و نباید روی وضعیت فعلی بشینه.
           if (myToken !== searchToken) return;
           if (aiSearchStatus) aiSearchStatus.textContent = "";
+          latestSearchResults = results;
+          searchSelectedIndexes.clear();
           aiSearchResults.innerHTML = results
             .map(
-              (r) =>
-                `<a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
-                  <strong>${r.book}</strong>
-                  <p>${r.text}</p>
-                  <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
-                </a>`
+              (r, i) =>
+                `<div class="ai-search-result-row">
+                  <span class="result-number">${i + 1}</span>
+                  <input type="checkbox" class="result-checkbox ai-result-checkbox" data-ai-index="${i}" title="انتخاب برای کپی/خروجی/نشانه">
+                  <a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
+                    <strong>${r.book}</strong>
+                    <p>${r.text}</p>
+                    <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
+                  </a>
+                </div>`
             )
             .join("");
         } catch (err) {
@@ -262,6 +616,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }, 400); // debounce: صبر کن کاربر تایپش تموم بشه
     });
+
+    // تیک‌زدن هر چک‌باکس، فقط انتخاب رو به‌روز می‌کنه؛ کلیک روی خودِ لینک
+    // (برای رفتن به کتاب) دست‌نخورده می‌مونه چون این‌ها دو المان جدان.
+    aiSearchResults.addEventListener("change", (e) => {
+      const checkbox = e.target.closest(".ai-result-checkbox");
+      if (!checkbox) return;
+      const index = Number(checkbox.dataset.aiIndex);
+      if (checkbox.checked) {
+        searchSelectedIndexes.add(index);
+      } else {
+        searchSelectedIndexes.delete(index);
+      }
+    });
   }
 
   const aiChatForm = document.getElementById("aiChatForm");
@@ -270,6 +637,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (aiChatForm && aiChatInput && aiChatOutput) {
     let chatToken = 0; // همون منطق نسل، برای پرسش‌های پشت‌سرهم در تب گفت‌وگو
+    let latestChatItem = null; // آخرین پرسش‌وپاسخ موفق، برای نوار ابزار
+
+    const chatToolbar = createAiToolbar(
+      () => (latestChatItem ? [latestChatItem] : []),
+      "ابتدا یک پاسخ دریافت کنید"
+    );
+    aiChatOutput.insertAdjacentElement("afterend", chatToolbar);
 
     aiChatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -278,6 +652,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const myToken = ++chatToken;
       aiChatOutput.innerHTML = "در حال بررسی و تنظیم پاسخ…";
+      latestChatItem = null;
       try {
         const { answer, sources } = await askQuestion(question);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
@@ -290,6 +665,12 @@ document.addEventListener("DOMContentLoaded", () => {
             مآخذ: ${sourceLinks}
           </div>
         `;
+        // آیتم کپی/خروجی/نشانه: خودِ سؤال+پاسخ، با فهرست منابع به‌عنوان url
+        latestChatItem = {
+          title: `پرسش: ${question}`,
+          text: answer,
+          url: sources.map((s) => s.source).join("، "),
+        };
       } catch (err) {
         if (myToken !== chatToken) return;
         aiChatOutput.innerHTML = err.message || "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
