@@ -197,7 +197,13 @@ function textFragmentUrl(baseUrl, text) {
 }
 
 // ---------- گفت‌وگو (پرسش‌وپاسخ بر اساس متن‌های مرتبط) ----------
-async function askQuestion(question) {
+// Item جدید (گفتگوی ادامه‌دار): history آرایه‌ای از تبادل‌های قبلی همین
+// نشست است ({question, answer})، نه شامل سؤال فعلی. این آرایه به Worker
+// فرستاده می‌شود تا (بعد از این‌که سمت worker/src/index.js هم همین
+// تاریخچه را به پرامپت Gemini اضافه کند) پاسخ بعدی واقعاً با در نظر
+// گرفتن سؤال‌های قبلی همین گفتگو ساخته شود - نه این‌که هر پرسش، بی‌خبر
+// از پرسش‌های قبلی، از صفر پاسخ داده شود.
+async function askQuestion(question, history = []) {
   // اول مرتبط‌ترین بخش‌ها رو با همون جست‌وجوی معنایی پیدا کن
   const relevant = await semanticSearch(question, 5);
   const contextTexts = relevant.map((r) => r.text);
@@ -205,7 +211,7 @@ async function askQuestion(question) {
   const chatRes = await fetch(`${WORKER_URL}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, context: contextTexts }),
+    body: JSON.stringify({ question, context: contextTexts, history }),
   });
   if (!chatRes.ok) {
     let message = "خطا در دریافت پاسخ از دستیار";
@@ -560,6 +566,34 @@ function injectAiToolbarStyles() {
       font-size: 0.82rem;
       color: #16a34a;
     }
+    /* Item جدید: گفتگوی ادامه‌دار - هر تبادل (سؤال+پاسخ) یه بلوک جدا،
+       زیر بلوک قبلی، بدون این‌که گفتگوی قبلی پاک بشه. */
+    .ai-chat-turn {
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .ai-chat-turn:last-child {
+      border-bottom: none;
+    }
+    .ai-chat-question {
+      font-weight: bold;
+      color: #173b63;
+      margin-bottom: 6px;
+    }
+    .ai-chat-question::before {
+      content: "❓ ";
+    }
+    .ai-chat-pending {
+      color: #64748b;
+      font-size: 0.9rem;
+      padding: 6px 0;
+    }
+    .ai-chat-error {
+      color: #b91c1c;
+      font-size: 0.9rem;
+      padding: 6px 0;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -661,13 +695,36 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (aiChatForm && aiChatInput && aiChatOutput) {
     let chatToken = 0; // همون منطق نسل، برای پرسش‌های پشت‌سرهم در تب گفت‌وگو
-    let latestChatItem = null; // آخرین پرسش‌وپاسخ موفق، برای نوار ابزار
+    // Item جدید (گفتگوی ادامه‌دار): کل تبادل‌های همین نشست، به ترتیب -
+    // هم برای نمایش هر تبادل زیر تبادل قبلی (نه جایگزینیش)، هم برای
+    // ساخت history‌ای که به askQuestion داده می‌شه.
+    const chatTurns = [];
 
     const chatToolbar = createAiToolbar(
-      () => (latestChatItem ? [latestChatItem] : []),
+      () =>
+        chatTurns.map((turn) => ({
+          title: `پرسش: ${turn.question}`,
+          text: turn.answer,
+          url: turn.sourcesText,
+        })),
       "ابتدا یک پاسخ دریافت کنید"
     );
     aiChatOutput.insertAdjacentElement("afterend", chatToolbar);
+
+    function renderChatTurns() {
+      aiChatOutput.innerHTML = chatTurns
+        .map(
+          (turn) => `
+            <div class="ai-chat-turn">
+              <div class="ai-chat-question">${turn.question}</div>
+              <div class="ai-chat-answer">${turn.answer}</div>
+              <div class="ai-chat-sources">مآخذ: ${turn.sourceLinksHtml}</div>
+            </div>
+          `
+        )
+        .join("");
+      aiChatOutput.scrollTop = aiChatOutput.scrollHeight;
+    }
 
     aiChatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -675,31 +732,56 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!question) return;
 
       const myToken = ++chatToken;
-      aiChatOutput.innerHTML = "در حال بررسی و تنظیم پاسخ…";
-      latestChatItem = null;
+      // Item جدید: به‌جای پاک‌کردن گفتگوی قبلی، فقط یه نشونهٔ «در حال
+      // پاسخ» زیرش اضافه می‌شه؛ سؤالات و جواب‌های قبلی همچنان دیده می‌شن.
+      aiChatInput.value = "";
+      renderChatTurns();
+      aiChatOutput.insertAdjacentHTML(
+        "beforeend",
+        `<div class="ai-chat-pending" id="aiChatPending-${myToken}">در حال بررسی و تنظیم پاسخ…</div>`
+      );
+      aiChatOutput.scrollTop = aiChatOutput.scrollHeight;
+
       try {
-        const { answer, sources } = await askQuestion(question);
+        // Item جدید (گفتگوی ادامه‌دار): تاریخچهٔ تبادل‌های قبلی همین
+        // نشست، جدا از پرسش فعلی، به askQuestion فرستاده می‌شه.
+        const history = chatTurns.map((turn) => ({ question: turn.question, answer: turn.answer }));
+        const { answer, sources } = await askQuestion(question, history);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
-        const sourceLinks = sources
+
+        const sourceLinksHtml = sources
           .map((s) => `<a href="${textFragmentUrl(encodeURI(s.source), s.text)}" target="_blank" rel="noopener">${s.book}</a>`)
           .join("، ");
-        aiChatOutput.innerHTML = `
-          <div class="ai-chat-answer">${answer}</div>
-          <div class="ai-chat-sources">
-            مآخذ: ${sourceLinks}
-          </div>
-        `;
-        // آیتم کپی/خروجی/نشانه: خودِ سؤال+پاسخ، با فهرست منابع به‌عنوان url
-        latestChatItem = {
-          title: `پرسش: ${question}`,
-          text: answer,
-          url: sources.map((s) => s.source).join("، "),
-        };
+
+        chatTurns.push({
+          question,
+          answer,
+          sourceLinksHtml,
+          sourcesText: sources.map((s) => s.source).join("، "),
+        });
+        renderChatTurns();
       } catch (err) {
         if (myToken !== chatToken) return;
-        aiChatOutput.innerHTML = err.message || "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
+        const pendingEl = document.getElementById(`aiChatPending-${myToken}`);
+        const message = err.message || "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
+        if (pendingEl) {
+          pendingEl.textContent = message;
+        } else {
+          aiChatOutput.insertAdjacentHTML("beforeend", `<div class="ai-chat-error">${message}</div>`);
+        }
         console.error(err);
       }
     });
+
+    // Item جدید: شروع گفتگوی تازه - چون گفتگو حالا ادامه‌دار و انباشتی
+    // شده، کاربر باید بتونه با اراده‌ی خودش تاریخچه رو خالی کنه، نه
+    // این‌که مجبور باشه هر بار همه‌چیز رو نگه داره.
+    const aiChatResetButton = document.getElementById("aiChatResetButton");
+    if (aiChatResetButton) {
+      aiChatResetButton.addEventListener("click", () => {
+        chatTurns.length = 0;
+        aiChatOutput.innerHTML = "";
+      });
+    }
   }
 });
