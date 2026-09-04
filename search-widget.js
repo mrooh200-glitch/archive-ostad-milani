@@ -784,6 +784,12 @@ function injectAiToolbarStyles() {
       align-items: flex-start;
       gap: 8px;
       margin-bottom: 10px;
+      border-radius: 8px;
+      transition: background 0.15s ease;
+    }
+    .ai-search-result-row.is-active-result {
+      background: #eff6ff;
+      outline: 2px solid #93c5fd;
     }
     .ai-search-result-row .ai-result-marker {
       display: flex;
@@ -889,12 +895,23 @@ document.addEventListener("DOMContentLoaded", () => {
   const aiSearchInput = document.getElementById("aiSearchInput");
   const aiSearchResults = document.getElementById("aiSearchResults");
   const aiSearchStatus = document.getElementById("aiSearchStatus");
+  const aiSearchSelectionBar = document.getElementById("aiSearchSelectionBar");
 
   if (aiSearchInput && aiSearchResults) {
     let debounceTimer;
     let searchToken = 0; // شمارندهٔ نسل: هر بار تایپ، شماره‌ای جدید می‌گیره
     let latestSearchResults = []; // نتایج جست‌وجوی آخر، برای نوار ابزار زیرش
     const searchSelectedIndexes = new Set(); // ایندکس‌های تیک‌خورده در همین نتایج
+
+    // Item جدید (کار روی چند نتیجه با هم): چک‌باکس‌های زنده رو با
+    // searchSelectedIndexes هماهنگ می‌کنه - هم موقع «انتخاب همه»/«لغو
+    // انتخاب»، هم بعد از هر جست‌وجوی تازه.
+    function syncSearchCheckboxes() {
+      aiSearchResults.querySelectorAll(".ai-result-checkbox").forEach((checkbox) => {
+        const index = Number(checkbox.dataset.aiIndex);
+        checkbox.checked = searchSelectedIndexes.has(index);
+      });
+    }
 
     // نوار ابزار یک‌بار ساخته و بعد از باکس نتایج قرار می‌گیره؛ هر بار
     // که نتایج جدید بیاد، همین نوار می‌مونه، فقط لیست انتخاب‌ها خالی می‌شه.
@@ -920,6 +937,9 @@ document.addEventListener("DOMContentLoaded", () => {
           latestSearchResults = [];
           searchSelectedIndexes.clear();
           if (aiSearchStatus) aiSearchStatus.textContent = "";
+          if (aiSearchSelectionBar) aiSearchSelectionBar.style.display = "none";
+          activeResultIndex = -1;
+          updateAiSearchNavButtons();
           return;
         }
         if (aiSearchStatus) aiSearchStatus.textContent = "در حال جست‌وجو…";
@@ -931,6 +951,9 @@ document.addEventListener("DOMContentLoaded", () => {
           if (aiSearchStatus) aiSearchStatus.textContent = "";
           latestSearchResults = results;
           searchSelectedIndexes.clear();
+          if (aiSearchSelectionBar) aiSearchSelectionBar.style.display = results.length > 0 ? "flex" : "none";
+          activeResultIndex = -1;
+          updateAiSearchNavButtons();
           aiSearchResults.innerHTML = results
             .map(
               (r, i) =>
@@ -968,6 +991,72 @@ document.addEventListener("DOMContentLoaded", () => {
         searchSelectedIndexes.delete(index);
       }
     });
+
+    // Item جدید (کار روی چند نتیجه با هم، مثل جست‌وجوی داخلی فایل):
+    const aiSearchSelectAllButton = document.getElementById("aiSearchSelectAll");
+    if (aiSearchSelectAllButton) {
+      aiSearchSelectAllButton.addEventListener("click", () => {
+        searchSelectedIndexes.clear();
+        latestSearchResults.forEach((_, i) => searchSelectedIndexes.add(i));
+        syncSearchCheckboxes();
+      });
+    }
+
+    const aiSearchClearSelectionButton = document.getElementById("aiSearchClearSelection");
+    if (aiSearchClearSelectionButton) {
+      aiSearchClearSelectionButton.addEventListener("click", () => {
+        searchSelectedIndexes.clear();
+        syncSearchCheckboxes();
+      });
+    }
+
+    // Item جدید (یکسان‌سازی با جست‌وجوی داخلی فایل): دکمهٔ سه‌نقطه، همون
+    // جعبهٔ گزینه‌های (کپی/خروجی/نشانه) رو باز و بسته می‌کنه - عیناً
+    // انگار خودِ کاربر رو برچسب "⚙️ گزینه‌ها"ی جعبه کلیک کرده.
+    const aiSearchOptionsToggle = document.getElementById("aiSearchOptionsToggle");
+    if (aiSearchOptionsToggle) {
+      aiSearchOptionsToggle.addEventListener("click", () => {
+        searchToolbar.open = !searchToolbar.open;
+        aiSearchOptionsToggle.setAttribute("aria-expanded", String(searchToolbar.open));
+      });
+    }
+
+    // Item جدید: پیمایش بین نتایج شماره‌گذاری‌شده با دکمه‌های قبل/بعد -
+    // نتیجهٔ فعال با اسکرول و یه کادر مشخص، هایلایت می‌شه.
+    let activeResultIndex = -1;
+
+    function updateAiSearchNavButtons() {
+      const previousButton = document.getElementById("aiSearchPrevious");
+      const nextButton = document.getElementById("aiSearchNext");
+      const hasResults = latestSearchResults.length > 0;
+      if (previousButton) previousButton.disabled = !hasResults;
+      if (nextButton) nextButton.disabled = !hasResults;
+    }
+
+    function focusAiResult(index) {
+      const rows = aiSearchResults.querySelectorAll(".ai-search-result-row");
+      if (rows.length === 0) return;
+
+      activeResultIndex = ((index % rows.length) + rows.length) % rows.length;
+      rows.forEach((row, i) => row.classList.toggle("is-active-result", i === activeResultIndex));
+      rows[activeResultIndex].scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+
+    const aiSearchPreviousButton = document.getElementById("aiSearchPrevious");
+    if (aiSearchPreviousButton) {
+      aiSearchPreviousButton.addEventListener("click", () => {
+        if (latestSearchResults.length === 0) return;
+        focusAiResult(activeResultIndex <= 0 ? latestSearchResults.length - 1 : activeResultIndex - 1);
+      });
+    }
+
+    const aiSearchNextButton = document.getElementById("aiSearchNext");
+    if (aiSearchNextButton) {
+      aiSearchNextButton.addEventListener("click", () => {
+        if (latestSearchResults.length === 0) return;
+        focusAiResult(activeResultIndex + 1);
+      });
+    }
   }
 
   const aiChatForm = document.getElementById("aiChatForm");

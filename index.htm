@@ -1035,6 +1035,72 @@
       font-size: 1.15rem;
     }
 
+    /* آیتم جدید: یکسان‌سازی کادر جستجوی مفهومی با کادر جستجوی داخلی
+       فایل - عنوان، کادر متن، قبل/بعد، صوتی، و سه‌نقطه همه در یک ردیف. */
+    .ai-search-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ai-search-row .ai-section-title {
+      flex-shrink: 0;
+      margin: 0;
+      font-size: 1.05rem;
+    }
+
+    .ai-search-input-wrap {
+      flex: 1;
+      min-width: 160px;
+    }
+
+    .ai-search-input-wrap .search-box {
+      width: 100%;
+    }
+
+    #aiSearchPrevious,
+    #aiSearchNext {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      padding: 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    #aiSearchPrevious:disabled,
+    #aiSearchNext:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    #aiSearchPrevious:hover:not(:disabled),
+    #aiSearchNext:hover:not(:disabled) {
+      background: #f1f5f9;
+    }
+
+    .ai-search-options-toggle {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #fff;
+      color: #334155;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .ai-search-options-toggle:hover {
+      background: #f1f5f9;
+    }
+
     .ai-section-desc {
       margin: 0 0 14px;
       color: #64748b;
@@ -1050,6 +1116,27 @@
       margin: 10px 0 0;
       color: #64748b;
       font-size: 0.85rem;
+    }
+
+    .ai-search-selection-bar {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .ai-search-selection-bar button {
+      border: 1px solid #93c5fd;
+      border-radius: 6px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font: inherit;
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+
+    .ai-search-selection-bar button:hover {
+      background: #dbeafe;
     }
 
     .ai-search-results {
@@ -2204,20 +2291,65 @@
     <div id="aiPanel" class="tab-panel">
       <div class="ai-panel-inner">
         <section class="ai-section">
-          <h2 class="ai-section-title" title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">جست‌وجوی مفهومی</h2>
+          <div class="ai-search-row">
+            <span class="ai-section-title" title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">جست‌وجوی مفهومی</span>
 
-          <div class="search-box-wrap ai-search-box-wrap">
-            <input
-              id="aiSearchInput"
-              class="search-box"
-              type="search"
-              autocomplete="off"
-              placeholder="برای نمونه: نسبت میان عرفان و فلسفه"
-              aria-label="جست‌وجوی مفهومی"
-              title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">
+            <div class="ai-search-input-wrap">
+              <input
+                id="aiSearchInput"
+                class="search-box"
+                type="search"
+                autocomplete="off"
+                placeholder="برای نمونه: نسبت میان عرفان و فلسفه"
+                aria-label="جست‌وجوی مفهومی"
+                title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">
+            </div>
+
+            <button
+              id="aiSearchPrevious"
+              type="button"
+              disabled
+              title="رفتن به نتیجهٔ قبلی"
+              aria-label="رفتن به نتیجهٔ قبلی">
+              ▶
+            </button>
+
+            <button
+              id="aiSearchNext"
+              type="button"
+              disabled
+              title="رفتن به نتیجهٔ بعدی"
+              aria-label="رفتن به نتیجهٔ بعدی">
+              ◀
+            </button>
+
+            <button
+              id="aiVoiceInput"
+              type="button"
+              class="voice-input-button"
+              title="جست‌وجوی صوتی (به‌جای تایپ، عبارت را با میکروفون بگویید)"
+              aria-label="جست‌وجوی صوتی">
+              🎤
+            </button>
+
+            <button
+              id="aiSearchOptionsToggle"
+              type="button"
+              class="ai-search-options-toggle"
+              title="گزینه‌ها (انتخاب همه، خروجی، نشانه)"
+              aria-label="گزینه‌ها"
+              aria-haspopup="true"
+              aria-expanded="false">
+              ⋮
+            </button>
           </div>
 
           <p id="aiSearchStatus" class="ai-status" aria-live="polite"></p>
+
+          <div id="aiSearchSelectionBar" class="ai-search-selection-bar" style="display:none;">
+            <button type="button" id="aiSearchSelectAll">انتخاب همه</button>
+            <button type="button" id="aiSearchClearSelection">لغو انتخاب</button>
+          </div>
 
           <div id="aiSearchResults" class="ai-search-results" aria-live="polite"></div>
         </section>
@@ -2265,6 +2397,8 @@
     <input
       type="text"
       id="siteTagInput"
+      name="bookmarkTagInput"
+      autocomplete="on"
       placeholder="برچسب (اختیاری، با کاما جدا کنید)">
     <div class="site-tag-popover-actions">
       <button type="button" id="siteTagSave">ذخیره</button>
@@ -4211,6 +4345,72 @@
         siteVoiceButton.title = "مرورگر شما از جست‌وجوی صوتی پشتیبانی نمی‌کند";
       }
       siteVoiceButton.addEventListener("click", toggleSiteVoiceInput);
+    }
+
+    // Item جدید (یکسان‌سازی کادر جستجوی مفهومی با جستجوی داخلی فایل):
+    // همون الگوی جست‌وجوی صوتی بالا، فقط برای کادر جستجوی مفهومی.
+    let aiVoiceRecognition = null;
+
+    function toggleAiVoiceInput() {
+      const Ctor = getSpeechRecognitionCtor();
+      const button = document.getElementById("aiVoiceInput");
+      const input = document.getElementById("aiSearchInput");
+
+      if (!Ctor) {
+        if (button) {
+          button.title = "پشتیبانی نمی‌شود";
+          button.setAttribute("aria-label", "جست‌وجوی صوتی - پشتیبانی نمی‌شود");
+        }
+        return;
+      }
+
+      if (aiVoiceRecognition) {
+        aiVoiceRecognition.stop();
+        return;
+      }
+
+      aiVoiceRecognition = new Ctor();
+      aiVoiceRecognition.lang = "fa-IR";
+      aiVoiceRecognition.interimResults = false;
+      aiVoiceRecognition.maxAlternatives = 1;
+
+      aiVoiceRecognition.addEventListener("start", () => {
+        if (button) {
+          button.classList.add("is-listening");
+          button.title = "در حال شنیدن…";
+          button.setAttribute("aria-label", "در حال شنیدن…");
+        }
+      });
+
+      aiVoiceRecognition.addEventListener("result", event => {
+        const transcript = event.results[0][0].transcript;
+        input.value = transcript;
+        // Item جدید: به‌جای صدازدن مستقیم یه تابع جست‌وجو، رویداد input
+        // رو شبیه‌سازی می‌کنیم تا همون شنوندهٔ debounce‌شدهٔ موجود تو
+        // search-widget.js (که جست‌وجوی مفهومی رو انجام می‌ده) خودش
+        // بگیردش - نیازی به دونستن جزئیات اون منطق اینجا نیست.
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+
+      aiVoiceRecognition.addEventListener("end", () => {
+        if (button) {
+          button.classList.remove("is-listening");
+          button.title = "جست‌وجوی صوتی";
+          button.setAttribute("aria-label", "جست‌وجوی صوتی");
+        }
+        aiVoiceRecognition = null;
+      });
+
+      aiVoiceRecognition.start();
+    }
+
+    const aiVoiceButton = document.getElementById("aiVoiceInput");
+    if (aiVoiceButton) {
+      if (!getSpeechRecognitionCtor()) {
+        aiVoiceButton.disabled = true;
+        aiVoiceButton.title = "مرورگر شما از جست‌وجوی صوتی پشتیبانی نمی‌کند";
+      }
+      aiVoiceButton.addEventListener("click", toggleAiVoiceInput);
     }
 
     const siteSearchRoot = document.getElementById("siteSearchRoot");

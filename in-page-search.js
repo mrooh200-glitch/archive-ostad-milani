@@ -1064,6 +1064,8 @@
       <input
         type="text"
         id="inPageSelectionTagInput"
+        name="bookmarkTagInput"
+        autocomplete="on"
         placeholder="برچسب (اختیاری، با کاما جدا کنید)">
       <div class="in-page-selection-tag-popover-actions">
         <button type="button" id="inPageSelectionTagSave">ذخیره</button>
@@ -4162,17 +4164,11 @@
   function buildBookmarkExportPlainText(items) {
     const body = buildBookmarkExportGroups(items).map(group => {
       const tagsBody = group.tagGroups.map(tagGroup => {
-        const itemsBody = tagGroup.items.map((item, index) => {
-          const tagsLine = (item.tags && item.tags.length) ?
-            `\n      🏷️ ${item.tags.join("، ")}` :
-            "";
-
-          return (
-            `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}${tagsLine}\n` +
-            `      🔗 لینک: ${item.url}` +
-            buildLinksPlainTextSuffix(item.links, "      ")
-          );
-        }).join("\n\n");
+        const itemsBody = tagGroup.items.map((item, index) => (
+          `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}\n` +
+          `      🔗 لینک: ${item.url}` +
+          buildLinksPlainTextSuffix(item.links, "      ")
+        )).join("\n\n");
 
         return `${tagGroup.subNumber} - 🏷️ ${tagGroup.tagLabel}\n${itemsBody}`;
       }).join("\n\n");
@@ -4199,11 +4195,6 @@
     const itemsHtml = buildBookmarkExportGroups(items).map(group => {
       const tagsHtml = group.tagGroups.map(tagGroup => {
         const entriesHtml = tagGroup.items.map((item, index) => {
-          const itemTagsHtml = (item.tags && item.tags.length) ?
-            `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
-            `font-size:12px;color:#6d28d9;text-align:right;">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
-            "";
-
           const itemPageHtml = item.page ?
             `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
@@ -4214,7 +4205,6 @@
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
             `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>` +
             itemPageHtml +
-            itemTagsHtml +
             `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:12px;text-align:right;">🔗 ` +
             `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>` +
@@ -4270,11 +4260,6 @@
           <div class="export-item">
             <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>
             ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
-            ${
-              (item.tags && item.tags.length) ?
-                `<p class="export-link">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
-                ""
-            }
             <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
             ${buildLinksPdfSuffix(item.links)}
           </div>
