@@ -2776,6 +2776,22 @@
     return div.innerHTML;
   }
 
+  // Item جدید (رفع باگ: ستاره‌های ** خام تو خروجی Word/PDF نشانه‌ها):
+  // متن ذخیره‌شدهٔ یک نشانه (item.text) کلمهٔ هایلایت‌شده رو با
+  // **...** مشخص می‌کنه - این قرارداد فقط برای هدف‌های متن‌سادست
+  // (رجوع کنید به buildParagraphPlainText). وقتی همین متن تو یه بافت
+  // HTML واقعی (Word/PDF/پنل زنده) نمایش داده می‌شه، باید این نشانه‌ها
+  // به هایلایت واقعی تبدیل بشن - نه این‌که عیناً به‌صورت ** دیده بشن.
+  function renderBookmarkTextHtml(text) {
+    const escaped = escapeHtml(text || "");
+    return escaped.replace(
+      /\*\*(.+?)\*\*/g,
+      (_match, inner) =>
+        `<span style="background-color:#fde047;mso-highlight:yellow;color:#111827;` +
+        `padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${inner}</span>`
+    );
+  }
+
   function getSnippetContainer(mark) {
     let el = mark.parentElement;
 
@@ -3085,6 +3101,17 @@
 
         seen.add(key);
         refs.push({ kind: "footnote", label: label || "پاورقی", text: footnoteText });
+        return;
+      }
+
+      // Item جدید (رفع باگ: لینک اشتباهی برای اسامی داخل متن مثل «محمد»):
+      // اگه این لینک فقط به همین صفحه اشاره می‌کنه (یه پرش داخلی است)
+      // ولی پاورقی هم نبود، یعنی صرفاً یه لنگر ناوبری داخلی خروجی خام
+      // Word است (مثلاً دور یک عنوان یا اسم، برای فهرست مطالب) - نه
+      // چیزی که ارزش نمایش در خروجی/نشانه داشته باشه. کاملاً نادیده
+      // گرفته می‌شود، برخلاف قبل که اشتباهاً به‌عنوان یه لینک واقعی
+      // صادر می‌شد.
+      if (resolveSamePageFragmentId(rawHref)) {
         return;
       }
 
@@ -4052,7 +4079,7 @@
           );
         }).join("\n\n");
 
-        return `${tagGroup.subNumber} - ${tagGroup.tagLabel}\n${itemsBody}`;
+        return `${tagGroup.subNumber} - 🏷️ ${tagGroup.tagLabel}\n${itemsBody}`;
       }).join("\n\n");
 
       return `${group.mainNumber} - ${group.bookTitle}\n\n${tagsBody}`;
@@ -4090,7 +4117,7 @@
           return (
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-            `<strong>${index + 1}.</strong>\u00a0«${escapeHtml(item.text)}»</p>` +
+            `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text)}»</p>` +
             itemPageHtml +
             itemTagsHtml +
             `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
@@ -4103,7 +4130,7 @@
         return (
           `<p dir="rtl" style="margin:10px 0 6px;font-family:Tahoma,Arial,sans-serif;` +
           `font-size:13px;font-weight:bold;color:#6d28d9;text-align:right;">` +
-          `${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</p>` +
+          `${tagGroup.subNumber} - 🏷️ ${escapeHtml(tagGroup.tagLabel)}</p>` +
           entriesHtml
         );
       }).join("");
@@ -4146,7 +4173,7 @@
       const tagsHtml = group.tagGroups.map(tagGroup => {
         const entriesHtml = tagGroup.items.map((item, index) => `
           <div class="export-item">
-            <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${escapeHtml(item.text)}»</p>
+            <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text)}»</p>
             ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
             ${
               (item.tags && item.tags.length) ?
@@ -4159,7 +4186,7 @@
         `).join("");
 
         return `
-          <div class="export-group-tag">${tagGroup.subNumber} - ${escapeHtml(tagGroup.tagLabel)}</div>
+          <div class="export-group-tag">${tagGroup.subNumber} - 🏷️ ${escapeHtml(tagGroup.tagLabel)}</div>
           ${entriesHtml}
         `;
       }).join("");
@@ -4398,7 +4425,7 @@
                   aria-label="انتخاب این نشانه">
                 <div class="bookmark-item-content">
                   ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(item.page)}</span>` : ""}
-                  <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
+                  <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
                   <div class="archive-item-actions">
                     <a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">
                       بازکردن
@@ -4413,7 +4440,7 @@
           `).join("");
 
           return `
-            <div class="bookmark-group-tag">${subNumber} - ${escapeHtml(tagLabel)}</div>
+            <div class="bookmark-group-tag">${subNumber} - 🏷️ ${escapeHtml(tagLabel)}</div>
             ${itemsHtml}
           `;
         }).join("");

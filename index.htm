@@ -674,10 +674,29 @@
       color: #ffffff;
     }
 
-    .archive-book-group-title {
+    .archive-book-group-title,
+    .bookmark-group-book {
       padding: 10px 16px 2px;
       color: #94a3b8;
       font-size: 0.72rem;
+      font-weight: bold;
+    }
+
+    .bookmark-group-tag {
+      padding: 6px 16px 2px;
+      color: #6d28d9;
+      font-size: 0.74rem;
+      font-weight: bold;
+    }
+
+    .in-page-result-page {
+      display: inline-block;
+      margin: 0 0 4px;
+      padding: 1px 6px;
+      border-radius: 9999px;
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-size: 0.68rem;
       font-weight: bold;
     }
 
@@ -3493,18 +3512,71 @@
     // گروه‌بندی ساده‌تر: فقط بر اساس عنوان کتاب، بدون شماره‌گذاری فرعی
     // per-برچسب) - روی همون فهرستِ فیلترشده‌ای عمل می‌کند که همین الان
     // در پنل دیده می‌شود.
-    function groupBookmarksByTitle(items) {
-      const groups = new Map();
+    // Item جدید: گروه‌بندی بر اساس کتاب و سپس برچسب - دقیقاً هم‌ساختار با
+    // in-page-search.js (buildBookmarkGroups/sortedBookmarkTagKeys) تا
+    // نشانه‌های ساخته‌شده از هرجای سایت (صفحهٔ کتاب، جست‌وجوی مفهومی، یا
+    // جست‌وجوی کلمه‌ای همین صفحه) یکسان نمایش داده بشن.
+    const BOOKMARK_NO_TAG_LABEL = "بدون برچسب";
+
+    function compareFa(a, b) {
+      return (a || "").localeCompare(b || "", "fa");
+    }
+
+    function buildBookmarkGroups(items, restrictTags) {
+      const bookMap = new Map();
+      const hasRestriction = restrictTags && restrictTags.size > 0;
 
       items.forEach(item => {
-        const title = item.title || "بدون عنوان";
-        if (!groups.has(title)) {
-          groups.set(title, []);
+        const bookTitle = item.title || "";
+
+        if (!bookMap.has(bookTitle)) {
+          bookMap.set(bookTitle, new Map());
         }
-        groups.get(title).push(item);
+
+        const tagMap = bookMap.get(bookTitle);
+        const tagsForGrouping = hasRestriction ?
+          (item.tags || []).filter(tag => restrictTags.has(tag)) :
+          ((item.tags && item.tags.length) ? item.tags : [BOOKMARK_NO_TAG_LABEL]);
+
+        tagsForGrouping.forEach(tag => {
+          if (!tagMap.has(tag)) {
+            tagMap.set(tag, []);
+          }
+
+          tagMap.get(tag).push(item);
+        });
       });
 
-      return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0], "fa"));
+      return bookMap;
+    }
+
+    function sortedBookmarkTagKeys(tagMap) {
+      const keys = Array.from(tagMap.keys());
+      const hasNoTagGroup = keys.includes(BOOKMARK_NO_TAG_LABEL);
+      const named = keys.filter(key => key !== BOOKMARK_NO_TAG_LABEL).sort(compareFa);
+
+      return hasNoTagGroup ? named.concat([BOOKMARK_NO_TAG_LABEL]) : named;
+    }
+
+    // Item جدید: فهرست گروه‌های آماده برای خروجی (Text/Word/PDF) - هر
+    // کتاب با شمارهٔ اصلی، هر برچسب داخلش با شمارهٔ فرعی (۱.۱، ۱.۲...).
+    function buildBookmarkExportGroups(items) {
+      const groups = buildBookmarkGroups(items, bookmarkFilterTags);
+      const bookTitles = Array.from(groups.keys()).sort(compareFa);
+
+      return bookTitles.map((bookTitle, bookIndex) => {
+        const mainNumber = bookIndex + 1;
+        const tagMap = groups.get(bookTitle);
+        const tagKeys = sortedBookmarkTagKeys(tagMap);
+
+        const tagGroups = tagKeys.map((tagLabel, tagIndex) => ({
+          tagLabel,
+          subNumber: `${mainNumber}.${tagIndex + 1}`,
+          items: tagMap.get(tagLabel)
+        }));
+
+        return { bookTitle: bookTitle || "بدون عنوان", mainNumber, tagGroups };
+      });
     }
 
     function exportBookmarksAsText(items) {
@@ -3512,20 +3584,17 @@
         return;
       }
 
-      const groups = groupBookmarksByTitle(items);
-
-      const body = groups.map(([title, groupItems]) => {
-        const itemsBody = groupItems.map((item, index) => {
-          const tagsLine = (item.tags && item.tags.length > 0) ?
-            `\n   🏷️ ${item.tags.join("، ")}` : "";
-
-          return (
-            `   ${index + 1}. «${item.text}»${tagsLine}\n` +
+      const body = buildBookmarkExportGroups(items).map(group => {
+        const tagsBody = group.tagGroups.map(tagGroup => {
+          const itemsBody = tagGroup.items.map((item, index) => (
+            `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}\n` +
             `      🔗 ${formatShareLink("لینک منبع", item.url)}`
-          );
+          )).join("\n\n");
+
+          return `${tagGroup.subNumber} - 🏷️ ${tagGroup.tagLabel}\n${itemsBody}`;
         }).join("\n\n");
 
-        return `📘 ${title}\n\n${itemsBody}`;
+        return `${group.mainNumber} - 📘 ${group.bookTitle}\n\n${tagsBody}`;
       }).join("\n\n");
 
       downloadTextFile("نشانه‌ها.txt", body);
@@ -3536,31 +3605,34 @@
         return;
       }
 
-      const groups = groupBookmarksByTitle(items);
-
-      const itemsHtml = groups.map(([title, groupItems]) => {
-        const entriesHtml = groupItems.map((item, index) => {
-          const itemTagsHtml = (item.tags && item.tags.length > 0) ?
-            `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
-            `font-size:12px;color:#6d28d9;text-align:right;">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
-            "";
-
-          return (
+      const itemsHtml = buildBookmarkExportGroups(items).map(group => {
+        const tagsHtml = group.tagGroups.map(tagGroup => {
+          const entriesHtml = tagGroup.items.map((item, index) => (
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-            `<strong>${index + 1}.</strong>\u00a0«${escapeHtml(item.text)}»</p>` +
-            itemTagsHtml +
+            `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text)}»</p>` +
+            (item.page ?
+              `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+              `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
+              "") +
             `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:12px;text-align:right;">🔗 ` +
             `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+          )).join("");
+
+          return (
+            `<p dir="rtl" style="margin:10px 0 6px;font-family:Tahoma,Arial,sans-serif;` +
+            `font-size:13px;font-weight:bold;color:#6d28d9;text-align:right;">` +
+            `${tagGroup.subNumber} - 🏷️ ${escapeHtml(tagGroup.tagLabel)}</p>` +
+            entriesHtml
           );
         }).join("");
 
         return (
           `<p dir="rtl" style="margin:16px 0 4px;font-family:Tahoma,Arial,sans-serif;` +
           `font-size:15px;font-weight:bold;color:#173b63;border-bottom:2px solid #173b63;` +
-          `padding-bottom:4px;text-align:right;">📘 ${escapeHtml(title)}</p>` +
-          entriesHtml
+          `padding-bottom:4px;text-align:right;">${group.mainNumber} - 📘 ${escapeHtml(group.bookTitle)}</p>` +
+          tagsHtml
         );
       }).join("");
 
@@ -3590,24 +3662,25 @@
         return;
       }
 
-      const groups = groupBookmarksByTitle(items);
+      const itemsHtml = buildBookmarkExportGroups(items).map(group => {
+        const tagsHtml = group.tagGroups.map(tagGroup => {
+          const entriesHtml = tagGroup.items.map((item, index) => `
+            <div class="export-item">
+              <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text)}»</p>
+              ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
+              <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
+            </div>
+          `).join("");
 
-      const itemsHtml = groups.map(([title, groupItems]) => {
-        const entriesHtml = groupItems.map((item, index) => `
-          <div class="export-item">
-            <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${escapeHtml(item.text)}»</p>
-            ${
-              (item.tags && item.tags.length > 0) ?
-                `<p class="export-link">🏷️ ${escapeHtml(item.tags.join("، "))}</p>` :
-                ""
-            }
-            <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
-          </div>
-        `).join("");
+          return `
+            <div class="export-group-tag">${tagGroup.subNumber} - 🏷️ ${escapeHtml(tagGroup.tagLabel)}</div>
+            ${entriesHtml}
+          `;
+        }).join("");
 
         return `
-          <div class="export-group-book">📘 ${escapeHtml(title)}</div>
-          ${entriesHtml}
+          <div class="export-group-book">${group.mainNumber} - 📘 ${escapeHtml(group.bookTitle)}</div>
+          ${tagsHtml}
         `;
       }).join("");
 
@@ -3635,6 +3708,17 @@
               font-size: 16px;
               font-weight: bold;
               color: #173b63;
+            }
+            .export-group-tag {
+              margin: 10px 0 6px;
+              font-size: 13px;
+              font-weight: bold;
+              color: #6d28d9;
+            }
+            .export-page {
+              margin: 0 0 4px;
+              font-size: 12px;
+              color: #1d4ed8;
             }
             .export-item {
               padding: 10px 0;
@@ -3711,45 +3795,50 @@
         </div>
       `;
 
-      // Item ط: گروه‌بندی بر اساس عنوان کتاب، تا نشانه‌های یک کتاب کنار
-      // هم باشند حتی اگر در زمان‌های مختلف ذخیره شده باشند.
-      const groups = new Map();
-
-      items.forEach(item => {
-        const title = item.title || "بدون عنوان";
-        if (!groups.has(title)) {
-          groups.set(title, []);
-        }
-        groups.get(title).push(item);
-      });
-
-      const bookTitles = [...groups.keys()].sort((a, b) => a.localeCompare(b, "fa"));
+      // Item ط (یکسان‌سازی با in-page-search.js): گروه‌بندی بر اساس کتاب
+      // و سپس برچسب، با شماره‌گذاری فرعی (۱.۱، ۱.۲...) - دقیقاً هم‌ساختار
+      // با پنل نشانه‌های صفحهٔ کتاب.
+      const bookGroups = buildBookmarkGroups(items, bookmarkFilterTags);
+      const bookTitles = Array.from(bookGroups.keys()).sort(compareFa);
 
       const listHtml = items.length === 0 ?
         `<p class="archive-empty">${
           bookmarkFilterTags.size > 0 ? "نشانه‌ای با این برچسب‌ها یافت نشد." : "هنوز نشانه‌ای ذخیره نشده است."
         }</p>` :
-        bookTitles.map(title => `
-          <div class="archive-book-group-title">📘 ${escapeHtml(title)} (${groups.get(title).length})</div>
-          ${groups.get(title).map(item => `
-            <div class="archive-item">
-              ${(item.tags && item.tags.length > 0) ? `
-                <div class="archive-item-tags">
-                  ${item.tags.map(tag => `<span class="archive-item-tag">${escapeHtml(tag)}</span>`).join("")}
+        bookTitles.map((bookTitle, bookIndex) => {
+          const mainNumber = bookIndex + 1;
+          const tagMap = bookGroups.get(bookTitle);
+          const tagKeys = sortedBookmarkTagKeys(tagMap);
+
+          const tagsHtml = tagKeys.map((tagLabel, tagIndex) => {
+            const subNumber = `${mainNumber}.${tagIndex + 1}`;
+
+            const itemsHtml = tagMap.get(tagLabel).map(item => `
+              <div class="archive-item">
+                ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(String(item.page))}</span>` : ""}
+                <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
+                <div class="archive-item-actions">
+                  <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
+                    بازکردن
+                  </a>
+                  <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
+                    حذف
+                  </button>
                 </div>
-              ` : ""}
-              <p class="archive-item-text">"${escapeHtml(item.text || "")}"</p>
-              <div class="archive-item-actions">
-                <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
-                  بازکردن
-                </a>
-                <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
-                  حذف
-                </button>
               </div>
-            </div>
-          `).join("")}
-        `).join("");
+            `).join("");
+
+            return `
+              <div class="bookmark-group-tag">${subNumber} - 🏷️ ${escapeHtml(tagLabel)}</div>
+              ${itemsHtml}
+            `;
+          }).join("");
+
+          return `
+            <div class="bookmark-group-book">${mainNumber} - 📘 ${escapeHtml(bookTitle || "بدون عنوان")}</div>
+            ${tagsHtml}
+          `;
+        }).join("");
 
       const exportRowHtml = items.length === 0 ? "" : `
         <div class="bookmark-export-row">
@@ -4302,6 +4391,22 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    // Item جدید (رفع باگ: ستاره‌های ** خام تو خروجی Word/PDF نشانه‌ها):
+    // نشانه‌هایی که از صفحهٔ خودِ کتاب (in-page-search.js) ذخیره شدن،
+    // چون کلید localStorage مشترکه، همین‌جا هم دیده می‌شن؛ متن‌شون
+    // ممکنه علامت **...** داشته باشه (قرارداد متن‌سادهٔ آنجا). این
+    // تابع همون علامت رو، وقتی تو یه بافت HTML واقعی نمایش داده می‌شه،
+    // به هایلایت واقعی تبدیل می‌کنه.
+    function renderBookmarkTextHtml(text) {
+      const escaped = escapeHtml(text || "");
+      return escaped.replace(
+        /\*\*(.+?)\*\*/g,
+        (_match, inner) =>
+          `<span style="background-color:#fde047;mso-highlight:yellow;color:#111827;` +
+          `padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${inner}</span>`
+      );
     }
 
     // Item ح: هر پاراگراف علاوه بر متنش، مشخص می‌کند که آیا داخل یک
