@@ -99,7 +99,7 @@ async function loadEmbeddings() {
       return EMBEDDINGS;
     }
 
-    const res = await fetch("embeddings.json");
+    const res = await fetch("embeddings.json", { cache: "no-store" });
     const raw = await res.json();
     const decoded = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
 
