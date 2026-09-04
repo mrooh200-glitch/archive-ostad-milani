@@ -222,7 +222,7 @@ async function askQuestion(question) {
 // سایت، کنار نتایج جست‌وجوی متنی، نشون داده بشن.
 // ============================================================
 
-const ARCHIVE_STORAGE_KEY = "milaniSearchResultsArchive";
+const AI_ARCHIVE_STORAGE_KEY = "milaniSearchResultsArchive";
 
 function escapeHtmlAi(text) {
   return String(text || "")
@@ -307,7 +307,7 @@ async function copyRichTextAi(plainText, html) {
 
 function loadArchiveAi() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(ARCHIVE_STORAGE_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(AI_ARCHIVE_STORAGE_KEY) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -316,7 +316,7 @@ function loadArchiveAi() {
 
 function saveArchiveAi(items) {
   try {
-    localStorage.setItem(ARCHIVE_STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(AI_ARCHIVE_STORAGE_KEY, JSON.stringify(items));
   } catch {
     // ذخیره‌نشدن نشانه خطای مهمی نیست، کاربر می‌تونه دوباره امتحان کنه
   }
