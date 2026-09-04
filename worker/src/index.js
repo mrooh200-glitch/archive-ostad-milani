@@ -127,6 +127,18 @@ async function handleChat(request, env) {
   const body = await request.json();
   const question = (body.question || "").trim();
   const contextChunks = Array.isArray(body.context) ? body.context : [];
+  // Item جدید (گفتگوی ادامه‌دار): تاریخچهٔ تبادل‌های قبلی همین نشست
+  // (بدون سؤال فعلی) - هر آیتم باید {question, answer} با متن غیرخالی
+  // باشه؛ هر آیتم ناقص یا نامعتبر نادیده گرفته می‌شه، نه این‌که کل
+  // درخواست رد بشه.
+  const history = Array.isArray(body.history)
+    ? body.history
+        .map((turn) => ({
+          question: typeof turn?.question === "string" ? turn.question.trim() : "",
+          answer: typeof turn?.answer === "string" ? turn.answer.trim() : "",
+        }))
+        .filter((turn) => turn.question && turn.answer)
+    : [];
 
   if (!question) {
     return jsonResponse({ error: "پارامتر question لازمه" }, 400);
@@ -141,21 +153,36 @@ async function handleChat(request, env) {
 
   const systemPrompt = `شما دستیار پژوهشی آرشیو دیجیتال متون استاد میلانی هستید. پاسخ خود را صرفاً بر اساس متن‌های زیر که از کتاب‌ها استخراج شده، به‌صورت دقیق، رسمی و علمی ارائه دهید. در صورتی که پاسخ در این متن‌ها یافت نشد، صادقانه اعلام کنید که در منابع موجود پاسخی یافت نشد؛ از افزودن مطلبی که مستند به متن نیست خودداری کنید.
 
-مطلب را مستقیم و قاطع بیان کنید — پاسخ را با عباراتی مانند «طبق این متون...»، «بر اساس منابع فوق...» یا هر مقدمه‌چینی مشابه شروع نکنید؛ این نوع عبارات، با وجود قصد بی‌طرفی، عملاً به اعتبار و قاطعیت پاسخ خدشه وارد می‌کند. کافی است در پایان پاسخ، مآخذ ذکر شود (که به‌صورت خودکار در رابط کاربری اضافه می‌شود)؛ نیازی به تکرار «طبق متن» در ابتدای هر جمله یا پاراگراف نیست.
+مطلب را مستقیم و قاطع بیان کنید — پاسخ را با عباراتی مانند «طبق این متون...»، «بر اساس منابع فوق...» یا هر مقدمه‌چینی مشابه شروع نکنید؛ این نوع عبارات، با وجود قصد بی‌طرفی، عملاً به اعتبار و قاطعیت پاسخ خدشه وارد می‌کند. کافی است در پایان پاسخ، مآخذ ذکر شود (که به‌صورت خودکار در رابط کاربری اضافه می‌شود)؛ نیازی به تکرار «طبق متن» در ابتدای هر جمله یا پاراگراف نیست.${
+    history.length > 0
+      ? "\n\nاین سؤال، ادامهٔ همین گفتگوست - به سؤال‌ها و پاسخ‌های قبلی که پیش از این پیام آمده توجه کن و در صورت نیاز (مثلاً اگر سؤال به «آن»، «همان مطلب»، یا موضوع قبلی اشاره داشت) پاسخ را با در نظر گرفتن آن‌ها بساز."
+      : ""
+  }
 
 متن‌های مرتبط:
 ${contextText}`;
 
   const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.7-flash:generateContent?key=${env.GEMINI_API_KEY}`;
 
-  const geminiRequestBody = JSON.stringify({
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `${systemPrompt}\n\nسؤال کاربر: ${question}` }],
-      },
-    ],
+  // Item جدید (گفتگوی ادامه‌دار): هر تبادل قبلیِ همین نشست، به‌صورت یک
+  // نوبت واقعی user + یک نوبت واقعی model قبل از سؤال فعلی اضافه می‌شه -
+  // این‌جوری Gemini واقعاً می‌بینه چه سؤال‌هایی قبلاً پرسیده شده و چه
+  // جوابی داده، نه این‌که هر بار انگار اولین سؤاله. متن‌های مرتبط
+  // (context) چون برای هر سؤال جدا از نو با جست‌وجوی معنایی پیدا می‌شن،
+  // فقط به نوبت فعلی (نه نوبت‌های قبلی تاریخچه) ضمیمه می‌شن.
+  const contents = [];
+
+  for (const turn of history) {
+    contents.push({ role: "user", parts: [{ text: turn.question }] });
+    contents.push({ role: "model", parts: [{ text: turn.answer }] });
+  }
+
+  contents.push({
+    role: "user",
+    parts: [{ text: `${systemPrompt}\n\nسؤال کاربر: ${question}` }],
   });
+
+  const geminiRequestBody = JSON.stringify({ contents });
 
   const geminiRes = await fetchGeminiWithRetry(geminiUrl, geminiRequestBody);
 
