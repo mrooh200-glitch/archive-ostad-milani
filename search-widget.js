@@ -183,8 +183,21 @@ async function semanticSearch(query, topK = 5) {
 // به‌جای کل متن، فقط چند کلمهٔ اول و چند کلمهٔ آخرش رو به‌عنوان «شروع» و «پایان»
 // بازه‌ی هایلایت می‌فرستیم؛ مرورگر خودش بین این دو رو کامل هایلایت می‌کنه.
 function textFragmentUrl(baseUrl, text) {
+  // Item جدید (رفع باگ: نشانه‌ها به صفحهٔ اول کتاب می‌رفتن، نه بخش
+  // انتخاب‌شده؛ و لینک منبع تو فایل‌های خروجی فعال نبود): baseUrl تا
+  // این‌جا یه مسیر نسبی بود (مثل "Osoul....htm") - برای نمایش زندهٔ
+  // نتیجه تو خودِ سایت کافی بود، ولی وقتی همین آدرس تو یه نشانه ذخیره
+  // می‌شه یا تو یه فایل Word/PDF صادر می‌شه، دیگه بافتِ «تو کدوم صفحه‌
+  // ایم» رو نداره - پس باید از همون‌جا مطلق (با دامنهٔ کامل) ساخته بشه.
+  let absoluteBase;
+  try {
+    absoluteBase = new URL(baseUrl, location.href).href;
+  } catch {
+    absoluteBase = baseUrl;
+  }
+
   const words = (text || "").trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return baseUrl;
+  if (words.length === 0) return absoluteBase;
 
   const startWords = words.slice(0, 6).join(" ");
   const endWords = words.length > 12 ? words.slice(-6).join(" ") : null;
@@ -193,7 +206,7 @@ function textFragmentUrl(baseUrl, text) {
     ? `${encodeURIComponent(startWords)},${encodeURIComponent(endWords)}`
     : encodeURIComponent(startWords);
 
-  return `${baseUrl}#:~:text=${fragment}`;
+  return `${absoluteBase}#:~:text=${fragment}`;
 }
 
 // ---------- گفت‌وگو (پرسش‌وپاسخ بر اساس متن‌های مرتبط) ----------
@@ -891,7 +904,7 @@ document.addEventListener("DOMContentLoaded", () => {
           .sort((a, b) => a - b)
           .map((i) => latestSearchResults[i])
           .filter(Boolean)
-          .map((r) => ({ title: r.book, text: r.text, url: r.source, page: r.page })),
+          .map((r) => ({ title: r.book, text: r.text, url: textFragmentUrl(encodeURI(r.source), r.text), page: r.page })),
       "ابتدا یک یا چند نتیجه را با تیک انتخاب کنید"
     );
     aiSearchResults.insertAdjacentElement("afterend", searchToolbar);
@@ -974,7 +987,7 @@ document.addEventListener("DOMContentLoaded", () => {
           kind: "chat",
           title: `پرسش: ${turn.question}`,
           text: turn.answer,
-          url: turn.sourcesText,
+          url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].url) || turn.sourcesText,
           question: turn.question,
           answer: turn.answer,
           sourcesInfo: turn.sourcesInfo,

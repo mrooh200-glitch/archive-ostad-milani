@@ -1939,7 +1939,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 16px;
+        padding: 12px 16px 12px 34px;
         border-bottom: 1px solid #e2e8f0;
         background: #f8fafc;
         color: #173b63;
@@ -2055,18 +2055,18 @@
          آرشیو گفتگوهای دستیار هوشمند که همین کلاس رو استفاده می‌کنن). */
       .panel-close-x {
         position: absolute;
-        top: 8px;
-        left: 8px;
-        width: 30px;
-        height: 30px;
+        top: 4px;
+        left: 4px;
+        width: 24px;
+        height: 24px;
         border: none;
         background: transparent;
         color: #64748b;
-        font-size: 1.3rem;
+        font-size: 1.15rem;
         line-height: 1;
         cursor: pointer;
         border-radius: 6px;
-        z-index: 1;
+        z-index: 2;
       }
 
       .panel-close-x:hover {
