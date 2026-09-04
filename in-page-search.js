@@ -3099,7 +3099,22 @@
     try {
       const absolute = new URL(rawHref, location.href);
 
-      if (!absolute.hash || absolute.href.split("#")[0] !== location.href.split("#")[0]) {
+      if (!absolute.hash) {
+        return null;
+      }
+
+      // Item جدید (رفع باگ: لینک‌های داخلی مثل «الله» هنوز صادر می‌شدن):
+      // قبلاً کل URL (شامل query string) مقایسه می‌شد؛ اگه خودِ صفحه‌ی
+      // جاری با یه لینک دارای پارامتر باز شده باشه (مثلاً از نتیجه‌ی
+      // جست‌وجو یا با ?page=... برای بازگشت)، location.href این
+      // پارامترها رو داره ولی لنگر داخلی خامِ Word معمولاً نداره - پس
+      // این دو هیچ‌وقت دقیقاً برابر نمی‌شدن و لینک اشتباهاً «صفحه‌ی
+      // دیگه» تشخیص داده می‌شد. الان فقط origin و مسیر (pathname) مقایسه
+      // می‌شه، نه کل URL.
+      const isSameOrigin = absolute.origin === location.origin;
+      const isSamePath = absolute.pathname === location.pathname;
+
+      if (!isSameOrigin || !isSamePath) {
         return null;
       }
 
