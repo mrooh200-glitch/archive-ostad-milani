@@ -143,8 +143,14 @@ function cosineSimilarity(a, b) {
 // ---------- جست‌وجوی معنایی ----------
 // query: متن جست‌وجوی کاربر
 // topK: چند نتیجهٔ برتر برگردونده بشه
-async function semanticSearch(query, topK = 5) {
+// bookFilter: (اختیاری) Set از اسم کتاب‌هایی که جست‌وجو باید فقط
+// محدود به اون‌ها باشه - برای «محدودهٔ جست‌وجو» (بند ب). اگه خالی یا
+// undefined باشه، مثل قبل رو کل آرشیو جست‌وجو می‌کنه.
+async function semanticSearch(query, topK = 5, bookFilter = null) {
   const data = await loadEmbeddings();
+  const scopedData = bookFilter && bookFilter.size > 0
+    ? data.filter((item) => bookFilter.has(item.book))
+    : data;
 
   // گرفتن بردار عبارت جست‌وجو از Worker
   const embedRes = await fetch(`${WORKER_URL}/embed`, {
@@ -166,8 +172,8 @@ async function semanticSearch(query, topK = 5) {
   }
   const { vector: queryVector } = await embedRes.json();
 
-  // مقایسهٔ شباهت با همهٔ بخش‌های ذخیره‌شده
-  const scored = data.map((item) => ({
+  // مقایسهٔ شباهت با همهٔ بخش‌های ذخیره‌شده (یا فقط زیرمجموعهٔ محدودشده)
+  const scored = scopedData.map((item) => ({
     ...item,
     score: cosineSimilarity(queryVector, item.vector),
   }));
@@ -178,6 +184,89 @@ async function semanticSearch(query, topK = 5) {
 
 // ---------- ساخت لینک به همان قطعهٔ متنی داخل صفحه (Text Fragment مرورگر) ----------
 // این یه ویژگی استاندارد مرورگرهاست: با اضافه‌کردن #:~:text=... به انتهای لینک،
+
+// آیتم ب: راه‌اندازی مشترک پنل «محدودهٔ جست‌وجو/گفتگو» - فهرست تیک‌خور
+// کتاب‌ها رو از embeddings.json (بعد از بارگذاری، فقط یک‌بار) می‌سازه و
+// یه Set از اسم کتاب‌های تیک‌خورده رو برمی‌گردونه؛ این Set همیشه به‌روزه
+// (با تیک‌زدن/برداشتن هر کتاب، خودش تغییر می‌کنه) - خالی‌بودنش یعنی
+// «بدون محدودیت، جست‌وجو تو کل آرشیو».
+function setupScopeSelector(toggleId, panelId, listId) {
+  const selectedBooks = new Set();
+  const toggle = document.getElementById(toggleId);
+  const panel = document.getElementById(panelId);
+  const list = document.getElementById(listId);
+
+  if (!toggle || !panel || !list) return selectedBooks;
+
+  let populated = false;
+
+  async function populateList() {
+    if (populated) return;
+    populated = true;
+    list.innerHTML = `<p>در حال بارگذاری فهرست کتاب‌ها…</p>`;
+    try {
+      const data = await loadEmbeddings();
+      const books = [...new Set(data.map((item) => item.book))].sort((a, b) => a.localeCompare(b, "fa"));
+      list.innerHTML = books
+        .map(
+          (book) => `
+          <label>
+            <input type="checkbox" class="ai-scope-checkbox" value="${book.replace(/"/g, "&quot;")}">
+            ${book}
+          </label>
+        `
+        )
+        .join("");
+
+      list.querySelectorAll(".ai-scope-checkbox").forEach((checkbox) => {
+        checkbox.addEventListener("change", () => {
+          if (checkbox.checked) {
+            selectedBooks.add(checkbox.value);
+          } else {
+            selectedBooks.delete(checkbox.value);
+          }
+        });
+      });
+    } catch {
+      list.innerHTML = `<p style="color:#b91c1c;">خطا در بارگذاری فهرست کتاب‌ها</p>`;
+    }
+  }
+
+  toggle.addEventListener("click", async () => {
+    const isOpen = panel.style.display !== "none";
+    if (isOpen) {
+      panel.style.display = "none";
+      toggle.setAttribute("aria-expanded", "false");
+      return;
+    }
+    await populateList();
+    panel.style.display = "flex";
+    toggle.setAttribute("aria-expanded", "true");
+  });
+
+  document.addEventListener("click", (event) => {
+    if (panel.style.display !== "none" && !panel.contains(event.target) && event.target !== toggle) {
+      panel.style.display = "none";
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
+
+  panel.querySelectorAll("[data-scope-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const checkAll = button.dataset.scopeAction === "all";
+      list.querySelectorAll(".ai-scope-checkbox").forEach((checkbox) => {
+        checkbox.checked = checkAll;
+        if (checkAll) {
+          selectedBooks.add(checkbox.value);
+        } else {
+          selectedBooks.delete(checkbox.value);
+        }
+      });
+    });
+  });
+
+  return selectedBooks;
+}
 // مرورگر خودش صفحه رو تا اون متن اسکرول و هایلایتش می‌کنه — بدون نیاز به id یا
 // هیچ تغییری تو فایل‌های htm کتاب‌ها. چون متن‌های تکه‌ها می‌تونن طولانی باشن،
 // به‌جای کل متن، فقط چند کلمهٔ اول و چند کلمهٔ آخرش رو به‌عنوان «شروع» و «پایان»
@@ -216,11 +305,11 @@ function textFragmentUrl(baseUrl, text) {
 // تاریخچه را به پرامپت Gemini اضافه کند) پاسخ بعدی واقعاً با در نظر
 // گرفتن سؤال‌های قبلی همین گفتگو ساخته شود - نه این‌که هر پرسش، بی‌خبر
 // از پرسش‌های قبلی، از صفر پاسخ داده شود.
-async function askQuestion(question, history = [], mode = "grounded", image = null) {
+async function askQuestion(question, history = [], mode = "grounded", image = null, bookFilter = null) {
   // Item جدید (پاسخ آزاد): تو این حالت، پاسخ قرار نیست به متون آرشیو
   // محدود باشه - پس نیازی به جست‌وجوی معنایی (که یه تماس شبکه‌ی اضافه‌ست)
   // نیست؛ context خالی می‌مونه و مآخذی هم نشون داده نمی‌شه.
-  const relevant = mode === "general" ? [] : await semanticSearch(question, 5);
+  const relevant = mode === "general" ? [] : await semanticSearch(question, 5, bookFilter);
   const contextTexts = relevant.map((r) => r.text);
 
   const chatRes = await fetch(`${WORKER_URL}/chat`, {
@@ -1006,6 +1095,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let searchToken = 0; // شمارندهٔ نسل: هر بار تایپ، شماره‌ای جدید می‌گیره
     let latestSearchResults = []; // نتایج جست‌وجوی آخر، برای نوار ابزار زیرش
     const searchSelectedIndexes = new Set(); // ایندکس‌های تیک‌خورده در همین نتایج
+    // آیتم ب: محدودهٔ جست‌وجو - Set از کتاب‌های تیک‌خورده (خالی = کل آرشیو)
+    const aiSearchBookScope = setupScopeSelector("aiSearchScopeToggle", "aiSearchScopePanel", "aiSearchScopeList");
 
     // Item جدید (کار روی چند نتیجه با هم): چک‌باکس‌های زنده رو با
     // searchSelectedIndexes هماهنگ می‌کنه - هم موقع «انتخاب همه»/«لغو
@@ -1102,7 +1193,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         if (aiSearchStatus) aiSearchStatus.textContent = "در حال جست‌وجو…";
         try {
-          const results = await semanticSearch(query);
+          const results = await semanticSearch(query, 5, aiSearchBookScope);
           // اگه در این فاصله کاربر متن رو پاک کرده یا چیز دیگه‌ای تایپ کرده،
           // این جواب دیگه منسوخ شده و نباید روی وضعیت فعلی بشینه.
           if (myToken !== searchToken) return;
@@ -1267,6 +1358,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (aiChatForm && aiChatInput && aiChatOutput) {
     let chatToken = 0; // همون منطق نسل، برای پرسش‌های پشت‌سرهم در تب گفت‌وگو
+    // آیتم ب: محدودهٔ گفتگو - Set از کتاب‌های تیک‌خورده (خالی = کل آرشیو)
+    const aiChatBookScope = setupScopeSelector("aiChatScopeToggle", "aiChatScopePanel", "aiChatScopeList");
     // Item جدید (گفتگوی ادامه‌دار): کل تبادل‌های همین نشست، به ترتیب -
     // هم برای نمایش هر تبادل زیر تبادل قبلی (نه جایگزینیش)، هم برای
     // ساخت history‌ای که به askQuestion داده می‌شه.
@@ -1505,7 +1598,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const history = chatTurns.map((turn) => ({ question: turn.question, answer: turn.answer }));
         const chatModeInput = document.querySelector('input[name="aiChatMode"]:checked');
         const chatMode = chatModeInput ? chatModeInput.value : "grounded";
-        const { answer, sources } = await askQuestion(question, history, chatMode, attachmentForThisMessage);
+        const { answer, sources } = await askQuestion(question, history, chatMode, attachmentForThisMessage, aiChatBookScope);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
 
         // Item جدید: فهرست یکتای کتاب‌هایی که پاسخ از آن‌ها گرفته شده -
