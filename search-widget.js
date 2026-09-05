@@ -280,7 +280,7 @@ function setupScopeSelector(toggleId, panelId, listId, onToggle) {
 // هیچ تغییری تو فایل‌های htm کتاب‌ها. چون متن‌های تکه‌ها می‌تونن طولانی باشن،
 // به‌جای کل متن، فقط چند کلمهٔ اول و چند کلمهٔ آخرش رو به‌عنوان «شروع» و «پایان»
 // بازه‌ی هایلایت می‌فرستیم؛ مرورگر خودش بین این دو رو کامل هایلایت می‌کنه.
-function textFragmentUrl(baseUrl, text) {
+function textFragmentUrl(baseUrl, text, page) {
   // Item جدید (رفع باگ: نشانه‌ها به صفحهٔ اول کتاب می‌رفتن، نه بخش
   // انتخاب‌شده؛ و لینک منبع تو فایل‌های خروجی فعال نبود): baseUrl تا
   // این‌جا یه مسیر نسبی بود (مثل "Osoul....htm") - برای نمایش زندهٔ
@@ -304,7 +304,27 @@ function textFragmentUrl(baseUrl, text) {
     ? `${encodeURIComponent(startWords)},${encodeURIComponent(endWords)}`
     : encodeURIComponent(startWords);
 
-  return `${absoluteBase}#:~:text=${fragment}`;
+  // Item جدید (رفع باگ ریشه‌ای موارد ۱-۴): تا الان این تابع فقط
+  // #:~:text= می‌ساخت - دقیقاً همون باگی که قبلاً برای نشانه‌های
+  // انتخابیِ متنی پیدا و رفع کردیم (بدون q/frag/occ، صفحهٔ مقصد اصلاً
+  // نمی‌تونه با سیستم هایلایتِ خودِ سایت این متن رو پیدا کنه - فقط به
+  // رفتار ناپایدار مرورگر برای #:~:text= متکی می‌مونه). این تابع برای
+  // *همهٔ* لینک‌های جستجوی مفهومی و گفتگو استفاده می‌شه، پس این رفع،
+  // هم نتایج زندهٔ جستجوی مفهومی، هم نشانه‌ها، هم منابع گفتگو رو پوشش
+  // می‌ده.
+  let urlWithParams;
+  try {
+    const urlObj = new URL(absoluteBase);
+    urlObj.searchParams.set("q", startWords);
+    urlObj.searchParams.set("frag", startWords);
+    urlObj.searchParams.set("occ", "1");
+    if (page) urlObj.searchParams.set("page", String(page));
+    urlWithParams = urlObj.href;
+  } catch {
+    urlWithParams = absoluteBase;
+  }
+
+  return `${urlWithParams}#:~:text=${fragment}`;
 }
 
 // ---------- گفت‌وگو (پرسش‌وپاسخ بر اساس متن‌های مرتبط) ----------
@@ -1151,7 +1171,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 <span class="result-number">${i + 1}</span>
                 ${r.page ? `<span class="ai-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${r.page}</span>` : ""}
               </div>
-              <a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text)}" target="_blank" rel="noopener">
+              <a class="ai-search-result" href="${textFragmentUrl(encodeURI(r.source), r.text, r.page)}" target="_blank" rel="noopener">
                 <strong>${r.book}</strong>
                 <p>${r.text}</p>
                 <small>میزان تطابق مفهومی: ${(r.score * 100).toFixed(1)}٪ — برای مشاهدهٔ کتاب کلیک کنید</small>
@@ -1169,7 +1189,7 @@ document.addEventListener("DOMContentLoaded", () => {
           .sort((a, b) => a - b)
           .map((i) => latestSearchResults[i])
           .filter(Boolean)
-          .map((r) => ({ title: r.book, text: r.text, url: textFragmentUrl(encodeURI(r.source), r.text), page: r.page })),
+          .map((r) => ({ title: r.book, text: r.text, url: textFragmentUrl(encodeURI(r.source), r.text, r.page), page: r.page })),
       "ابتدا یک یا چند نتیجه را با تیک انتخاب کنید",
       {
         selectAll: () => {
@@ -1352,7 +1372,7 @@ document.addEventListener("DOMContentLoaded", () => {
           : latestSearchResults;
 
         window.addItemsToArchiveGeneric(
-          source.map((r) => ({ title: r.book, text: r.text, url: textFragmentUrl(encodeURI(r.source), r.text), page: r.page }))
+          source.map((r) => ({ title: r.book, text: r.text, url: textFragmentUrl(encodeURI(r.source), r.text, r.page), page: r.page }))
         );
 
         const originalLabel = aiAddToArchiveButton.textContent;
@@ -1719,7 +1739,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const sourcesInfo = [];
         const bookIndexMap = new Map();
         sources.forEach((s) => {
-          const entry = { page: s.page || null, url: textFragmentUrl(encodeURI(s.source), s.text) };
+          const entry = { page: s.page || null, url: textFragmentUrl(encodeURI(s.source), s.text, s.page) };
 
           if (!bookIndexMap.has(s.book)) {
             bookIndexMap.set(s.book, sourcesInfo.length);
