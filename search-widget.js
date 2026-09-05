@@ -456,7 +456,7 @@ function saveBookmarksAi(items) {
   }
 }
 
-function addItemsToBookmarksAi(items) {
+function addItemsToBookmarksAi(items, tags) {
   const bookmarks = loadBookmarksAi();
   items.forEach((item) => {
     bookmarks.push({
@@ -467,10 +467,11 @@ function addItemsToBookmarksAi(items) {
       // این فیلدها رو هم‌شکل با نشانه‌های ساخته‌شده تو in-page-search.js
       // نگه می‌داریم (حتی اگه اینجا همیشه خالی/پیش‌فرض باشن) تا پنل
       // مشترک «نشانه‌ها» بدون فرض اضافه، هر دو نوع نشانه رو یکسان رندر کنه.
-      tags: [],
+      tags: Array.isArray(tags) ? tags : [],
       links: [],
       occurrenceIndex: 1,
       page: item.page || null,
+      hasRealSource: item.hasRealSource !== false,
       savedAt: new Date().toISOString(),
     });
   });
@@ -976,8 +977,16 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
     } else if (action === "pdf") {
       openPrintableForItemsAi(items);
     } else if (action === "bookmark") {
-      addItemsToBookmarksAi(items);
-      setStatus("به نشانه‌ها افزوده شد");
+      if (typeof window.openBookmarkTagPopoverGeneric === "function") {
+        window.openBookmarkTagPopoverGeneric(btn.getBoundingClientRect(), (tags) => {
+          addItemsToBookmarksAi(items, tags);
+          setStatus("به نشانه‌ها افزوده شد");
+        });
+      } else {
+        // اگه به هر دلیلی تابع عمومی در دسترس نبود، حداقل بدون برچسب ذخیره کن
+        addItemsToBookmarksAi(items);
+        setStatus("به نشانه‌ها افزوده شد");
+      }
     }
   });
 
@@ -1482,6 +1491,10 @@ document.addEventListener("DOMContentLoaded", () => {
             question: turn.question,
             answer: turn.answer,
             sourcesInfo: turn.sourcesInfo,
+            // آیتم ۱۳: وقتی از حالت «پاسخ آزاد» بوده (منبع واقعی‌ای در
+            // کار نبوده)، این false می‌شه - تا نشانه‌ی ساخته‌شده از
+            // این پاسخ، گزینه‌ی «بازکردن» غیرفعال داشته باشه.
+            hasRealSource: !!(turn.sourcesInfo && turn.sourcesInfo.length > 0),
           })),
       "ابتدا یک یا چند پرسش‌وپاسخ را با تیک انتخاب کنید",
       {

@@ -545,6 +545,19 @@
       color: #1f2937;
     }
 
+    /* آیتم ۸ (رفع باگ: × با محتوا شناور/اسکرول می‌شد): بلوک نشانه‌ها
+       خودش دیگه اسکرول نمی‌شه - این کار رو یه لایه‌ی داخلی
+       (panel-scroll-area) انجام می‌ده؛ × چون بیرون از این لایه‌ست،
+       ثابت می‌مونه، دقیقاً مثل خودِ تب‌های بالای بلوک. */
+    #bookmarksPanel {
+      overflow: hidden;
+    }
+
+    #bookmarksPanel .panel-scroll-area {
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
     #archivePanel .archive-header,
     #bookmarksPanel .archive-header,
     #aiChatArchivePanel .archive-header {
@@ -618,6 +631,17 @@
     #bookmarksPanel .archive-header-actions button:hover,
     #aiChatArchivePanel .archive-header-actions button:hover {
       background: #dbeafe;
+    }
+
+    .archive-item-nolink {
+      display: inline-block;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: #94a3b8;
+      font-size: 0.74rem;
+      padding: 4px 8px;
+      cursor: not-allowed;
     }
 
     .archive-empty {
@@ -2826,7 +2850,7 @@
     </div>
   </main>
 
-  <div id="siteTagPopover" class="site-tag-popover">
+  <form id="siteTagPopover" class="site-tag-popover">
     <input
       type="text"
       id="siteTagInput"
@@ -2834,10 +2858,10 @@
       autocomplete="on"
       placeholder="برچسب (اختیاری، با کاما جدا کنید)">
     <div class="site-tag-popover-actions">
-      <button type="button" id="siteTagSave">ذخیره</button>
+      <button type="submit" id="siteTagSave">ذخیره</button>
       <button type="button" id="siteTagCancel">انصراف</button>
     </div>
-  </div>
+  </form>
 
   <div id="compareReadBar" class="compare-read-bar">
     <span id="compareReadCount">۰ کتاب انتخاب شده</span>
@@ -4496,9 +4520,9 @@
                     ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(String(item.page))}</span>` : ""}
                     <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
                     <div class="archive-item-actions">
-                      <a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">
-                        بازکردن
-                      </a>
+                      ${item.hasRealSource === false
+                        ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
+                        : `<a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">بازکردن</a>`}
                       <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
                         حذف
                       </button>
@@ -4530,31 +4554,33 @@
 
       panel.innerHTML = `
         <button type="button" class="panel-close-x" id="bookmarksCloseButton" title="بستن" aria-label="بستن">×</button>
-        <div class="archive-header">
-          <span>نشانه‌ها (${all.length})</span>
-          <div class="archive-header-actions">
-            <button
-              type="button"
-              id="bookmarksSelectAll"
-              title="انتخاب تمام نشانه‌های نمایش‌داده‌شده در همین فهرست"
-              ${items.length === 0 ? "disabled" : ""}>انتخاب همه</button>
-            <button
-              type="button"
-              id="bookmarksClearSelection"
-              title="برداشتن علامت انتخاب از تمام نشانه‌هایی که تاکنون انتخاب کرده‌اید"
-              ${hasBookmarkSelection ? "" : "disabled"}>
-              پاک‌کردن انتخاب
-              ${hasBookmarkSelection ? `<span class="bookmark-selection-badge">(${selectedBookmarkIds.size})</span>` : ""}
-            </button>
-            <button type="button" id="bookmarksClearButton">پاک‌کردن همه</button>
-            <button type="button" id="bookmarksCopy" ${exportItems.length === 0 ? "disabled" : ""}>کپی</button>
-            <button type="button" id="bookmarksExportPdf" ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
-            <button type="button" id="bookmarksExportWord" ${exportItems.length === 0 ? "disabled" : ""}>Word</button>
-            <button type="button" id="bookmarksExportText" ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
+        <div class="panel-scroll-area">
+          <div class="archive-header">
+            <span>نشانه‌ها (${all.length})</span>
+            <div class="archive-header-actions">
+              <button
+                type="button"
+                id="bookmarksSelectAll"
+                title="انتخاب تمام نشانه‌های نمایش‌داده‌شده در همین فهرست"
+                ${items.length === 0 ? "disabled" : ""}>انتخاب همه</button>
+              <button
+                type="button"
+                id="bookmarksClearSelection"
+                title="برداشتن علامت انتخاب از تمام نشانه‌هایی که تاکنون انتخاب کرده‌اید"
+                ${hasBookmarkSelection ? "" : "disabled"}>
+                پاک‌کردن انتخاب
+                ${hasBookmarkSelection ? `<span class="bookmark-selection-badge">(${selectedBookmarkIds.size})</span>` : ""}
+              </button>
+              <button type="button" id="bookmarksClearButton">پاک‌کردن همه</button>
+              <button type="button" id="bookmarksCopy" ${exportItems.length === 0 ? "disabled" : ""}>کپی</button>
+              <button type="button" id="bookmarksExportPdf" ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
+              <button type="button" id="bookmarksExportWord" ${exportItems.length === 0 ? "disabled" : ""}>Word</button>
+              <button type="button" id="bookmarksExportText" ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
+            </div>
           </div>
+          ${tagChipsHtml}
+          ${listHtml}
         </div>
-        ${tagChipsHtml}
-        ${listHtml}
       `;
 
       const clearButton = panel.querySelector("#bookmarksClearButton");
@@ -4668,13 +4694,21 @@
     }
 
     // ---- Item جدید: پاپ‌آور برچسب («افزودن نشانه به انتخاب‌شده‌ها») ----
-    function openBookmarkTagPopover(rect) {
+    // آیتم ۱۱: این کادر قبلاً فقط برای جستجوی متنی کار می‌کرد (چون
+    // ذخیره‌سازی مستقیم به addSelectedResultsToBookmarks وصل بود). الان
+    // یه callback اختیاری می‌گیره - جستجوی مفهومی/گفتگو (از
+    // search-widget.js) هم می‌تونن با callback خودشون صداش بزنن.
+    let bookmarkTagPopoverOnSave = null;
+
+    function openBookmarkTagPopover(rect, onSave) {
       const popover = document.getElementById("siteTagPopover");
       const input = document.getElementById("siteTagInput");
 
       if (!popover) {
         return;
       }
+
+      bookmarkTagPopoverOnSave = typeof onSave === "function" ? onSave : addSelectedResultsToBookmarks;
 
       if (input) {
         input.value = "";
@@ -4701,6 +4735,10 @@
       }
     }
 
+    // آیتم جدید: برای این‌که search-widget.js (جستجوی مفهومی/گفتگو) هم
+    // بتونه همین کادر رو با callback خودش باز کنه.
+    window.openBookmarkTagPopoverGeneric = (rect, onSave) => openBookmarkTagPopover(rect, onSave);
+
     function closeBookmarkTagPopover() {
       const popover = document.getElementById("siteTagPopover");
       if (popover) {
@@ -4708,17 +4746,23 @@
       }
     }
 
-    const siteTagSaveButton = document.getElementById("siteTagSave");
-    if (siteTagSaveButton) {
-      siteTagSaveButton.addEventListener("click", event => {
+    // آیتم ۷ (رفع باگ: Enter کار نمی‌کرد): چون این کادر الان یه فرم
+    // واقعیه، رویداد submit (که هم با کلیک دکمه‌ی ذخیره، هم با زدن
+    // Enter تو کادر متنی فایر می‌شه) رو می‌گیریم - نه فقط کلیک دکمه.
+    const siteTagPopoverForm = document.getElementById("siteTagPopover");
+    if (siteTagPopoverForm) {
+      siteTagPopoverForm.addEventListener("submit", event => {
+        event.preventDefault();
         event.stopPropagation();
 
         const input = document.getElementById("siteTagInput");
         const tags = parseTagsInput(input ? input.value : "");
 
-        addSelectedResultsToBookmarks(tags);
+        (bookmarkTagPopoverOnSave || addSelectedResultsToBookmarks)(tags);
         closeBookmarkTagPopover();
       });
+
+      siteTagPopoverForm.addEventListener("click", event => event.stopPropagation());
     }
 
     const siteTagCancelButton = document.getElementById("siteTagCancel");

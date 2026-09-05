@@ -1057,7 +1057,7 @@
       handleSelectionBookmarkButtonClick();
     });
 
-    const selectionTagPopover = document.createElement("div");
+    const selectionTagPopover = document.createElement("form");
     selectionTagPopover.id = "inPageSelectionTagPopover";
     selectionTagPopover.className = "in-page-selection-tag-popover";
     selectionTagPopover.innerHTML = `
@@ -1068,7 +1068,7 @@
         autocomplete="on"
         placeholder="برچسب (اختیاری، با کاما جدا کنید)">
       <div class="in-page-selection-tag-popover-actions">
-        <button type="button" id="inPageSelectionTagSave">ذخیره</button>
+        <button type="submit" id="inPageSelectionTagSave">ذخیره</button>
         <button type="button" id="inPageSelectionTagCancel">انصراف</button>
       </div>
     `;
@@ -1079,17 +1079,20 @@
       event.stopPropagation();
     });
 
-    selectionTagPopover.querySelector("#inPageSelectionTagSave")
-      .addEventListener("click", handleTagPopoverSave);
+    // آیتم ۶/۱۲: با submit واقعیِ فرم (چه با کلیک روی «ذخیره»، چه با
+    // Enter تو کادر متنی) کار می‌کنه - نه فقط با کلیک مستقیم روی دکمه؛
+    // این تغییر لازمه تا تکمیل خودکار مرورگر (که فقط رو submit واقعیِ
+    // فرم فعال می‌شه) این‌جا هم کار کنه.
+    selectionTagPopover.addEventListener("submit", event => {
+      event.preventDefault();
+      handleTagPopoverSave();
+    });
     selectionTagPopover.querySelector("#inPageSelectionTagCancel")
       .addEventListener("click", () => hideTagPopover(false));
 
     selectionTagPopover.querySelector("#inPageSelectionTagInput")
       .addEventListener("keydown", event => {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          handleTagPopoverSave();
-        } else if (event.key === "Escape") {
+        if (event.key === "Escape") {
           hideTagPopover(false);
         }
       });
@@ -2004,6 +2007,17 @@
       #inPageArchivePanel .archive-header-actions button:hover,
       #inPageBookmarksPanel .archive-header-actions button:hover {
         background: #dbeafe;
+      }
+
+      .archive-item-nolink {
+        display: inline-block;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        background: #f1f5f9;
+        color: #94a3b8;
+        font-size: 0.74rem;
+        padding: 4px 8px;
+        cursor: not-allowed;
       }
 
       #inPageArchivePanel .archive-header-actions button:disabled,
@@ -4540,9 +4554,9 @@
                   ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(item.page)}</span>` : ""}
                   <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
                   <div class="archive-item-actions">
-                    <a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">
-                      بازکردن
-                    </a>
+                    ${item.hasRealSource === false
+                      ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
+                      : `<a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">بازکردن</a>`}
                     <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
                       حذف
                     </button>
@@ -4576,6 +4590,7 @@
 
     panel.innerHTML = `
       <button type="button" class="panel-close-x" id="inPageBookmarksClose" title="بستن" aria-label="بستن">×</button>
+      <div class="panel-scroll-area">
       <div class="archive-header">
         <span>نشانه‌ها (${all.length})</span>
         <div class="archive-header-actions">
@@ -4617,6 +4632,7 @@
       </div>
       ${tagChipsHtml}
       ${listHtml}
+      </div>
     `;
 
     const clearButton = panel.querySelector("#inPageBookmarksClear");
