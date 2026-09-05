@@ -1324,6 +1324,36 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
+    // آیتم جدید: افزودن به آرشیو (⚙️) - فقط رو نتایج تیک‌خورده؛ اگه
+    // هیچی تیک نخورده، رو همه‌ی نتایج فعلی.
+    const aiAddToArchiveButton = document.getElementById("aiAddToArchive");
+    if (aiAddToArchiveButton) {
+      aiAddToArchiveButton.addEventListener("click", () => {
+        if (typeof window.addItemsToArchiveGeneric !== "function") return;
+
+        const source = searchSelectedIndexes.size > 0
+          ? [...searchSelectedIndexes].sort((a, b) => a - b).map((i) => latestSearchResults[i]).filter(Boolean)
+          : latestSearchResults;
+
+        window.addItemsToArchiveGeneric(
+          source.map((r) => ({ title: r.book, text: r.text, url: textFragmentUrl(encodeURI(r.source), r.text), page: r.page }))
+        );
+
+        const originalLabel = aiAddToArchiveButton.textContent;
+        aiAddToArchiveButton.textContent = "افزوده شد!";
+        setTimeout(() => { aiAddToArchiveButton.textContent = originalLabel; }, 1500);
+      });
+    }
+
+    const aiOpenArchiveButton = document.getElementById("aiOpenArchive");
+    if (aiOpenArchiveButton) {
+      aiOpenArchiveButton.addEventListener("click", () => {
+        if (typeof window.openArchivePanelGeneric === "function") {
+          window.openArchivePanelGeneric();
+        }
+      });
+    }
+
     // Item جدید: پیمایش بین نتایج شماره‌گذاری‌شده با دکمه‌های قبل/بعد -
     // نتیجهٔ فعال با اسکرول و یه کادر مشخص، هایلایت می‌شه.
     let activeResultIndex = -1;

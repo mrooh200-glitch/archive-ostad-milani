@@ -2696,6 +2696,10 @@
                 <option value="book">بر اساس عنوان کتاب</option>
               </select>
             </div>
+            <div class="ai-settings-gear-row">
+              <button type="button" id="aiAddToArchive" class="ai-toolbar-btn" title="افزودن نتایج انتخاب‌شده به آرشیو">افزودن به آرشیو</button>
+              <button type="button" id="aiOpenArchive" class="ai-toolbar-btn" title="باز کردن آرشیوِ نتایج ذخیره‌شده">آرشیو</button>
+            </div>
           </div>
           </div>
 
@@ -3941,6 +3945,35 @@
       }
     }
 
+    // آیتم جدید: نسخهٔ عمومیِ افزودن به آرشیو - هم جستجوی متنی، هم
+    // جستجوی مفهومی (از فایل search-widget.js) از همینش استفاده می‌کنن.
+    function addItemsToArchiveGeneric(items) {
+      if (!items || items.length === 0) {
+        return;
+      }
+
+      const archive = loadArchive();
+
+      items.forEach(item => {
+        archive.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          title: item.title,
+          text: item.text,
+          url: item.url,
+          page: item.page || null,
+          savedAt: new Date().toISOString()
+        });
+      });
+
+      saveArchive(archive);
+      renderArchivePanel();
+    }
+
+    // آیتم جدید: بخش جستجوی مفهومی (search-widget.js) از همین تابع
+    // برای افزودن به آرشیو استفاده می‌کنه.
+    window.addItemsToArchiveGeneric = addItemsToArchiveGeneric;
+    window.openArchivePanelGeneric = () => openArchivePanel();
+
     function addSelectedToArchive() {
       const selected = [...selectedResultIndexes]
         .sort((a, b) => a - b)
@@ -3951,20 +3984,11 @@
         return;
       }
 
-      const archive = loadArchive();
-
-      selected.forEach(result => {
-        archive.push({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          title: result.title,
-          text: result.paragraph,
-          url: result.url,
-          savedAt: new Date().toISOString()
-        });
-      });
-
-      saveArchive(archive);
-      renderArchivePanel();
+      addItemsToArchiveGeneric(selected.map(result => ({
+        title: result.title,
+        text: result.paragraph,
+        url: result.url
+      })));
 
       const button = document.getElementById("addToArchiveButton");
 
@@ -6473,21 +6497,18 @@
       const selectedCount = selectedResultIndexes.size;
       const hasResults = currentResults.length > 0;
       const hasSelection = selectedCount > 0;
-      const archiveCount = loadArchive().length;
       const bookmarksCount = loadBookmarks().length;
 
       menu.innerHTML = `
         <button type="button" class="operations-menu-btn" id="siteMenuSelectAll" title="انتخاب همهٔ نتایج فعلی جست‌وجو (تمام صفحه‌ها)، برای کپی/آرشیو/خروجی گرفتن گروهی از آن‌ها" ${hasResults ? "" : "disabled"}>انتخاب همهٔ نتایج</button>
         <button type="button" class="operations-menu-btn" id="siteMenuClearSelection" title="برداشتن علامت انتخاب از تمام نتایجی که تاکنون انتخاب کرده‌اید" ${hasSelection ? "" : "disabled"}>حذف انتخاب</button>
-        <button type="button" class="operations-menu-btn" id="siteMenuRemoveSelected" title="پاک‌کردن موارد انتخاب‌شده از فهرست نتایج (فقط از این فهرست)" ${hasSelection ? "" : "disabled"}>حذف موارد انتخاب‌شده${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
-        <button type="button" class="operations-menu-btn" id="siteMenuCopySelected" title="کپی متن موارد انتخاب‌شده در حافظه؛ با پیست‌کردن، لینک منبع هم همراه متن اضافه می‌شود" ${hasSelection ? "" : "disabled"}>کپی</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuRemoveSelected" title="پاک‌کردن موارد انتخاب‌شده از فهرست نتایج (فقط از این فهرست)" ${hasSelection ? "" : "disabled"}>🗑️ حذف موارد انتخاب‌شده${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuCopySelected" title="کپی متن موارد انتخاب‌شده در حافظه؛ با پیست‌کردن، لینک منبع هم همراه متن اضافه می‌شود" ${hasSelection ? "" : "disabled"}>📋 کپی</button>
         <button type="button" class="operations-menu-btn" id="siteMenuExportText" title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره" ${hasSelection ? "" : "disabled"}>Text</button>
         <button type="button" class="operations-menu-btn" id="siteMenuExportWord" title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره" ${hasSelection ? "" : "disabled"}>Word</button>
         <button type="button" class="operations-menu-btn" id="siteMenuExportPdf" title="دریافت موارد انتخاب‌شده به‌صورت یک فایل PDF قابل ذخیره" ${hasSelection ? "" : "disabled"}>PDF</button>
-        <button type="button" class="operations-menu-btn" id="siteMenuAddToBookmarks" title="افزودن موارد انتخاب‌شده به نشانه‌ها همراه با برچسب دلخواه" ${hasSelection ? "" : "disabled"}>افزودن به نشانه${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
-        <button type="button" class="operations-menu-btn" id="siteMenuOpenBookmarks" title="باز کردن نشانه‌هایی که تاکنون در نتایج جست‌وجو یا کادر داخل‌صفحه ذخیره کرده‌اید">مشاهدهٔ نشانه‌ها${bookmarksCount > 0 ? `<span class="operations-menu-badge">${bookmarksCount}</span>` : ""}</button>
-        <button type="button" class="operations-menu-btn" id="siteMenuAddToArchive" title="افزودن موارد انتخاب‌شده به آرشیو، برای مراجعه و استفاده بعدی" ${hasSelection ? "" : "disabled"}>افزودن به آرشیو${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
-        <button type="button" class="operations-menu-btn" id="siteMenuOpenArchive" title="باز کردن آرشیوی که پیش‌تر نتایج جست‌وجو را در آن ذخیره کرده‌اید">آرشیو${archiveCount > 0 ? `<span class="operations-menu-badge">${archiveCount}</span>` : ""}</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuAddToBookmarks" title="افزودن موارد انتخاب‌شده به نشانه‌ها همراه با برچسب دلخواه" ${hasSelection ? "" : "disabled"}>⭐ افزودن به نشانه${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuOpenBookmarks" title="باز کردن نشانه‌هایی که تاکنون در نتایج جست‌وجو یا کادر داخل‌صفحه ذخیره کرده‌اید">🔖 مشاهدهٔ نشانه‌ها${bookmarksCount > 0 ? `<span class="operations-menu-badge">${bookmarksCount}</span>` : ""}</button>
       `;
 
       const bind = (id, handler) => {
@@ -6512,16 +6533,6 @@
       bind("siteMenuRemoveSelected", () => {
         removeSelectedResults();
         closeOperationsMenu();
-      });
-
-      bind("siteMenuOpenArchive", () => {
-        openArchivePanel();
-        closeOperationsMenu();
-      });
-
-      bind("siteMenuAddToArchive", () => {
-        addSelectedToArchive();
-        renderOperationsMenu();
       });
 
       bind("siteMenuOpenBookmarks", () => {
@@ -6690,7 +6701,30 @@
         return;
       }
 
+      const hasSelectionForArchive = selectedResultIndexes.size > 0;
+      const archiveCountForMenu = loadArchive().length;
+
       menu.innerHTML = `
+        <button
+          type="button"
+          class="settings-item"
+          id="siteMenuAddToArchive"
+          title="افزودن موارد انتخاب‌شده به آرشیو، برای مراجعه و استفاده بعدی"
+          ${hasSelectionForArchive ? "" : "disabled"}>
+          <span>افزودن به آرشیو</span>
+          ${hasSelectionForArchive ? `<span class="settings-badge">${selectedResultIndexes.size}</span>` : ""}
+        </button>
+        <button
+          type="button"
+          class="settings-item"
+          id="siteMenuOpenArchive"
+          title="باز کردن آرشیوی که پیش‌تر نتایج جست‌وجو را در آن ذخیره کرده‌اید">
+          <span>آرشیو</span>
+          ${archiveCountForMenu > 0 ? `<span class="settings-badge">${archiveCountForMenu}</span>` : ""}
+        </button>
+
+        <div class="settings-separator"></div>
+
         <div class="settings-section-label">مرتب‌سازی نتایج</div>
         <label
           class="settings-radio"
@@ -6798,6 +6832,21 @@
           مقایسهٔ نتایج در کتاب‌های مختلف (کنار هم)
         </label>
       `;
+
+      const bindSettingsItem = (id, handler) => {
+        const el = menu.querySelector(`#${id}`);
+        if (el) el.addEventListener("click", handler);
+      };
+
+      bindSettingsItem("siteMenuOpenArchive", () => {
+        openArchivePanel();
+        closeSettingsMenu();
+      });
+
+      bindSettingsItem("siteMenuAddToArchive", () => {
+        addSelectedToArchive();
+        renderSettingsMenu();
+      });
 
       menu.querySelectorAll('input[name="siteSortMode"]').forEach(radio => {
         radio.addEventListener("change", () => {
