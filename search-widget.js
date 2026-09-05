@@ -336,9 +336,16 @@ async function askQuestion(question, history = [], mode = "grounded", image = nu
     }
     throw new Error(message);
   }
-  const { answer } = await chatRes.json();
+  const { answer, usedReferences } = await chatRes.json();
 
-  return { answer, sources: relevant };
+  // آیتم ۱۰ (فیلتر ارتباط): اگه Worker گفته کدوم بخش‌ها رو واقعاً
+  // استفاده کرده، فقط همونا رو به‌عنوان منبع برمی‌گردونیم - نه کل
+  // نتایج خامِ جست‌وجوی معنایی (که ممکنه بعضیاشون اصلاً مرتبط نبوده باشن).
+  const sources = Array.isArray(usedReferences)
+    ? relevant.filter((_, i) => usedReferences.includes(i + 1))
+    : relevant;
+
+  return { answer, sources };
 }
 
 // ============================================================
@@ -1483,19 +1490,24 @@ document.addEventListener("DOMContentLoaded", () => {
           .sort((a, b) => a - b)
           .map((i) => chatTurns[i])
           .filter(Boolean)
-          .map((turn) => ({
-            kind: "chat",
-            title: `پرسش: ${turn.question}`,
-            text: turn.answer,
-            url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].entries && turn.sourcesInfo[0].entries[0] && turn.sourcesInfo[0].entries[0].url) || location.origin + location.pathname,
-            question: turn.question,
-            answer: turn.answer,
-            sourcesInfo: turn.sourcesInfo,
-            // آیتم ۱۳: وقتی از حالت «پاسخ آزاد» بوده (منبع واقعی‌ای در
-            // کار نبوده)، این false می‌شه - تا نشانه‌ی ساخته‌شده از
-            // این پاسخ، گزینه‌ی «بازکردن» غیرفعال داشته باشه.
-            hasRealSource: !!(turn.sourcesInfo && turn.sourcesInfo.length > 0),
-          })),
+          .map((turn) => {
+            const sourcesLabel = formatSourcesInfoLineAi(turn.sourcesInfo);
+            return {
+              kind: "chat",
+              // آیتم ۱۰: عنوان نشانه، اسم کتاب(های) واقعیِ استفاده‌شده‌ست -
+              // نه خودِ سؤال - تا منبع واقعاً تو بلوک نشانه‌ها دیده بشه.
+              title: sourcesLabel || "پاسخ آزاد (دانش عمومی)",
+              text: `سؤال: ${turn.question}\n\nپاسخ: ${turn.answer}`,
+              url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].entries && turn.sourcesInfo[0].entries[0] && turn.sourcesInfo[0].entries[0].url) || location.origin + location.pathname,
+              question: turn.question,
+              answer: turn.answer,
+              sourcesInfo: turn.sourcesInfo,
+              // آیتم ۱۳: وقتی از حالت «پاسخ آزاد» بوده (منبع واقعی‌ای در
+              // کار نبوده)، این false می‌شه - تا نشانه‌ی ساخته‌شده از
+              // این پاسخ، گزینه‌ی «بازکردن» غیرفعال داشته باشه.
+              hasRealSource: !!(turn.sourcesInfo && turn.sourcesInfo.length > 0),
+            };
+          }),
       "ابتدا یک یا چند پرسش‌وپاسخ را با تیک انتخاب کنید",
       {
         selectAll: () => {

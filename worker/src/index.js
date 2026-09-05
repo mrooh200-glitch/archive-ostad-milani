@@ -174,6 +174,11 @@ async function handleChat(request, env) {
 
 مطلب را مستقیم و قاطع بیان کنید — پاسخ را با عباراتی مانند «طبق این متون...»، «بر اساس منابع فوق...» یا هر مقدمه‌چینی مشابه شروع نکنید؛ این نوع عبارات، با وجود قصد بی‌طرفی، عملاً به اعتبار و قاطعیت پاسخ خدشه وارد می‌کند. کافی است در پایان پاسخ، مآخذ ذکر شود (که به‌صورت خودکار در رابط کاربری اضافه می‌شود)؛ نیازی به تکرار «طبق متن» در ابتدای هر جمله یا پاراگراف نیست.${historyNote}
 
+مهم (برای تشخیص منابع واقعاً مرتبط): هر «بخش» زیر یه شماره داره. ممکنه بعضی از این بخش‌ها اصلاً به سؤال ربطی نداشته باشن (چون جست‌وجوی معنایی صرفاً نزدیک‌ترین‌ها رو آورده، نه لزوماً مرتبط‌ترین‌ها). در **آخرین خط** پاسخ خودتون (بعد از یه خط خالی، جدا از متن اصلی پاسخ)، دقیقاً به این شکل بنویسید کدوم شماره‌بخش‌ها واقعاً در ساختن این پاسخ استفاده شدن:
+REFERENCES: 1,3
+(اگه فقط از یه بخش استفاده شد: REFERENCES: 2 — اگه هیچ‌کدوم واقعاً مرتبط نبودن: REFERENCES: none)
+این خط رو دقیقاً با همین قالب (REFERENCES: به انگلیسی، بدون توضیح اضافه) بنویسید؛ رابط کاربری این خط رو خودش پردازش می‌کنه و از دید کاربر حذفش می‌کنه.
+
 متن‌های مرتبط:
 ${contextText}`;
 
@@ -218,8 +223,26 @@ ${contextText}`;
   }
 
   const geminiJson = await geminiRes.json();
-  const answer =
+  const rawAnswer =
     geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || "پاسخی دریافت نشد.";
 
-  return jsonResponse({ answer });
+  // آیتم ۱۰ (فیلتر ارتباط): خط REFERENCES رو از متنِ دیده‌شده توسط
+  // کاربر جدا می‌کنیم و اندیس‌های استفاده‌شده رو استخراج می‌کنیم - تا
+  // فقط منابعی که واقعاً استفاده شدن (نه هرچی که جست‌وجوی معنایی
+  // برگردونده) به کاربر نشون داده بشه.
+  let answer = rawAnswer;
+  let usedReferences = null; // null یعنی "نمی‌دونیم" (مثلاً حالت general)
+
+  if (mode === "grounded") {
+    const match = rawAnswer.match(/\n?REFERENCES:\s*([^\n]*)\s*$/i);
+    if (match) {
+      answer = rawAnswer.slice(0, match.index).trim();
+      const refsRaw = match[1].trim().toLowerCase();
+      usedReferences = refsRaw === "none" || refsRaw === ""
+        ? []
+        : refsRaw.split(",").map(s => parseInt(s.trim(), 10)).filter(n => Number.isInteger(n) && n > 0);
+    }
+  }
+
+  return jsonResponse({ answer, usedReferences });
 }
