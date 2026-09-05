@@ -4556,7 +4556,7 @@
                   <div class="archive-item-actions">
                     ${item.hasRealSource === false
                       ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
-                      : `<a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}">بازکردن</a>`}
+                      : `<a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}" target="_blank" rel="noopener">بازکردن</a>`}
                     <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
                       حذف
                     </button>
