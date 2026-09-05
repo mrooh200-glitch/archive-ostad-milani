@@ -1070,6 +1070,7 @@
     /* آیتم جدید: یکسان‌سازی کادر جستجوی مفهومی با کادر جستجوی داخلی
        فایل - عنوان، کادر متن، قبل/بعد، صوتی، و سه‌نقطه همه در یک ردیف. */
     .ai-search-row {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -1332,9 +1333,9 @@
     .ai-chat-mode-toggle {
       display: flex;
       gap: 16px;
-      margin: 0 0 10px;
       font-size: 0.82rem;
       color: #475569;
+      flex-shrink: 0;
     }
 
     .ai-chat-mode-toggle label {
@@ -1342,17 +1343,24 @@
       align-items: center;
       gap: 4px;
       cursor: pointer;
+      white-space: nowrap;
     }
 
-    /* بلوک سوم (پایین‌ترین بخش تب گفتگو): حالت پاسخ‌دهی + هشدار */
+    /* بلوک سوم (پایین‌ترین بخش تب گفتگو): هشدار و حالت پاسخ‌دهی، هر دو
+       در یک ردیفِ واحد - نه دو خط جدا. */
     .ai-chat-bottom-block {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
       margin-top: 10px;
       padding-top: 10px;
       border-top: 1px dashed #e2e8f0;
     }
 
     .ai-chat-tabs-notice {
-      margin: 6px 0 0;
+      flex: 1;
+      min-width: 160px;
       color: #92400e;
       font-size: 0.76rem;
     }
@@ -2427,7 +2435,7 @@
     <div id="aiPanel" class="tab-panel">
       <div class="ai-panel-inner">
         <section class="ai-section">
-          <div class="ai-search-row">
+          <div id="aiSearchRow" class="ai-search-row">
             <span class="ai-section-title" title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">جست‌وجوی مفهومی</span>
 
             <div class="ai-search-input-wrap">
@@ -2580,17 +2588,17 @@
 
           <!-- بلوک سوم: حالت پاسخ‌دهی + هشدار -->
           <div class="ai-chat-bottom-block">
+            <span class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ با مأخذ تطبیق دهید.</span>
             <div class="ai-chat-mode-toggle" role="radiogroup" aria-label="حالت پاسخ‌دهی">
               <label>
                 <input type="radio" name="aiChatMode" value="grounded" checked>
-                پاسخ بر اساس متون آرشیو
+                بر اساس منابع سایت
               </label>
               <label>
                 <input type="radio" name="aiChatMode" value="general">
-                پاسخ آزاد (دانش عمومی)
+                پاسخ بر اساس دانش عمومی
               </label>
             </div>
-            <p class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ با مأخذ تطبیق دهید.</p>
           </div>
         </section>
       </div>

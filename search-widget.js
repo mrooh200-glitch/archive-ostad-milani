@@ -871,49 +871,37 @@ function injectAiToolbarStyles() {
       min-width: 0;
     }
     .ai-result-toolbar {
-      margin: 10px 0;
-      padding: 6px 10px;
-      border: 1px dashed #cbd5e1;
-      border-radius: 8px;
-      background: #f8fafc;
+      position: absolute;
+      top: 100%;
+      left: 20px;
+      z-index: 21;
+      margin-top: 6px;
+      width: max-content;
+      max-width: 260px;
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
     }
     .ai-toolbar-summary {
-      cursor: pointer;
-      list-style: none;
-      font-size: 0.82rem;
-      color: #64748b;
-      padding: 2px 0;
-      outline: none;
-      user-select: none;
-    }
-    .ai-toolbar-summary::-webkit-details-marker {
       display: none;
-    }
-    .ai-toolbar-summary::before {
-      content: "▸ ";
-      display: inline-block;
-      transition: transform 0.15s ease;
-    }
-    .ai-result-toolbar[open] .ai-toolbar-summary::before {
-      transform: rotate(90deg);
     }
     .ai-toolbar-buttons {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px dashed #e2e8f0;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 4px;
+      padding: 8px;
     }
     .ai-toolbar-btn {
       border: 1px solid #cbd5e1;
       background: #fff;
       border-radius: 6px;
-      padding: 4px 10px;
-      font-size: 0.85rem;
+      padding: 5px 10px;
+      font-size: 0.83rem;
       cursor: pointer;
       color: #1f2937;
+      text-align: right;
     }
     .ai-toolbar-btn:hover {
       background: #eff6ff;
@@ -1033,7 +1021,8 @@ document.addEventListener("DOMContentLoaded", () => {
         },
       }
     );
-    aiSearchResults.insertAdjacentElement("afterend", searchToolbar);
+    const aiSearchRow = document.getElementById("aiSearchRow");
+    if (aiSearchRow) aiSearchRow.appendChild(searchToolbar);
 
     aiSearchInput.addEventListener("input", () => {
       clearTimeout(debounceTimer);
@@ -1279,7 +1268,7 @@ document.addEventListener("DOMContentLoaded", () => {
         },
       }
     );
-    aiChatForm.insertAdjacentElement("afterend", chatToolbar);
+    aiChatForm.appendChild(chatToolbar);
 
     // Item جدید (بند س - یکپارچه‌سازی ردیف گفتگو): دکمهٔ سه‌نقطهٔ همین
     // ردیف، همون نوار عملیات (کپی/خروجی/نشانه) رو باز و بسته می‌کنه.
@@ -1310,7 +1299,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="ai-chat-bubble ai-chat-bubble-user">${turn.question}</div>
               <div class="ai-chat-bubble ai-chat-bubble-assistant">
                 <div>${turn.answer}</div>
-                <div class="ai-chat-sources">مآخذ: ${turn.sourceLinksHtml}</div>
+                <div class="ai-chat-sources">منابع: ${turn.sourceLinksHtml}</div>
               </div>
             </div>
           `;
@@ -1431,14 +1420,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const { answer, sources } = await askQuestion(question, history, chatMode, attachmentForThisMessage);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
 
-        const sourceLinksHtml = sources
-          .map((s) => `<a href="${textFragmentUrl(encodeURI(s.source), s.text)}" target="_blank" rel="noopener">${s.book}</a>`)
-          .join("، ");
-
         // Item جدید: فهرست یکتای کتاب‌هایی که پاسخ از آن‌ها گرفته شده،
         // هرکدوم با شماره صفحه‌اش (اگه داشت) - برای خط «پاسخ از کتاب...»
-        // در خروجی‌ها و آرشیو. اگه یک کتاب چند بار در منابع تکرار بشه
-        // (چند تکه از یک کتاب)، فقط یک‌بار (اولین صفحه‌اش) نگه داشته می‌شه.
+        // در خروجی‌ها و آرشیو، و همچنین برای خط «منابع:» زیر پاسخ. اگه
+        // یک کتاب چند بار در منابع تکرار بشه (چند تکه از یک کتاب)، فقط
+        // یک‌بار (اولین صفحه‌اش) نگه داشته می‌شه - رفع باگ: قبلاً خط
+        // «منابع» از روی sources خام (بدون یکتاسازی) ساخته می‌شد و یه
+        // کتاب می‌تونست چندبار پشت‌سرهم تکرار بشه.
         const sourcesInfo = [];
         const seenBooks = new Set();
         sources.forEach((s) => {
@@ -1450,6 +1438,10 @@ document.addEventListener("DOMContentLoaded", () => {
             url: textFragmentUrl(encodeURI(s.source), s.text),
           });
         });
+
+        const sourceLinksHtml = sourcesInfo
+          .map((s) => `<a href="${s.url}" target="_blank" rel="noopener">${s.book}</a>`)
+          .join("، ");
 
         chatTurns.push({
           question,
