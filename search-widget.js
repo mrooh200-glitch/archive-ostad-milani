@@ -403,15 +403,26 @@ function saveChatArchiveAi(items) {
 // تبادل‌ها، نه فقط آخری) به‌عنوان منبع استفاده شدن، هرکدوم با شماره
 // صفحه‌اش - دقیقاً همون چیزی که برای عنوان آیتم آرشیوشده لازمه.
 function collectConversationSourcesAi(chatTurns) {
-  const seenBooks = new Set();
   const sourcesInfo = [];
+  const bookIndexMap = new Map();
+
   chatTurns.forEach((turn) => {
     (turn.sourcesInfo || []).forEach((s) => {
-      if (seenBooks.has(s.book)) return;
-      seenBooks.add(s.book);
-      sourcesInfo.push(s);
+      if (!bookIndexMap.has(s.book)) {
+        bookIndexMap.set(s.book, sourcesInfo.length);
+        sourcesInfo.push({ book: s.book, entries: [...(s.entries || [])] });
+        return;
+      }
+
+      const existing = sourcesInfo[bookIndexMap.get(s.book)];
+      (s.entries || []).forEach((entry) => {
+        if (!existing.entries.some((e) => e.page === entry.page && e.url === entry.url)) {
+          existing.entries.push(entry);
+        }
+      });
     });
   });
+
   return sourcesInfo;
 }
 
@@ -554,32 +565,66 @@ function answerIndicatesNotFoundAi(answerText) {
 function formatSourcesInfoLineAi(sourcesInfo) {
   if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
   return sourcesInfo
-    .map((s) => (s.page ? `${s.book} (صفحهٔ ${s.page})` : s.book))
-    .join("، ");
-}
-
-// آیتم ۴ (لینک‌دهی مثل جست‌وجوی مفهومی): همون خط بالا، ولی هر اسم کتاب
-// خودش یه لینک واقعی به همون بخش از کتابه - برای خروجی‌های HTML/Word/PDF.
-function formatSourcesInfoHtmlAi(sourcesInfo) {
-  if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
-  return sourcesInfo
     .map((s) => {
-      const label = s.page ? `${escapeHtmlAi(s.book)} (صفحهٔ ${escapeHtmlAi(String(s.page))})` : escapeHtmlAi(s.book);
-      return s.url
-        ? `<a href="${escapeHtmlAi(s.url)}" style="color:#1d4ed8;text-decoration:none;">${label}</a>`
-        : label;
+      const pages = (s.entries || []).map((e) => e.page).filter(Boolean);
+      return pages.length > 0 ? `${s.book} (صفحهٔ ${pages.join("، ")})` : s.book;
     })
     .join("، ");
 }
 
-// نسخهٔ متن‌سادهٔ فهرست لینک‌ها - هر کتاب و آدرسش در یک خط، برای فایل
-// txt که اصلاً نمی‌تونه لینک قابل‌کلیک داشته باشه.
-function formatSourcesInfoLinksPlainTextAi(sourcesInfo, indent) {
+// آیتم ۴ (لینک‌دهی مثل جست‌وجوی مفهومی): همون خط بالا، ولی هر صفحه
+// خودش یه لینک واقعی به همون بخش از کتابه - برای خروجی‌های HTML/Word/PDF
+// و پنل زندهٔ گفتگو. اگه یک کتاب از دو جای مختلف استفاده شده باشه، اسم
+// کتاب فقط یک‌بار میاد ولی هر دو صفحه (هرکدوم با لینک خودش) نشون داده
+// می‌شه.
+function formatSourcesInfoHtmlAi(sourcesInfo) {
   if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
   return sourcesInfo
-    .filter((s) => s.url)
-    .map((s) => `\n${indent}🔗 ${s.book}: ${s.url}`)
-    .join("");
+    .map((s) => {
+      const entries = s.entries && s.entries.length ? s.entries : [{ page: null, url: s.url }];
+
+      // فقط یه تکه از این کتاب استفاده شده - نمایش ساده، بدون پرانتز
+      // اضافه اگه صفحه‌ای در کار نباشه.
+      if (entries.length === 1) {
+        const entry = entries[0];
+        const label = entry.page ? `${escapeHtmlAi(s.book)} (صفحهٔ ${escapeHtmlAi(String(entry.page))})` : escapeHtmlAi(s.book);
+        return entry.url
+          ? `<a href="${escapeHtmlAi(entry.url)}" style="color:#1d4ed8;text-decoration:none;">${label}</a>`
+          : label;
+      }
+
+      // چند تکه از همین یک کتاب - هرکدوم جدا نشون داده می‌شه؛ اگه صفحه
+      // داشت با شمارهٔ صفحه، وگرنه (چون این فایل صفحه‌بندی نداره) با
+      // یه شمارهٔ ترتیبی «بخش N» - وگرنه تکه‌های بدون صفحه، بی‌سروصدا
+      // از دید کاربر گم می‌شدن.
+      const partsHtml = entries
+        .map((entry, i) => {
+          const partLabel = entry.page ? `صفحهٔ ${escapeHtmlAi(String(entry.page))}` : `بخش ${i + 1}`;
+          return entry.url
+            ? `<a href="${escapeHtmlAi(entry.url)}" style="color:#1d4ed8;text-decoration:none;">${partLabel}</a>`
+            : partLabel;
+        })
+        .join("، ");
+
+      return `${escapeHtmlAi(s.book)} (${partsHtml})`;
+    })
+    .join("، ");
+}
+
+// نسخهٔ متن‌سادهٔ فهرست لینک‌ها - هر صفحه/آدرس در یک خط، برای فایل txt
+// که اصلاً نمی‌تونه لینک قابل‌کلیک داشته باشه.
+function formatSourcesInfoLinksPlainTextAi(sourcesInfo, indent) {
+  if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
+  const lines = [];
+  sourcesInfo.forEach((s) => {
+    const entries = s.entries && s.entries.length ? s.entries : [{ page: null, url: s.url }];
+    entries.forEach((e) => {
+      if (!e.url) return;
+      const label = e.page ? `${s.book} (صفحهٔ ${e.page})` : s.book;
+      lines.push(`\n${indent}🔗 ${label}: ${e.url}`);
+    });
+  });
+  return lines.join("");
 }
 
 function buildPlainTextForItemsAi(items) {
@@ -1260,7 +1305,7 @@ document.addEventListener("DOMContentLoaded", () => {
             kind: "chat",
             title: `پرسش: ${turn.question}`,
             text: turn.answer,
-            url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].url) || location.origin + location.pathname,
+            url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].entries && turn.sourcesInfo[0].entries[0] && turn.sourcesInfo[0].entries[0].url) || location.origin + location.pathname,
             question: turn.question,
             answer: turn.answer,
             sourcesInfo: turn.sourcesInfo,
@@ -1463,23 +1508,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const { answer, sources } = await askQuestion(question, history, chatMode, attachmentForThisMessage);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
 
-        // Item جدید: فهرست یکتای کتاب‌هایی که پاسخ از آن‌ها گرفته شده،
-        // هرکدوم با شماره صفحه‌اش (اگه داشت) - برای خط «پاسخ از کتاب...»
-        // در خروجی‌ها و آرشیو، و همچنین برای خط «منابع:» زیر پاسخ. اگه
-        // یک کتاب چند بار در منابع تکرار بشه (چند تکه از یک کتاب)، فقط
-        // یک‌بار (اولین صفحه‌اش) نگه داشته می‌شه - رفع باگ: قبلاً خط
-        // «منابع» از روی sources خام (بدون یکتاسازی) ساخته می‌شد و یه
-        // کتاب می‌تونست چندبار پشت‌سرهم تکرار بشه.
+        // Item جدید: فهرست یکتای کتاب‌هایی که پاسخ از آن‌ها گرفته شده -
+        // عنوان هر کتاب فقط یک‌بار میاد، ولی اگه از دو صفحه/تکهٔ مختلف
+        // همون کتاب استفاده شده باشه، هر دوشون (با لینک جدا) تو
+        // entries همون کتاب نگه داشته می‌شن - نه این‌که وقوع دوم دور
+        // انداخته بشه.
         const sourcesInfo = [];
-        const seenBooks = new Set();
+        const bookIndexMap = new Map();
         sources.forEach((s) => {
-          if (seenBooks.has(s.book)) return;
-          seenBooks.add(s.book);
-          sourcesInfo.push({
-            book: s.book,
-            page: s.page || null,
-            url: textFragmentUrl(encodeURI(s.source), s.text),
-          });
+          const entry = { page: s.page || null, url: textFragmentUrl(encodeURI(s.source), s.text) };
+
+          if (!bookIndexMap.has(s.book)) {
+            bookIndexMap.set(s.book, sourcesInfo.length);
+            sourcesInfo.push({ book: s.book, entries: [entry] });
+            return;
+          }
+
+          const existing = sourcesInfo[bookIndexMap.get(s.book)];
+          // همون صفحه رو دوباره اضافه نکن (مثلاً دو تکه از یه صفحه)
+          if (!existing.entries.some((e) => e.page === entry.page && e.url === entry.url)) {
+            existing.entries.push(entry);
+          }
         });
 
         // Item جدید: اگه پاسخ خودش می‌گه چیزی تو منابع یافت نشده، خط
@@ -1487,9 +1536,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // خط منابع وقتی خالیه اصلاً نمایش داده نمی‌شه).
         const sourceLinksHtml = answerIndicatesNotFoundAi(answer)
           ? ""
-          : sourcesInfo
-              .map((s) => `<a href="${s.url}" target="_blank" rel="noopener">${s.book}</a>`)
-              .join("، ");
+          : formatSourcesInfoHtmlAi(sourcesInfo);
 
         chatTurns.push({
           question,
