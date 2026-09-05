@@ -1032,10 +1032,10 @@ function injectAiToolbarStyles() {
       position: absolute;
       top: 100%;
       left: 0;
+      right: 0;
       z-index: 21;
       margin-top: 6px;
-      width: max-content;
-      max-width: 480px;
+      width: auto;
       background: #fff;
       border: 1px solid #dbe3ee;
       border-radius: 10px;
