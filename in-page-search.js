@@ -1941,7 +1941,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 12px 16px 12px 34px;
+        padding: 12px 16px 12px 44px;
         border-bottom: 1px solid #e2e8f0;
         background: #f8fafc;
         color: #173b63;
@@ -4198,20 +4198,8 @@
     return body;
   }
 
-  function exportBookmarksAsText(items) {
-    if (!items || items.length === 0) {
-      return;
-    }
-
-    downloadTextFile("نشانه‌ها.txt", buildBookmarkExportPlainText(items));
-  }
-
-  function exportBookmarksAsWord(items) {
-    if (!items || items.length === 0) {
-      return;
-    }
-
-    const itemsHtml = buildBookmarkExportGroups(items).map(group => {
+  function buildBookmarkExportRichHtml(items) {
+    return buildBookmarkExportGroups(items).map(group => {
       const tagsHtml = group.tagGroups.map(tagGroup => {
         const entriesHtml = tagGroup.items.map((item, index) => {
           const itemPageHtml = item.page ?
@@ -4246,6 +4234,32 @@
         tagsHtml
       );
     }).join("");
+  }
+
+  // آیتم ۳: کپی به کلیپ‌بورد - هم متن ساده هم HTML غنی، دقیقاً از همون
+  // منبعی که خروجی Word ازش استفاده می‌کنه.
+  async function copyBookmarksToClipboard(items) {
+    if (!items || items.length === 0) {
+      return false;
+    }
+
+    return copyRichTextToClipboard(buildBookmarkExportPlainText(items), buildBookmarkExportRichHtml(items));
+  }
+
+  function exportBookmarksAsText(items) {
+    if (!items || items.length === 0) {
+      return;
+    }
+
+    downloadTextFile("نشانه‌ها.txt", buildBookmarkExportPlainText(items));
+  }
+
+  function exportBookmarksAsWord(items) {
+    if (!items || items.length === 0) {
+      return;
+    }
+
+    const itemsHtml = buildBookmarkExportRichHtml(items);
 
     const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -4581,6 +4595,11 @@
           <button type="button" id="inPageBookmarksClear" ${all.length === 0 ? "disabled" : ""}>پاک‌کردن همه</button>
           <button
             type="button"
+            id="inPageBookmarksCopy"
+            title="کپی نشانه‌های ${exportLabel} در کلیپ‌بورد"
+            ${exportItems.length === 0 ? "disabled" : ""}>کپی</button>
+          <button
+            type="button"
             id="inPageBookmarksPdf"
             title="دریافت نشانه‌های ${exportLabel} به‌صورت یک فایل PDF قابل ذخیره"
             ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
@@ -4663,6 +4682,16 @@
     const textButton = panel.querySelector("#inPageBookmarksText");
     if (textButton) {
       textButton.addEventListener("click", () => exportBookmarksAsText(exportItems));
+    }
+
+    const copyButton = panel.querySelector("#inPageBookmarksCopy");
+    if (copyButton) {
+      copyButton.addEventListener("click", async () => {
+        const originalLabel = copyButton.textContent;
+        const ok = await copyBookmarksToClipboard(exportItems);
+        copyButton.textContent = ok ? "کپی شد!" : "خطا در کپی";
+        setTimeout(() => { copyButton.textContent = originalLabel; }, 1500);
+      });
     }
 
     panel.querySelectorAll("[data-bookmark-id]").forEach(button => {

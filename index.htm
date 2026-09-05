@@ -553,7 +553,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 16px 12px 34px;
+      padding: 12px 16px 12px 44px;
       border-bottom: 1px solid #e2e8f0;
       background: #f8fafc;
       color: #173b63;
@@ -1137,6 +1137,13 @@
 
     .ai-search-options-toggle:hover {
       background: #f1f5f9;
+    }
+
+    .ai-new-chat-button {
+      width: auto;
+      padding: 0 12px;
+      font-size: 0.82rem;
+      white-space: nowrap;
     }
 
     .ai-settings-gear-panel {
@@ -2694,10 +2701,10 @@
             <button
               type="button"
               id="aiChatResetButton"
-              class="ai-search-options-toggle"
+              class="ai-search-options-toggle ai-new-chat-button"
               title="گفتگوی جدید - این گفتگو در آرشیو گفتگوها ذخیره می‌شود"
               aria-label="گفتگوی جدید">
-              🆕
+              گفتگوی جدید
             </button>
 
             <button
@@ -4175,12 +4182,8 @@
       downloadTextFile("نشانه‌ها.txt", body);
     }
 
-    function exportBookmarksAsWord(items) {
-      if (!items || items.length === 0) {
-        return;
-      }
-
-      const itemsHtml = buildBookmarkExportGroups(items).map(group => {
+    function buildBookmarkExportRichHtml(items) {
+      return buildBookmarkExportGroups(items).map(group => {
         const tagsHtml = group.tagGroups.map(tagGroup => {
           const entriesHtml = tagGroup.items.map((item, index) => (
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
@@ -4210,6 +4213,23 @@
           tagsHtml
         );
       }).join("");
+    }
+
+    // آیتم ۳: کپی نشانه‌ها به کلیپ‌بورد
+    async function copyBookmarksToClipboard(items) {
+      if (!items || items.length === 0) {
+        return false;
+      }
+
+      return copyRichText(buildBookmarkExportPlainText(items), buildBookmarkExportRichHtml(items));
+    }
+
+    function exportBookmarksAsWord(items) {
+      if (!items || items.length === 0) {
+        return;
+      }
+
+      const itemsHtml = buildBookmarkExportRichHtml(items);
 
       const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
         <head>
@@ -4460,6 +4480,7 @@
               ${hasBookmarkSelection ? `<span class="bookmark-selection-badge">(${selectedBookmarkIds.size})</span>` : ""}
             </button>
             <button type="button" id="bookmarksClearButton">پاک‌کردن همه</button>
+            <button type="button" id="bookmarksCopy" ${exportItems.length === 0 ? "disabled" : ""}>کپی</button>
             <button type="button" id="bookmarksExportPdf" ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
             <button type="button" id="bookmarksExportWord" ${exportItems.length === 0 ? "disabled" : ""}>Word</button>
             <button type="button" id="bookmarksExportText" ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
@@ -4508,6 +4529,16 @@
       const exportTextButton = panel.querySelector("#bookmarksExportText");
       if (exportTextButton) {
         exportTextButton.addEventListener("click", () => exportBookmarksAsText(exportItems));
+      }
+
+      const copyButton = panel.querySelector("#bookmarksCopy");
+      if (copyButton) {
+        copyButton.addEventListener("click", async () => {
+          const originalLabel = copyButton.textContent;
+          const ok = await copyBookmarksToClipboard(exportItems);
+          copyButton.textContent = ok ? "کپی شد!" : "خطا در کپی";
+          setTimeout(() => { copyButton.textContent = originalLabel; }, 1500);
+        });
       }
 
       const exportWordButton = panel.querySelector("#bookmarksExportWord");
@@ -6113,9 +6144,16 @@
     // اسکرول به یک <mark> روی همان صفحه، چون نتایج اینجا صفحه‌بندی‌شده
     // است، ابتدا صفحهٔ لازم را (در صورت نیاز) باز می‌کند، بعد به کارت
     // نتیجه اسکرول کرده و لحظه‌ای هایلایتش می‌کند.
-    function showResult(index) {
+    function showResult(index, direction) {
       if (currentResults.length === 0 || index < 0 || index >= currentResults.length) {
         return;
+      }
+
+      // آیتم ۴: اگه صدازننده جهت رو صریح نداده، از مقایسه با اندیس
+      // قبلی حدس بزن - برای فراخوانی‌های قدیمی‌تری که این پارامتر رو
+      // نمی‌دن.
+      if (typeof direction !== "number") {
+        direction = index > currentResultPointer ? 1 : -1;
       }
 
       currentResultPointer = index;
@@ -6142,7 +6180,17 @@
         .forEach(el => el.classList.remove("is-current-result"));
 
       article.classList.add("is-current-result");
-      article.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+
+      // آیتم ۴ (رفع باگ): به‌جای scrollIntoView (که می‌تونست کل صفحه رو
+      // هم اسکرول کنه)، فقط اسکرول داخلیِ خودِ ستون شناور نتایج، دقیقاً
+      // به‌اندازهٔ ارتفاع یه نتیجه جابه‌جا می‌شه.
+      const resultsColumn = document.querySelector(".search-results-column");
+      if (resultsColumn) {
+        const rowStep = article.offsetHeight + 16; // ۱۶px ≈ فاصلهٔ بین نتایج
+        resultsColumn.scrollBy({ top: direction * rowStep, behavior: "smooth" });
+      } else {
+        article.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
     }
 
     // Keep the visible checkboxes in sync with selectedResultIndexes after
@@ -7664,9 +7712,9 @@
         // Item جدید: مثل in-page-search.js، Enter به نتیجهٔ بعدی و
         // Shift+Enter به نتیجهٔ قبلی می‌رود (هم‌ارز دکمه‌های ▶ ◀).
         if (event.shiftKey) {
-          showResult(currentResultPointer - 1);
+          showResult(currentResultPointer - 1, -1);
         } else {
-          showResult(currentResultPointer + 1);
+          showResult(currentResultPointer + 1, 1);
         }
       }
 
@@ -7693,13 +7741,13 @@
 
     if (sitePrevResultButton) {
       sitePrevResultButton.addEventListener("click", () => {
-        showResult(currentResultPointer - 1);
+        showResult(currentResultPointer - 1, -1);
       });
     }
 
     if (siteNextResultButton) {
       siteNextResultButton.addEventListener("click", () => {
-        showResult(currentResultPointer + 1);
+        showResult(currentResultPointer + 1, 1);
       });
     }
 

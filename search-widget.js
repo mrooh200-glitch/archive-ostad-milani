@@ -1336,20 +1336,28 @@ document.addEventListener("DOMContentLoaded", () => {
       if (nextButton) nextButton.disabled = !hasResults;
     }
 
-    function focusAiResult(index) {
+    function focusAiResult(index, direction) {
       const rows = aiSearchResults.querySelectorAll(".ai-search-result-row");
       if (rows.length === 0) return;
 
       activeResultIndex = ((index % rows.length) + rows.length) % rows.length;
       rows.forEach((row, i) => row.classList.toggle("is-active-result", i === activeResultIndex));
-      rows[activeResultIndex].scrollIntoView({ block: "center", behavior: "smooth" });
+
+      // فقط اسکرول داخلیِ خودِ بلوک شناور نتایج جابه‌جا می‌شه - نه
+      // بلوک جستجو، نه کل صفحه - و دقیقاً به‌اندازهٔ ارتفاع یه نتیجه
+      // (نه کمتر، نه بیشتر).
+      const dropdown = document.querySelector(".ai-search-results-dropdown");
+      if (dropdown && direction) {
+        const rowStep = rows[activeResultIndex].offsetHeight + 10; // ۱۰px = فاصلهٔ بین نتایج
+        dropdown.scrollBy({ top: direction * rowStep, behavior: "smooth" });
+      }
     }
 
     const aiSearchPreviousButton = document.getElementById("aiSearchPrevious");
     if (aiSearchPreviousButton) {
       aiSearchPreviousButton.addEventListener("click", () => {
         if (latestSearchResults.length === 0) return;
-        focusAiResult(activeResultIndex <= 0 ? latestSearchResults.length - 1 : activeResultIndex - 1);
+        focusAiResult(activeResultIndex <= 0 ? latestSearchResults.length - 1 : activeResultIndex - 1, -1);
       });
     }
 
@@ -1357,7 +1365,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (aiSearchNextButton) {
       aiSearchNextButton.addEventListener("click", () => {
         if (latestSearchResults.length === 0) return;
-        focusAiResult(activeResultIndex + 1);
+        focusAiResult(activeResultIndex + 1, 1);
       });
     }
   }
