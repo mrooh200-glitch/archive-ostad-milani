@@ -894,8 +894,8 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
   // (به‌ترتیب برای جست‌وجو یا گفتگو) callback مربوطه رو بده.
   const selectionButtonsHtml = selectionControls
     ? `
-      <button type="button" class="ai-toolbar-btn" data-action="select-all">☑️ انتخاب همه</button>
-      <button type="button" class="ai-toolbar-btn" data-action="clear-selection">⬜ لغو انتخاب</button>
+      <button type="button" class="ai-toolbar-btn" data-action="select-all">انتخاب همه</button>
+      <button type="button" class="ai-toolbar-btn" data-action="clear-selection">لغو انتخاب</button>
       ${selectionControls.deleteSelected ? `<button type="button" class="ai-toolbar-btn" data-action="delete-selected">🗑️ حذف موارد انتخاب‌شده</button>` : ""}
     `
     : "";
@@ -1340,16 +1340,24 @@ document.addEventListener("DOMContentLoaded", () => {
       const rows = aiSearchResults.querySelectorAll(".ai-search-result-row");
       if (rows.length === 0) return;
 
+      const previousIndex = activeResultIndex;
       activeResultIndex = ((index % rows.length) + rows.length) % rows.length;
       rows.forEach((row, i) => row.classList.toggle("is-active-result", i === activeResultIndex));
 
       // فقط اسکرول داخلیِ خودِ بلوک شناور نتایج جابه‌جا می‌شه - نه
-      // بلوک جستجو، نه کل صفحه - و دقیقاً به‌اندازهٔ ارتفاع یه نتیجه
-      // (نه کمتر، نه بیشتر).
+      // بلوک جستجو، نه کل صفحه - و دقیقاً به‌اندازهٔ فاصلهٔ واقعیِ بین
+      // دو ردیف (نه یه عدد تقریبی که می‌تونست بلوک رو نصفه‌ونیمه
+      // نشون بده).
       const dropdown = document.querySelector(".ai-search-results-dropdown");
-      if (dropdown && direction) {
-        const rowStep = rows[activeResultIndex].offsetHeight + 10; // ۱۰px = فاصلهٔ بین نتایج
-        dropdown.scrollBy({ top: direction * rowStep, behavior: "smooth" });
+      if (
+        dropdown &&
+        direction &&
+        previousIndex >= 0 &&
+        previousIndex < rows.length &&
+        previousIndex !== activeResultIndex
+      ) {
+        const delta = rows[activeResultIndex].getBoundingClientRect().top - rows[previousIndex].getBoundingClientRect().top;
+        dropdown.scrollBy({ top: delta, behavior: "smooth" });
       }
     }
 

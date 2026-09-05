@@ -629,34 +629,6 @@
 
     /* Item جدید: پنل «نشانه‌ها» - هم‌ساختار با #archivePanel بالا، به‌علاوهٔ
        فیلتر برچسب و گروه‌بندی بر اساس عنوان کتاب. */
-    #bookmarksPanel {
-      width: min(728px, 100%);
-      max-height: 80vh;
-      overflow-y: auto;
-      background: #ffffff;
-      border-radius: 14px;
-      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
-    }
-
-    #bookmarksPanel .archive-header {
-      position: sticky;
-      top: 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 16px;
-      border-bottom: 1px solid #e2e8f0;
-      background: #f8fafc;
-      color: #173b63;
-      font-weight: bold;
-    }
-
-    #bookmarksPanel .archive-header-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
     .bookmark-tag-filter {
       display: flex;
       flex-wrap: wrap;
@@ -4231,12 +4203,8 @@
       });
     }
 
-    function exportBookmarksAsText(items) {
-      if (!items || items.length === 0) {
-        return;
-      }
-
-      const body = buildBookmarkExportGroups(items).map(group => {
+    function buildBookmarkExportPlainText(items) {
+      return buildBookmarkExportGroups(items).map(group => {
         const tagsBody = group.tagGroups.map(tagGroup => {
           const itemsBody = tagGroup.items.map((item, index) => (
             `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}\n` +
@@ -4248,8 +4216,14 @@
 
         return `${group.mainNumber} - ${group.bookTitle}\n\n${tagsBody}`;
       }).join("\n\n");
+    }
 
-      downloadTextFile("نشانه‌ها.txt", body);
+    function exportBookmarksAsText(items) {
+      if (!items || items.length === 0) {
+        return;
+      }
+
+      downloadTextFile("نشانه‌ها.txt", buildBookmarkExportPlainText(items));
     }
 
     function buildBookmarkExportRichHtml(items) {
@@ -4605,7 +4579,12 @@
       if (copyButton) {
         copyButton.addEventListener("click", async () => {
           const originalLabel = copyButton.textContent;
-          const ok = await copyBookmarksToClipboard(exportItems);
+          let ok = false;
+          try {
+            ok = await copyBookmarksToClipboard(exportItems);
+          } catch (error) {
+            console.error("خطا در کپی نشانه‌ها:", error);
+          }
           copyButton.textContent = ok ? "کپی شد!" : "خطا در کپی";
           setTimeout(() => { copyButton.textContent = originalLabel; }, 1500);
         });
@@ -6219,19 +6198,31 @@
         return;
       }
 
+      const previousIndex = currentResultPointer;
+
       // آیتم ۴: اگه صدازننده جهت رو صریح نداده، از مقایسه با اندیس
       // قبلی حدس بزن - برای فراخوانی‌های قدیمی‌تری که این پارامتر رو
       // نمی‌دن.
       if (typeof direction !== "number") {
-        direction = index > currentResultPointer ? 1 : -1;
+        direction = index > previousIndex ? 1 : -1;
       }
+
+      // آیتم ۳ (رفع باگ: بلوک ناقص بالا می‌اومد): قبل از هر تغییری،
+      // موقعیت واقعیِ ردیف «قبلی» (اگه هنوز تو همین صفحه باشه) رو
+      // نگه می‌داریم - تا بعداً دقیقاً فاصلهٔ واقعیش با ردیف جدید رو
+      // حساب کنیم؛ نه یه عدد تقریبی که می‌تونست بلوک رو نصفه‌ونیمه
+      // نشون بده.
+      const previousCheckbox = searchResults.querySelector(`.result-checkbox[data-global-index="${previousIndex}"]`);
+      const previousArticle = previousCheckbox ? previousCheckbox.closest(".text-search-result") : null;
+      const previousTop = previousArticle ? previousArticle.getBoundingClientRect().top : null;
 
       currentResultPointer = index;
       updateSearchStatus();
 
       const targetPage = Math.floor(index / resultsPerPage) + 1;
+      const pageChanged = targetPage !== currentPage;
 
-      if (targetPage !== currentPage) {
+      if (pageChanged) {
         currentPage = targetPage;
         renderCurrentPage();
       }
@@ -6252,12 +6243,21 @@
       article.classList.add("is-current-result");
 
       // آیتم ۴ (رفع باگ): به‌جای scrollIntoView (که می‌تونست کل صفحه رو
-      // هم اسکرول کنه)، فقط اسکرول داخلیِ خودِ ستون شناور نتایج، دقیقاً
-      // به‌اندازهٔ ارتفاع یه نتیجه جابه‌جا می‌شه.
+      // هم اسکرول کنه)، فقط اسکرول داخلیِ خودِ ستون شناور نتایج جابه‌جا
+      // می‌شه.
       const resultsColumn = document.querySelector(".search-results-column");
       if (resultsColumn) {
-        const rowStep = article.offsetHeight + 16; // ۱۶px ≈ فاصلهٔ بین نتایج
-        resultsColumn.scrollBy({ top: direction * rowStep, behavior: "smooth" });
+        if (previousTop !== null && !pageChanged) {
+          const delta = article.getBoundingClientRect().top - previousTop;
+          resultsColumn.scrollBy({ top: delta, behavior: "smooth" });
+        } else {
+          // صفحه عوض شده یا ردیف قبلی در دسترس نبود - فاصلهٔ دقیق قابل
+          // محاسبه نیست؛ به‌جاش نتیجهٔ جدید رو (فقط داخل همین ستون) به
+          // بالای دیدِ ستون می‌بریم.
+          const columnRect = resultsColumn.getBoundingClientRect();
+          const articleRect = article.getBoundingClientRect();
+          resultsColumn.scrollBy({ top: articleRect.top - columnRect.top, behavior: "smooth" });
+        }
       } else {
         article.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       }

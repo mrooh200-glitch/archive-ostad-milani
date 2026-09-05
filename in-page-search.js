@@ -4688,7 +4688,12 @@
     if (copyButton) {
       copyButton.addEventListener("click", async () => {
         const originalLabel = copyButton.textContent;
-        const ok = await copyBookmarksToClipboard(exportItems);
+        let ok = false;
+        try {
+          ok = await copyBookmarksToClipboard(exportItems);
+        } catch (error) {
+          console.error("خطا در کپی نشانه‌ها:", error);
+        }
         copyButton.textContent = ok ? "کپی شد!" : "خطا در کپی";
         setTimeout(() => { copyButton.textContent = originalLabel; }, 1500);
       });
