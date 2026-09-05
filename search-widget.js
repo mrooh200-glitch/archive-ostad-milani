@@ -1228,7 +1228,17 @@ document.addEventListener("DOMContentLoaded", () => {
         })),
       "ابتدا یک پاسخ دریافت کنید"
     );
-    aiChatOutput.insertAdjacentElement("afterend", chatToolbar);
+    aiChatForm.insertAdjacentElement("afterend", chatToolbar);
+
+    // Item جدید (بند س - یکپارچه‌سازی ردیف گفتگو): دکمهٔ سه‌نقطهٔ همین
+    // ردیف، همون نوار عملیات (کپی/خروجی/نشانه) رو باز و بسته می‌کنه.
+    const aiChatOptionsToggle = document.getElementById("aiChatOptionsToggle");
+    if (aiChatOptionsToggle) {
+      aiChatOptionsToggle.addEventListener("click", () => {
+        chatToolbar.open = !chatToolbar.open;
+        aiChatOptionsToggle.setAttribute("aria-expanded", String(chatToolbar.open));
+      });
+    }
 
     function renderChatTurns() {
       aiChatOutput.innerHTML = chatTurns

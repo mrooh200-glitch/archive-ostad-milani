@@ -2492,21 +2492,45 @@
 
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
 
-          <form id="aiChatForm" class="ai-chat-form">
-            <input
-              id="aiChatInput"
-              class="search-box"
-              type="text"
-              autocomplete="off"
-              placeholder="گفتگوی پژوهشی خود را شروع کنید…"
-              aria-label="پرسش از دستیار هوشمند">
+          <form id="aiChatForm" class="ai-chat-form ai-search-row">
+            <div class="ai-search-input-wrap">
+              <input
+                id="aiChatInput"
+                class="search-box"
+                type="text"
+                autocomplete="off"
+                placeholder="گفتگوی پژوهشی خود را شروع کنید…"
+                aria-label="پرسش از دستیار هوشمند">
+            </div>
 
             <button type="submit" class="ai-chat-submit">ارسال پرسش</button>
+
+            <button
+              id="aiChatVoiceInput"
+              type="button"
+              class="voice-input-button"
+              title="جست‌وجوی صوتی (به‌جای تایپ، پرسش را با میکروفون بگویید)"
+              aria-label="جست‌وجوی صوتی">
+              🎤
+            </button>
+
+            <button type="button" id="aiChatResetButton" class="ai-search-options-toggle" title="این گفتگو در آرشیو گفتگوها ذخیره می‌شود و یک گفتگوی تازه شروع می‌شود" aria-label="گفتگوی جدید">➕</button>
+
+            <button type="button" id="aiChatArchiveButton" class="ai-search-options-toggle" title="مشاهدهٔ گفتگوهای قبلی ذخیره‌شده" aria-label="آرشیو گفتگوها">🗂️</button>
+
+            <button
+              id="aiChatOptionsToggle"
+              type="button"
+              class="ai-search-options-toggle"
+              title="عملیات (کپی، خروجی، نشانه)"
+              aria-label="عملیات"
+              aria-haspopup="true"
+              aria-expanded="false">
+              ⋮
+            </button>
           </form>
 
           <div class="ai-chat-tabs">
-            <button type="button" id="aiChatResetButton" class="ai-chat-reset" title="این گفتگو در آرشیو گفتگوها ذخیره می‌شود و یک گفتگوی تازه شروع می‌شود">➕ گفتگوی جدید</button>
-            <button type="button" id="aiChatArchiveButton" class="ai-chat-reset" title="مشاهدهٔ گفتگوهای قبلی ذخیره‌شده">🗂️ آرشیو گفتگوها</button>
             <span class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ با مأخذ تطبیق دهید.</span>
           </div>
         </section>
@@ -4578,6 +4602,78 @@
         aiVoiceButton.title = "مرورگر شما از جست‌وجوی صوتی پشتیبانی نمی‌کند";
       }
       aiVoiceButton.addEventListener("click", toggleAiVoiceInput);
+    }
+
+    // Item جدید (بند س): همون الگوی صوتی، این‌بار برای کادر گفتگو - با
+    // این تفاوت که به‌جای اجرای جست‌وجو، خودِ فرم گفتگو ارسال می‌شه.
+    let aiChatVoiceRecognition = null;
+
+    function toggleAiChatVoiceInput() {
+      const Ctor = getSpeechRecognitionCtor();
+      const button = document.getElementById("aiChatVoiceInput");
+      const input = document.getElementById("aiChatInput");
+      const form = document.getElementById("aiChatForm");
+
+      if (!Ctor) {
+        if (button) {
+          button.title = "پشتیبانی نمی‌شود";
+          button.setAttribute("aria-label", "جست‌وجوی صوتی - پشتیبانی نمی‌شود");
+        }
+        return;
+      }
+
+      if (aiChatVoiceRecognition) {
+        aiChatVoiceRecognition.stop();
+        return;
+      }
+
+      aiChatVoiceRecognition = new Ctor();
+      aiChatVoiceRecognition.lang = "fa-IR";
+      aiChatVoiceRecognition.interimResults = false;
+      aiChatVoiceRecognition.maxAlternatives = 1;
+
+      aiChatVoiceRecognition.addEventListener("start", () => {
+        if (button) {
+          button.classList.add("is-listening");
+          button.title = "در حال شنیدن…";
+          button.setAttribute("aria-label", "در حال شنیدن…");
+        }
+      });
+
+      aiChatVoiceRecognition.addEventListener("result", event => {
+        const transcript = event.results[0][0].transcript;
+        input.value = transcript;
+        if (form && typeof form.requestSubmit === "function") {
+          form.requestSubmit();
+        }
+      });
+
+      aiChatVoiceRecognition.addEventListener("error", event => {
+        if (button) {
+          button.title = describeVoiceError(event.error);
+        }
+        console.error("خطای جست‌وجوی صوتی:", event.error);
+      });
+
+      aiChatVoiceRecognition.addEventListener("end", () => {
+        if (button) {
+          button.classList.remove("is-listening");
+          button.title = "جست‌وجوی صوتی (به‌جای تایپ، پرسش را با میکروفون بگویید)";
+          button.setAttribute("aria-label", "جست‌وجوی صوتی");
+        }
+        aiChatVoiceRecognition = null;
+      });
+
+      aiChatVoiceRecognition.start();
+    }
+
+    const aiChatVoiceButton = document.getElementById("aiChatVoiceInput");
+    if (aiChatVoiceButton) {
+      if (!getSpeechRecognitionCtor()) {
+        aiChatVoiceButton.disabled = true;
+        aiChatVoiceButton.title = "مرورگر شما از جست‌وجوی صوتی پشتیبانی نمی‌کند";
+      }
+      aiChatVoiceButton.addEventListener("click", toggleAiChatVoiceInput);
     }
 
     const siteSearchRoot = document.getElementById("siteSearchRoot");
