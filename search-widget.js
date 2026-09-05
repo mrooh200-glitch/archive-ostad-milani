@@ -1004,6 +1004,12 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
     } else if (action === "pdf") {
       openPrintableForItemsAi(items);
     } else if (action === "bookmark") {
+      // Item جدید (رفع باگ ریشه‌ای - پیدا شد با تست واقعی در مرورگر):
+      // بدون stopPropagation، این کلیک به document بابل می‌کرد و همون
+      // شنوندهٔ سراسریِ «کلیک بیرون از پاپ‌آور برچسب» (که در index.htm
+      // تعریف شده) بلافاصله همون کادری که تازه باز شده بود رو می‌بست -
+      // همه‌چیز تو همون یه تیکِ کلیک، قبل از این‌که کاربر حتی ببینتش.
+      e.stopPropagation();
       if (typeof window.openBookmarkTagPopoverGeneric === "function") {
         window.openBookmarkTagPopoverGeneric(btn.getBoundingClientRect(), (tags) => {
           addItemsToBookmarksAi(items, tags);
