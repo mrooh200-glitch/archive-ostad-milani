@@ -200,15 +200,24 @@
     }
 
     .search-layout {
-      display: grid;
-      grid-template-columns: 260px 1fr;
-      gap: 20px;
-      align-items: start;
+      display: block;
     }
 
     .search-controls {
-      position: sticky;
-      top: 20px;
+      position: fixed;
+      z-index: 10002;
+      width: 280px;
+      max-height: 360px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #dbe3ee;
+      border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+      padding: 10px 12px;
+    }
+
+    .search-controls.is-open {
+      display: block !important;
     }
 
     /* Item 3: floating results block - same idea as
@@ -224,13 +233,8 @@
     }
 
     @media (max-width: 760px) {
-      .search-layout {
-        display: block;
-      }
-
       .search-controls {
-        position: static;
-        margin-bottom: 8px;
+        width: min(280px, calc(100vw - 40px));
       }
 
       /* The two-column grid collapses to a single stacked column at
@@ -2455,6 +2459,42 @@
             مشاهده مشتقات
           </label>
 
+          <button
+            id="siteSearchScopeToggle"
+            type="button"
+            class="voice-input-button"
+            title="محدودهٔ جست‌وجو (انتخاب کتاب‌های خاص)"
+            aria-label="محدودهٔ جست‌وجو"
+            aria-haspopup="true"
+            aria-expanded="false">
+            📚
+          </button>
+
+          <div class="search-controls" style="display:none;">
+            <div class="book-scope-actions">
+              <button
+                id="bookScopeSelectAll"
+                type="button"
+                class="book-scope-action-button">
+                انتخاب همه
+              </button>
+
+              <button
+                id="bookScopeDeselectAll"
+                type="button"
+                class="book-scope-action-button">
+                لغو انتخاب
+              </button>
+            </div>
+
+            <div
+              id="bookScopeList"
+              class="book-scope-list"
+              role="group"
+              aria-label="دامنهٔ جست‌وجو در کتاب‌ها">
+            </div>
+          </div>
+
           <div class="settings-wrap">
             <button
               id="siteSettingsGear"
@@ -2482,31 +2522,6 @@
       </div>
 
       <div class="search-layout">
-        <div class="search-controls">
-          <div class="book-scope-actions">
-            <button
-              id="bookScopeSelectAll"
-              type="button"
-              class="book-scope-action-button">
-              انتخاب همه
-            </button>
-
-            <button
-              id="bookScopeDeselectAll"
-              type="button"
-              class="book-scope-action-button">
-              لغو انتخاب
-            </button>
-          </div>
-
-          <div
-            id="bookScopeList"
-            class="book-scope-list"
-            role="group"
-            aria-label="دامنهٔ جست‌وجو در کتاب‌ها">
-          </div>
-        </div>
-
         <div class="search-results-column">
           <section
             id="searchResults"
@@ -6154,6 +6169,104 @@
     // position:fixed با مختصات محاسبه‌شده در JS، که از برش‌خوردن توسط
     // نیای overflow فرار می‌کند.
     let settingsMenuReflowHandler = null;
+
+    let searchScopeReflowHandler = null;
+
+    function positionSearchScopePopover() {
+      const popover = document.querySelector(".search-controls");
+      const toggle = document.getElementById("siteSearchScopeToggle");
+
+      if (!popover || !toggle || !popover.classList.contains("is-open")) {
+        return;
+      }
+
+      const GAP = 6;
+      const EDGE_MARGIN = 8;
+      const MIN_USABLE = 200;
+
+      const toggleRect = toggle.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - toggleRect.bottom - GAP - EDGE_MARGIN;
+      const spaceAbove = toggleRect.top - GAP - EDGE_MARGIN;
+      const openUpward = spaceBelow < MIN_USABLE && spaceAbove > spaceBelow;
+
+      let left = toggleRect.right - popover.offsetWidth;
+      left = Math.max(EDGE_MARGIN, Math.min(left, window.innerWidth - popover.offsetWidth - EDGE_MARGIN));
+      popover.style.left = left + "px";
+
+      if (openUpward) {
+        popover.style.top = "auto";
+        popover.style.bottom = (window.innerHeight - toggleRect.top + GAP) + "px";
+      } else {
+        popover.style.top = (toggleRect.bottom + GAP) + "px";
+        popover.style.bottom = "auto";
+      }
+
+      const available = Math.max(openUpward ? spaceAbove : spaceBelow, MIN_USABLE);
+      popover.style.maxHeight = Math.min(360, available) + "px";
+    }
+
+    function openSearchScopePopover() {
+      const popover = document.querySelector(".search-controls");
+      const toggle = document.getElementById("siteSearchScopeToggle");
+
+      if (popover) popover.classList.add("is-open");
+      if (toggle) toggle.setAttribute("aria-expanded", "true");
+
+      positionSearchScopePopover();
+
+      if (!searchScopeReflowHandler) {
+        searchScopeReflowHandler = () => positionSearchScopePopover();
+        window.addEventListener("resize", searchScopeReflowHandler);
+        window.addEventListener("scroll", searchScopeReflowHandler, true);
+      }
+    }
+
+    function closeSearchScopePopover() {
+      const popover = document.querySelector(".search-controls");
+      const toggle = document.getElementById("siteSearchScopeToggle");
+
+      if (popover) {
+        popover.classList.remove("is-open");
+        popover.style.maxHeight = "";
+        popover.style.left = "";
+        popover.style.top = "";
+        popover.style.bottom = "";
+      }
+
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+
+      if (searchScopeReflowHandler) {
+        window.removeEventListener("resize", searchScopeReflowHandler);
+        window.removeEventListener("scroll", searchScopeReflowHandler, true);
+        searchScopeReflowHandler = null;
+      }
+    }
+
+    const siteSearchScopeToggle = document.getElementById("siteSearchScopeToggle");
+    if (siteSearchScopeToggle) {
+      siteSearchScopeToggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const popover = document.querySelector(".search-controls");
+        const isOpen = popover && popover.classList.contains("is-open");
+        if (isOpen) {
+          closeSearchScopePopover();
+        } else {
+          openSearchScopePopover();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const popover = document.querySelector(".search-controls");
+        if (
+          popover &&
+          popover.classList.contains("is-open") &&
+          !popover.contains(event.target) &&
+          event.target !== siteSearchScopeToggle
+        ) {
+          closeSearchScopePopover();
+        }
+      });
+    }
 
     function positionSettingsMenu() {
       const menu = document.getElementById("siteSettingsMenu");
