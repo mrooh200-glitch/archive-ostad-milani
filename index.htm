@@ -1269,40 +1269,45 @@
       flex: 1;
     }
 
-    .ai-chat-submit {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 9px 18px;
+    /* آیتم جدید: دکمهٔ ارسال از یه تب/کپسول جدا به یه آیکون فلش گرد،
+       داخل خودِ کادر نوشتن پرسش (سمت چپِ کادر، چون کادر RTL است)
+       تبدیل شد - دقیقاً مثل چت‌های امروزی. */
+    .ai-chat-input-wrap {
+      position: relative;
+    }
+
+    .ai-chat-input-wrap .search-box {
+      padding-left: 42px;
+    }
+
+    .ai-chat-send-icon {
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 30px;
+      height: 30px;
       border: none;
-      border-radius: 999px;
+      border-radius: 50%;
       background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: #fff;
-      font: inherit;
-      font-size: 0.86rem;
-      font-weight: 600;
+      font-size: 1rem;
+      line-height: 1;
       cursor: pointer;
-      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25);
       transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
     }
 
-    .ai-chat-submit::before {
-      content: "➤";
-      display: inline-block;
-      font-size: 0.78rem;
-      line-height: 1;
-    }
-
-    .ai-chat-submit:hover {
+    .ai-chat-send-icon:hover {
       background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
-      transform: translateY(-1px);
-      box-shadow: 0 4px 10px rgba(29, 78, 216, 0.32);
+      transform: translateY(-50%) scale(1.05);
     }
 
-    .ai-chat-submit:active {
-      transform: translateY(0);
-      box-shadow: 0 1px 3px rgba(29, 78, 216, 0.3);
+    .ai-chat-send-icon:active {
+      transform: translateY(-50%) scale(0.95);
     }
 
     .ai-chat-reset {
@@ -1339,22 +1344,47 @@
       cursor: pointer;
     }
 
-    .ai-chat-tabs {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+    /* بلوک سوم (پایین‌ترین بخش تب گفتگو): حالت پاسخ‌دهی + هشدار */
+    .ai-chat-bottom-block {
       margin-top: 10px;
-      flex-wrap: nowrap;
+      padding-top: 10px;
+      border-top: 1px dashed #e2e8f0;
     }
 
     .ai-chat-tabs-notice {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+      margin: 6px 0 0;
       color: #92400e;
       font-size: 0.76rem;
+    }
+
+    /* پیش‌نمایش فایل/عکسِ پیوست‌شده به پرسش، قبل از ارسال */
+    .ai-chat-attachment-preview {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      padding: 6px 10px;
+      border: 1px solid #dbe3ee;
+      border-radius: 8px;
+      background: #f8fafc;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+
+    .ai-chat-attachment-preview img {
+      width: 32px;
+      height: 32px;
+      object-fit: cover;
+      border-radius: 4px;
+    }
+
+    .ai-chat-attachment-preview button {
+      margin-right: auto;
+      border: none;
+      background: transparent;
+      color: #b91c1c;
+      cursor: pointer;
+      font-size: 0.9rem;
     }
 
     .ai-chat-output {
@@ -1362,6 +1392,8 @@
       max-height: 60vh;
       overflow-y: auto;
       padding-left: 4px;
+      display: flex;
+      flex-direction: column-reverse;
     }
 
     .ai-chat-turn {
@@ -1369,6 +1401,15 @@
       flex-direction: column;
       gap: 8px;
       margin-bottom: 16px;
+    }
+
+    .ai-chat-turn-select {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .ai-chat-turn-checkbox {
+      cursor: pointer;
     }
 
     .ai-chat-bubble {
@@ -2479,21 +2520,22 @@
         <section class="ai-section">
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
 
-          <div class="ai-chat-mode-toggle" role="radiogroup" aria-label="حالت پاسخ‌دهی">
-            <label>
-              <input type="radio" name="aiChatMode" value="grounded" checked>
-              پاسخ بر اساس متون آرشیو
-            </label>
-            <label>
-              <input type="radio" name="aiChatMode" value="general">
-              پاسخ آزاد (دانش عمومی)
-            </label>
-          </div>
-
+          <!-- بلوک دوم: گفتگوی آبشاری (به سمت بالا رشد می‌کند) با قابلیت انتخاب -->
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
 
+          <!-- بلوک اول: کادر پرسش و همهٔ کنترل‌های گفتگو -->
           <form id="aiChatForm" class="ai-chat-form ai-search-row">
-            <div class="ai-search-input-wrap">
+            <button
+              type="button"
+              id="aiChatAttachButton"
+              class="ai-search-options-toggle"
+              title="افزودن فایل یا عکس"
+              aria-label="افزودن فایل یا عکس">
+              ➕
+            </button>
+            <input type="file" id="aiChatAttachInput" accept="image/*" hidden>
+
+            <div class="ai-search-input-wrap ai-chat-input-wrap">
               <input
                 id="aiChatInput"
                 class="search-box"
@@ -2501,9 +2543,17 @@
                 autocomplete="off"
                 placeholder="گفتگوی پژوهشی خود را شروع کنید…"
                 aria-label="پرسش از دستیار هوشمند">
+              <button type="submit" class="ai-chat-send-icon" title="ارسال پرسش" aria-label="ارسال پرسش">↑</button>
             </div>
 
-            <button type="submit" class="ai-chat-submit">ارسال پرسش</button>
+            <button
+              type="button"
+              id="aiChatResetButton"
+              class="ai-search-options-toggle"
+              title="گفتگوی جدید - این گفتگو در آرشیو گفتگوها ذخیره می‌شود"
+              aria-label="گفتگوی جدید">
+              🆕
+            </button>
 
             <button
               id="aiChatVoiceInput"
@@ -2514,15 +2564,11 @@
               🎤
             </button>
 
-            <button type="button" id="aiChatResetButton" class="ai-search-options-toggle" title="این گفتگو در آرشیو گفتگوها ذخیره می‌شود و یک گفتگوی تازه شروع می‌شود" aria-label="گفتگوی جدید">➕</button>
-
-            <button type="button" id="aiChatArchiveButton" class="ai-search-options-toggle" title="مشاهدهٔ گفتگوهای قبلی ذخیره‌شده" aria-label="آرشیو گفتگوها">🗂️</button>
-
             <button
               id="aiChatOptionsToggle"
               type="button"
               class="ai-search-options-toggle"
-              title="عملیات (کپی، خروجی، نشانه)"
+              title="عملیات (انتخاب، کپی، خروجی، نشانه، آرشیو)"
               aria-label="عملیات"
               aria-haspopup="true"
               aria-expanded="false">
@@ -2530,8 +2576,21 @@
             </button>
           </form>
 
-          <div class="ai-chat-tabs">
-            <span class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ با مأخذ تطبیق دهید.</span>
+          <div id="aiChatAttachmentPreview" class="ai-chat-attachment-preview" style="display:none;"></div>
+
+          <!-- بلوک سوم: حالت پاسخ‌دهی + هشدار -->
+          <div class="ai-chat-bottom-block">
+            <div class="ai-chat-mode-toggle" role="radiogroup" aria-label="حالت پاسخ‌دهی">
+              <label>
+                <input type="radio" name="aiChatMode" value="grounded" checked>
+                پاسخ بر اساس متون آرشیو
+              </label>
+              <label>
+                <input type="radio" name="aiChatMode" value="general">
+                پاسخ آزاد (دانش عمومی)
+              </label>
+            </div>
+            <p class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ با مأخذ تطبیق دهید.</p>
           </div>
         </section>
       </div>

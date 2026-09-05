@@ -192,10 +192,21 @@ ${contextText}`;
     contents.push({ role: "model", parts: [{ text: turn.answer }] });
   }
 
-  contents.push({
-    role: "user",
-    parts: [{ text: `${systemPrompt}\n\nسؤال کاربر: ${question}` }],
-  });
+  // Item جدید (پیوست عکس): اگه کاربر یه عکس همراه پرسش فرستاده باشه،
+  // به‌عنوان یه قسمت جدا (inline_data) کنار متن سؤال به Gemini داده
+  // می‌شه - فقط برای همین یه پرسش، نه برای کل تاریخچه.
+  const parts = [{ text: `${systemPrompt}\n\nسؤال کاربر: ${question}` }];
+
+  if (body.image && typeof body.image.base64 === "string" && typeof body.image.mimeType === "string") {
+    parts.push({
+      inline_data: {
+        mime_type: body.image.mimeType,
+        data: body.image.base64,
+      },
+    });
+  }
+
+  contents.push({ role: "user", parts });
 
   const geminiRequestBody = JSON.stringify({ contents });
 

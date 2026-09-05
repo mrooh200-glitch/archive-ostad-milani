@@ -216,7 +216,7 @@ function textFragmentUrl(baseUrl, text) {
 // تاریخچه را به پرامپت Gemini اضافه کند) پاسخ بعدی واقعاً با در نظر
 // گرفتن سؤال‌های قبلی همین گفتگو ساخته شود - نه این‌که هر پرسش، بی‌خبر
 // از پرسش‌های قبلی، از صفر پاسخ داده شود.
-async function askQuestion(question, history = [], mode = "grounded") {
+async function askQuestion(question, history = [], mode = "grounded", image = null) {
   // Item جدید (پاسخ آزاد): تو این حالت، پاسخ قرار نیست به متون آرشیو
   // محدود باشه - پس نیازی به جست‌وجوی معنایی (که یه تماس شبکه‌ی اضافه‌ست)
   // نیست؛ context خالی می‌مونه و مآخذی هم نشون داده نمی‌شه.
@@ -226,7 +226,7 @@ async function askQuestion(question, history = [], mode = "grounded") {
   const chatRes = await fetch(`${WORKER_URL}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, context: contextTexts, history, mode }),
+    body: JSON.stringify({ question, context: contextTexts, history, mode, image }),
   });
   if (!chatRes.ok) {
     let message = "خطا در دریافت پاسخ از دستیار";
@@ -730,21 +730,24 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
   const bar = document.createElement("details");
   bar.className = "ai-result-toolbar";
 
-  // Item جدید (یکسان‌سازی چینش - بند ج): وقتی صدازننده کنترل‌های
-  // انتخاب رو بده (فقط برای نوار نتایج جست‌وجو، نه گفتگو)، همون سه‌تا
-  // («انتخاب همه»، «لغو انتخاب»، «حذف موارد انتخاب‌شده») هم به همین
-  // یه بلوکِ عملیات اضافه می‌شن - به‌جای این‌که یه ردیف جدا و جدا از
-  // این نوار باشن.
+  // Item جدید (یکسان‌سازی چینش - بند ج/س): وقتی صدازننده کنترل‌های
+  // انتخاب رو بده، «انتخاب همه»/«لغو انتخاب» همیشه اضافه می‌شن؛
+  // «حذف موارد انتخاب‌شده» و «آرشیو» اختیاری‌ان - فقط وقتی صدازننده
+  // (به‌ترتیب برای جست‌وجو یا گفتگو) callback مربوطه رو بده.
   const selectionButtonsHtml = selectionControls
     ? `
       <button type="button" class="ai-toolbar-btn" data-action="select-all">☑️ انتخاب همه</button>
       <button type="button" class="ai-toolbar-btn" data-action="clear-selection">⬜ لغو انتخاب</button>
-      <button type="button" class="ai-toolbar-btn" data-action="delete-selected">🗑️ حذف موارد انتخاب‌شده</button>
+      ${selectionControls.deleteSelected ? `<button type="button" class="ai-toolbar-btn" data-action="delete-selected">🗑️ حذف موارد انتخاب‌شده</button>` : ""}
     `
     : "";
 
+  const archiveButtonHtml = selectionControls && selectionControls.viewArchive
+    ? `<button type="button" class="ai-toolbar-btn" data-action="view-archive">🗂️ آرشیو</button>`
+    : "";
+
   bar.innerHTML = `
-    <summary class="ai-toolbar-summary">☰ عملیات نتایج</summary>
+    <summary class="ai-toolbar-summary">☰ عملیات</summary>
     <div class="ai-toolbar-buttons">
       ${selectionButtonsHtml}
       <button type="button" class="ai-toolbar-btn" data-action="copy">📋 کپی</button>
@@ -753,6 +756,7 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
       <button type="button" class="ai-toolbar-btn" data-action="pdf">PDF</button>
       <button type="button" class="ai-toolbar-btn" data-action="bookmark">⭐ افزودن به نشانه</button>
       <button type="button" class="ai-toolbar-btn" data-action="view-bookmarks">🔖 مشاهدهٔ نشانه‌ها</button>
+      ${archiveButtonHtml}
       <span class="ai-toolbar-status" aria-live="polite"></span>
     </div>
   `;
@@ -791,6 +795,10 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
     }
     if (action === "delete-selected" && selectionControls) {
       selectionControls.deleteSelected();
+      return;
+    }
+    if (action === "view-archive" && selectionControls) {
+      selectionControls.viewArchive();
       return;
     }
 
@@ -1214,19 +1222,62 @@ document.addEventListener("DOMContentLoaded", () => {
     // هم برای نمایش هر تبادل زیر تبادل قبلی (نه جایگزینیش)، هم برای
     // ساخت history‌ای که به askQuestion داده می‌شه.
     const chatTurns = [];
+    // Item جدید (بلوک ۲ - قابلیت انتخاب): کدام تبادل‌ها با چک‌باکس
+    // علامت خورده‌اند - عملیات (کپی/خروجی/نشانه) فقط روی همین
+    // زیرمجموعه اعمال می‌شه؛ اگه هیچی انتخاب نشده باشه، نوار پیام
+    // می‌ده که اول انتخاب کنید.
+    const chatSelectedIndexes = new Set();
+
+    function syncChatCheckboxes() {
+      aiChatOutput.querySelectorAll(".ai-chat-turn-checkbox").forEach((checkbox) => {
+        const index = Number(checkbox.dataset.chatIndex);
+        checkbox.checked = chatSelectedIndexes.has(index);
+      });
+    }
+
+    aiChatOutput.addEventListener("change", (e) => {
+      const checkbox = e.target.closest(".ai-chat-turn-checkbox");
+      if (!checkbox) return;
+      const index = Number(checkbox.dataset.chatIndex);
+      if (checkbox.checked) {
+        chatSelectedIndexes.add(index);
+      } else {
+        chatSelectedIndexes.delete(index);
+      }
+    });
 
     const chatToolbar = createAiToolbar(
       () =>
-        chatTurns.map((turn) => ({
-          kind: "chat",
-          title: `پرسش: ${turn.question}`,
-          text: turn.answer,
-          url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].url) || turn.sourcesText,
-          question: turn.question,
-          answer: turn.answer,
-          sourcesInfo: turn.sourcesInfo,
-        })),
-      "ابتدا یک پاسخ دریافت کنید"
+        [...chatSelectedIndexes]
+          .sort((a, b) => a - b)
+          .map((i) => chatTurns[i])
+          .filter(Boolean)
+          .map((turn) => ({
+            kind: "chat",
+            title: `پرسش: ${turn.question}`,
+            text: turn.answer,
+            url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].url) || turn.sourcesText,
+            question: turn.question,
+            answer: turn.answer,
+            sourcesInfo: turn.sourcesInfo,
+          })),
+      "ابتدا یک یا چند پرسش‌وپاسخ را با تیک انتخاب کنید",
+      {
+        selectAll: () => {
+          chatSelectedIndexes.clear();
+          chatTurns.forEach((_, i) => chatSelectedIndexes.add(i));
+          syncChatCheckboxes();
+        },
+        clearSelection: () => {
+          chatSelectedIndexes.clear();
+          syncChatCheckboxes();
+        },
+        viewArchive: () => {
+          if (typeof openChatArchivePanelAi === "function") {
+            openChatArchivePanelAi();
+          }
+        },
+      }
     );
     aiChatForm.insertAdjacentElement("afterend", chatToolbar);
 
@@ -1241,20 +1292,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     function renderChatTurns() {
-      aiChatOutput.innerHTML = chatTurns
+      // Item جدید (سبک چت‌های امروزی): چون .ai-chat-output با
+      // flex-direction:column-reverse رندر می‌شه، اینجا هم ترتیب رو
+      // معکوس می‌سازیم (جدیدترین تبادل اول تو DOM) - نتیجه این می‌شه
+      // که جدیدترین پیام همیشه پایین (نزدیک کادر پرسش) می‌مونه و
+      // پیام‌های قدیمی‌تر به بالا هل داده می‌شن.
+      aiChatOutput.innerHTML = [...chatTurns]
+        .reverse()
         .map(
-          (turn) => `
+          (turn, displayIndex) => {
+            const originalIndex = chatTurns.length - 1 - displayIndex;
+            return `
             <div class="ai-chat-turn">
+              <div class="ai-chat-turn-select">
+                <input type="checkbox" class="ai-chat-turn-checkbox" data-chat-index="${originalIndex}" ${chatSelectedIndexes.has(originalIndex) ? "checked" : ""} title="انتخاب این پرسش‌وپاسخ" aria-label="انتخاب این پرسش‌وپاسخ">
+              </div>
               <div class="ai-chat-bubble ai-chat-bubble-user">${turn.question}</div>
               <div class="ai-chat-bubble ai-chat-bubble-assistant">
                 <div>${turn.answer}</div>
                 <div class="ai-chat-sources">مآخذ: ${turn.sourceLinksHtml}</div>
               </div>
             </div>
-          `
+          `;
+          }
         )
         .join("");
-      aiChatOutput.scrollTop = aiChatOutput.scrollHeight;
+      // با column-reverse، scrollTop=0 یعنی «انتهای معکوس‌شده» - یعنی
+      // دقیقاً همون‌جایی که جدیدترین پیام (اولین فرزند DOM) قرار داره.
+      aiChatOutput.scrollTop = 0;
     }
 
     // Item جدید (آرشیو گفتگو باز باشد): وقتی کاربر از پنل آرشیو
@@ -1265,6 +1330,7 @@ document.addEventListener("DOMContentLoaded", () => {
       archiveCurrentChatConversationAi(chatTurns);
 
       chatTurns.length = 0;
+      chatSelectedIndexes.clear();
       (event.detail.turns || []).forEach((turn) => {
         chatTurns.push({
           question: turn.question,
@@ -1279,10 +1345,71 @@ document.addEventListener("DOMContentLoaded", () => {
       aiChatInput.focus();
     });
 
+    // Item جدید (بلوک اول - پیوست فایل/عکس): کاربر با ➕ یه عکس انتخاب
+    // می‌کنه، به‌صورت base64 خونده و پیش‌نمایش داده می‌شه؛ موقع ارسال
+    // پرسش بعدی، همراهش به دستیار فرستاده می‌شه.
+    let pendingAttachment = null; // { mimeType, base64, name }
+
+    function renderAttachmentPreview() {
+      const preview = document.getElementById("aiChatAttachmentPreview");
+      if (!preview) return;
+
+      if (!pendingAttachment) {
+        preview.style.display = "none";
+        preview.innerHTML = "";
+        return;
+      }
+
+      preview.style.display = "flex";
+      preview.innerHTML = `
+        <img src="data:${pendingAttachment.mimeType};base64,${pendingAttachment.base64}" alt="">
+        <span>${pendingAttachment.name}</span>
+        <button type="button" id="aiChatAttachmentRemove">حذف ✕</button>
+      `;
+
+      const removeButton = document.getElementById("aiChatAttachmentRemove");
+      if (removeButton) {
+        removeButton.addEventListener("click", () => {
+          pendingAttachment = null;
+          renderAttachmentPreview();
+        });
+      }
+    }
+
+    const aiChatAttachButton = document.getElementById("aiChatAttachButton");
+    const aiChatAttachInput = document.getElementById("aiChatAttachInput");
+    if (aiChatAttachButton && aiChatAttachInput) {
+      aiChatAttachButton.addEventListener("click", () => aiChatAttachInput.click());
+
+      aiChatAttachInput.addEventListener("change", () => {
+        const file = aiChatAttachInput.files && aiChatAttachInput.files[0];
+        aiChatAttachInput.value = ""; // برای این‌که انتخاب دوبارهٔ همون فایل هم change بزنه
+
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+          alert("فعلاً فقط پیوست‌کردن عکس پشتیبانی می‌شه.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64 = reader.result.split(",")[1];
+          pendingAttachment = { mimeType: file.type, base64, name: file.name };
+          renderAttachmentPreview();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     aiChatForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       const question = aiChatInput.value.trim();
       if (!question) return;
+
+      const attachmentForThisMessage = pendingAttachment;
+      pendingAttachment = null;
+      renderAttachmentPreview();
 
       const myToken = ++chatToken;
       // Item جدید: به‌جای پاک‌کردن گفتگوی قبلی، فقط یه نشونهٔ «در حال
@@ -1290,10 +1417,10 @@ document.addEventListener("DOMContentLoaded", () => {
       aiChatInput.value = "";
       renderChatTurns();
       aiChatOutput.insertAdjacentHTML(
-        "beforeend",
+        "afterbegin",
         `<div class="ai-chat-pending" id="aiChatPending-${myToken}">در حال بررسی و تنظیم پاسخ…</div>`
       );
-      aiChatOutput.scrollTop = aiChatOutput.scrollHeight;
+      aiChatOutput.scrollTop = 0;
 
       try {
         // Item جدید (گفتگوی ادامه‌دار): تاریخچهٔ تبادل‌های قبلی همین
@@ -1301,7 +1428,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const history = chatTurns.map((turn) => ({ question: turn.question, answer: turn.answer }));
         const chatModeInput = document.querySelector('input[name="aiChatMode"]:checked');
         const chatMode = chatModeInput ? chatModeInput.value : "grounded";
-        const { answer, sources } = await askQuestion(question, history, chatMode);
+        const { answer, sources } = await askQuestion(question, history, chatMode, attachmentForThisMessage);
         if (myToken !== chatToken) return; // پرسش جدیدتری در همین حین ارسال شده
 
         const sourceLinksHtml = sources
@@ -1339,7 +1466,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (pendingEl) {
           pendingEl.textContent = message;
         } else {
-          aiChatOutput.insertAdjacentHTML("beforeend", `<div class="ai-chat-error">${message}</div>`);
+          aiChatOutput.insertAdjacentHTML("afterbegin", `<div class="ai-chat-error">${message}</div>`);
         }
         console.error(err);
       }
@@ -1354,13 +1481,9 @@ document.addEventListener("DOMContentLoaded", () => {
       aiChatResetButton.addEventListener("click", () => {
         archiveCurrentChatConversationAi(chatTurns);
         chatTurns.length = 0;
+        chatSelectedIndexes.clear();
         aiChatOutput.innerHTML = "";
       });
-    }
-
-    const aiChatArchiveButton = document.getElementById("aiChatArchiveButton");
-    if (aiChatArchiveButton) {
-      aiChatArchiveButton.addEventListener("click", openChatArchivePanelAi);
     }
 
     const aiChatArchiveOverlayEl = document.getElementById("aiChatArchiveOverlay");
