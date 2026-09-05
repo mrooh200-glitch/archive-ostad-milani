@@ -1106,6 +1106,15 @@ function injectAiToolbarStyles() {
       font-size: 0.82rem;
       color: #16a34a;
     }
+    .ai-toolbar-status:not(:empty) {
+      display: block;
+      width: 100%;
+      font-weight: bold;
+      color: #1d4ed8;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed #e2e8f0;
+    }
     /* Item جدید: گفتگوی ادامه‌دار - .ai-chat-turn و حباب‌های سؤال/پاسخ
        تو index.htm (کنار بقیهٔ استایل ثابت بخش گفتگو) تعریف شدن، نه
        اینجا - چون این استایل‌ها به‌صورت پویا تزریق می‌شن و باید بعد از
