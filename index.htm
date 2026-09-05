@@ -1142,18 +1142,20 @@
     .ai-settings-gear-panel {
       position: absolute;
       top: 100%;
-      left: 20px;
+      left: 0;
+      right: 0;
       z-index: 21;
       margin-top: 6px;
       display: flex;
       flex-direction: row;
+      flex-wrap: wrap;
       align-items: center;
       background: #fff;
       border: 1px solid #dbe3ee;
       border-radius: 10px;
       box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
       padding: 10px 12px;
-      width: max-content;
+      width: auto;
       font-size: 0.85rem;
     }
 
@@ -1172,7 +1174,7 @@
     .ai-scope-panel {
       position: absolute;
       top: 100%;
-      left: 20px;
+      left: 0;
       z-index: 21;
       margin-top: 6px;
       width: 260px;
@@ -2546,8 +2548,6 @@
       <div class="ai-panel-inner">
         <section class="ai-section">
           <div id="aiSearchRow" class="ai-search-row">
-            <span class="ai-section-title" title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">جست‌وجوی مفهومی</span>
-
             <div class="ai-search-input-wrap">
               <input
                 id="aiSearchInput"
@@ -2662,7 +2662,6 @@
     <div id="aiChatPanel" class="tab-panel">
       <div class="ai-panel-inner">
         <section class="ai-section">
-          <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
 
           <!-- بلوک دوم: گفتگوی آبشاری (به سمت بالا رشد می‌کند) با قابلیت انتخاب -->
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>

@@ -190,7 +190,7 @@ async function semanticSearch(query, topK = 5, bookFilter = null) {
 // یه Set از اسم کتاب‌های تیک‌خورده رو برمی‌گردونه؛ این Set همیشه به‌روزه
 // (با تیک‌زدن/برداشتن هر کتاب، خودش تغییر می‌کنه) - خالی‌بودنش یعنی
 // «بدون محدودیت، جست‌وجو تو کل آرشیو».
-function setupScopeSelector(toggleId, panelId, listId) {
+function setupScopeSelector(toggleId, panelId, listId, onToggle) {
   const selectedBooks = new Set();
   const toggle = document.getElementById(toggleId);
   const panel = document.getElementById(panelId);
@@ -243,17 +243,20 @@ function setupScopeSelector(toggleId, panelId, listId) {
     if (isOpen) {
       panel.style.display = "none";
       toggle.setAttribute("aria-expanded", "false");
+      if (onToggle) onToggle(false);
       return;
     }
     await populateList();
     panel.style.display = "flex";
     toggle.setAttribute("aria-expanded", "true");
+    if (onToggle) onToggle(true);
   });
 
   document.addEventListener("click", (event) => {
     if (panel.style.display !== "none" && !panel.contains(event.target) && event.target !== toggle) {
       panel.style.display = "none";
       toggle.setAttribute("aria-expanded", "false");
+      if (onToggle) onToggle(false);
     }
   });
 
@@ -1028,7 +1031,7 @@ function injectAiToolbarStyles() {
     .ai-result-toolbar {
       position: absolute;
       top: 100%;
-      left: 20px;
+      left: 0;
       z-index: 21;
       margin-top: 6px;
       width: max-content;
@@ -1366,7 +1369,31 @@ document.addEventListener("DOMContentLoaded", () => {
   if (aiChatForm && aiChatInput && aiChatOutput) {
     let chatToken = 0; // همون منطق نسل، برای پرسش‌های پشت‌سرهم در تب گفت‌وگو
     // آیتم ب: محدودهٔ گفتگو - Set از کتاب‌های تیک‌خورده (خالی = کل آرشیو)
-    const aiChatBookScope = setupScopeSelector("aiChatScopeToggle", "aiChatScopePanel", "aiChatScopeList");
+    // آیتم ۲ (بخش دوم): وقتی هرکدوم از پاپ‌آورهای این ردیف (⋮ عملیات یا
+    // 📚 محدوده) بازه، بلوک هشدار/حالت‌پاسخ زیرش باید پایین‌تر بره -
+    // وگرنه پاپ‌آور شناور روش می‌افته و روش رو می‌پوشونه.
+    function adjustChatBottomBlockSpacing() {
+      const bottomBlock = document.querySelector(".ai-chat-bottom-block");
+      if (!bottomBlock) return;
+
+      const openPopovers = [chatToolbar, document.getElementById("aiChatScopePanel")].filter(
+        (el) => el && (el.open || (el.style && el.style.display === "flex"))
+      );
+
+      if (openPopovers.length > 0) {
+        const tallest = Math.max(...openPopovers.map((el) => el.offsetHeight));
+        bottomBlock.style.marginTop = `${tallest + 12}px`;
+      } else {
+        bottomBlock.style.marginTop = "";
+      }
+    }
+
+    const aiChatBookScope = setupScopeSelector(
+      "aiChatScopeToggle",
+      "aiChatScopePanel",
+      "aiChatScopeList",
+      adjustChatBottomBlockSpacing
+    );
     // Item جدید (گفتگوی ادامه‌دار): کل تبادل‌های همین نشست، به ترتیب -
     // هم برای نمایش هر تبادل زیر تبادل قبلی (نه جایگزینیش)، هم برای
     // ساخت history‌ای که به askQuestion داده می‌شه.
@@ -1429,6 +1456,11 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     );
     aiChatForm.appendChild(chatToolbar);
+
+    // آیتم ۲ (بخش دوم): رویداد بومی toggle خودِ details - چه با کلیک
+    // مستقیم، چه با تغییر برنامه‌ای .open از دکمهٔ ⋮ - همیشه فایر
+    // می‌شه؛ همینه که برای جابه‌جایی بلوک هشدار زیرش استفاده می‌کنیم.
+    chatToolbar.addEventListener("toggle", () => adjustChatBottomBlockSpacing());
 
     // Item جدید (بند س - یکپارچه‌سازی ردیف گفتگو): دکمهٔ سه‌نقطهٔ همین
     // ردیف، همون نوار عملیات (کپی/خروجی/نشانه) رو باز و بسته می‌کنه.
