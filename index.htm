@@ -1395,6 +1395,30 @@
       font-size: 0.9rem;
     }
 
+    /* آیتم جدید: لایت‌باکس نمای کامل عکسِ پیوست‌شده */
+    .ai-chat-image-lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, 0.85);
+      cursor: zoom-out;
+      padding: 24px;
+    }
+
+    .ai-chat-image-lightbox.open {
+      display: flex;
+    }
+
+    .ai-chat-image-lightbox img {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    }
+
     .ai-chat-output {
       margin-top: 0;
       max-height: 60vh;
@@ -2531,6 +2555,8 @@
           <!-- بلوک دوم: گفتگوی آبشاری (به سمت بالا رشد می‌کند) با قابلیت انتخاب -->
           <div id="aiChatOutput" class="ai-chat-output" aria-live="polite"></div>
 
+          <div id="aiChatAttachmentPreview" class="ai-chat-attachment-preview" style="display:none;"></div>
+
           <!-- بلوک اول: کادر پرسش و همهٔ کنترل‌های گفتگو -->
           <form id="aiChatForm" class="ai-chat-form ai-search-row">
             <button
@@ -2583,8 +2609,6 @@
               ⋮
             </button>
           </form>
-
-          <div id="aiChatAttachmentPreview" class="ai-chat-attachment-preview" style="display:none;"></div>
 
           <!-- بلوک سوم: حالت پاسخ‌دهی + هشدار -->
           <div class="ai-chat-bottom-block">

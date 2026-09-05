@@ -1245,7 +1245,7 @@ document.addEventListener("DOMContentLoaded", () => {
             kind: "chat",
             title: `پرسش: ${turn.question}`,
             text: turn.answer,
-            url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].url) || turn.sourcesText,
+            url: (turn.sourcesInfo && turn.sourcesInfo[0] && turn.sourcesInfo[0].url) || location.origin + location.pathname,
             question: turn.question,
             answer: turn.answer,
             sourcesInfo: turn.sourcesInfo,
@@ -1299,7 +1299,7 @@ document.addEventListener("DOMContentLoaded", () => {
               <div class="ai-chat-bubble ai-chat-bubble-user">${turn.question}</div>
               <div class="ai-chat-bubble ai-chat-bubble-assistant">
                 <div>${turn.answer}</div>
-                <div class="ai-chat-sources">منابع: ${turn.sourceLinksHtml}</div>
+                ${turn.sourceLinksHtml ? `<div class="ai-chat-sources">منابع: ${turn.sourceLinksHtml}</div>` : ""}
               </div>
             </div>
           `;
@@ -1339,6 +1339,24 @@ document.addEventListener("DOMContentLoaded", () => {
     // پرسش بعدی، همراهش به دستیار فرستاده می‌شه.
     let pendingAttachment = null; // { mimeType, base64, name }
 
+    // Item جدید: کلیک روی پیش‌نمایش کوچیک عکس، یه نمای کامل (تمام‌صفحه)
+    // بازش می‌کنه - با کلیک روی هر جای اون نما، بسته می‌شه.
+    function openImageLightbox(src) {
+      let overlay = document.getElementById("aiChatImageLightbox");
+      if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "aiChatImageLightbox";
+        overlay.className = "ai-chat-image-lightbox";
+        overlay.innerHTML = `<img alt="نمای کامل عکس پیوست‌شده">`;
+        overlay.addEventListener("click", () => {
+          overlay.classList.remove("open");
+        });
+        document.body.appendChild(overlay);
+      }
+      overlay.querySelector("img").src = src;
+      overlay.classList.add("open");
+    }
+
     function renderAttachmentPreview() {
       const preview = document.getElementById("aiChatAttachmentPreview");
       if (!preview) return;
@@ -1349,12 +1367,19 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      const imageSrc = `data:${pendingAttachment.mimeType};base64,${pendingAttachment.base64}`;
+
       preview.style.display = "flex";
       preview.innerHTML = `
-        <img src="data:${pendingAttachment.mimeType};base64,${pendingAttachment.base64}" alt="">
+        <img src="${imageSrc}" alt="" title="برای دیدن نمای کامل کلیک کنید" style="cursor:zoom-in;">
         <span>${pendingAttachment.name}</span>
         <button type="button" id="aiChatAttachmentRemove">حذف ✕</button>
       `;
+
+      const previewImg = preview.querySelector("img");
+      if (previewImg) {
+        previewImg.addEventListener("click", () => openImageLightbox(imageSrc));
+      }
 
       const removeButton = document.getElementById("aiChatAttachmentRemove");
       if (removeButton) {
