@@ -987,6 +987,7 @@
 
     .tabs {
       display: flex;
+      flex-wrap: wrap;
       gap: 8px;
       margin: 0 0 20px;
     }
@@ -2150,17 +2151,27 @@
         role="tab"
         aria-selected="false"
         aria-controls="searchPanel">
-        جست‌وجو
+        جست‌وجوی متنی
       </button>
 
       <button
-        id="aiTabButton"
+        id="aiSearchTabButton"
         class="tab-button"
         type="button"
         role="tab"
         aria-selected="false"
-        aria-controls="aiPanel">
-        دستیار هوشمند
+        aria-controls="aiSearchPanel">
+        جست‌وجوی مفهومی
+      </button>
+
+      <button
+        id="aiChatTabButton"
+        class="tab-button"
+        type="button"
+        role="tab"
+        aria-selected="false"
+        aria-controls="aiChatPanel">
+        گفتگو
       </button>
     </nav>
 
@@ -2516,7 +2527,7 @@
       </div>
     </div>
 
-    <div id="aiPanel" class="tab-panel">
+    <div id="aiSearchPanel" class="tab-panel">
       <div class="ai-panel-inner">
         <section class="ai-section">
           <div id="aiSearchRow" class="ai-search-row">
@@ -2630,7 +2641,11 @@
             <div id="aiSearchResults" class="ai-search-results" aria-live="polite"></div>
           </div>
         </section>
+      </div>
+    </div>
 
+    <div id="aiChatPanel" class="tab-panel">
+      <div class="ai-panel-inner">
         <section class="ai-section">
           <h2 class="ai-section-title">گفت‌وگو با آرشیو</h2>
 
@@ -3163,14 +3178,17 @@
       compareReadCloseButton.addEventListener("click", closeCompareReadView);
     }
 
-    const aiTabButton = document.getElementById("aiTabButton");
-    const aiPanel = document.getElementById("aiPanel");
+    const aiSearchTabButton = document.getElementById("aiSearchTabButton");
+    const aiSearchPanel = document.getElementById("aiSearchPanel");
+    const aiChatTabButton = document.getElementById("aiChatTabButton");
+    const aiChatPanel = document.getElementById("aiChatPanel");
 
     function activateTab(tabName) {
       const tabs = [
         { name: "browse", button: browseTabButton, panel: browsePanel },
         { name: "search", button: searchTabButton, panel: searchPanel },
-        { name: "ai", button: aiTabButton, panel: aiPanel }
+        { name: "ai-search", button: aiSearchTabButton, panel: aiSearchPanel },
+        { name: "ai-chat", button: aiChatTabButton, panel: aiChatPanel }
       ];
 
       tabs.forEach(tab => {
@@ -3182,16 +3200,22 @@
 
       if (tabName === "search") {
         searchInput.focus();
-      } else if (tabName === "ai") {
+      } else if (tabName === "ai-search") {
         const aiSearchInputEl = document.getElementById("aiSearchInput");
         if (aiSearchInputEl) aiSearchInputEl.focus();
+      } else if (tabName === "ai-chat") {
+        const aiChatInputEl = document.getElementById("aiChatInput");
+        if (aiChatInputEl) aiChatInputEl.focus();
       }
     }
 
     browseTabButton.addEventListener("click", () => activateTab("browse"));
     searchTabButton.addEventListener("click", () => activateTab("search"));
-    if (aiTabButton) {
-      aiTabButton.addEventListener("click", () => activateTab("ai"));
+    if (aiSearchTabButton) {
+      aiSearchTabButton.addEventListener("click", () => activateTab("ai-search"));
+    }
+    if (aiChatTabButton) {
+      aiChatTabButton.addEventListener("click", () => activateTab("ai-chat"));
     }
 
     // ---- Item جدید: حالت شب --------------------------------------------

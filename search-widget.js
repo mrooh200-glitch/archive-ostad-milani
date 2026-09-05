@@ -207,11 +207,17 @@ function setupScopeSelector(toggleId, panelId, listId) {
     try {
       const data = await loadEmbeddings();
       const books = [...new Set(data.map((item) => item.book))].sort((a, b) => a.localeCompare(b, "fa"));
+
+      // آیتم جدید: پیش‌فرض این باشه که همه‌ی کتاب‌ها تیک خورده‌ن - هم
+      // تو ظاهر چک‌باکس‌ها، هم تو خودِ Set انتخاب‌شده (که از قبل خالی
+      // بود و به‌طور ضمنی یعنی «همه»؛ الان صریح و قابل‌مشاهده‌ست).
+      books.forEach((book) => selectedBooks.add(book));
+
       list.innerHTML = books
         .map(
           (book) => `
           <label>
-            <input type="checkbox" class="ai-scope-checkbox" value="${book.replace(/"/g, "&quot;")}">
+            <input type="checkbox" class="ai-scope-checkbox" value="${book.replace(/"/g, "&quot;")}" checked>
             ${book}
           </label>
         `
@@ -1262,7 +1268,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // بزرگ‌نمایی: با CSS zoom روی کل تب دستیار هوشمند (aiPanel)، هم‌الگو
     // با بزرگ‌نمایی صفحهٔ کتاب در in-page-search.js.
     let aiZoomLevel = 1;
-    const aiPanelEl = document.getElementById("aiPanel");
+    const aiPanelEl = document.getElementById("aiSearchPanel");
     const aiZoomLevelLabel = document.getElementById("aiZoomLevel");
 
     function applyAiZoom() {
