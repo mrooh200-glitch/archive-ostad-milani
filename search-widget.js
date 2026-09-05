@@ -1032,7 +1032,7 @@ function injectAiToolbarStyles() {
       z-index: 21;
       margin-top: 6px;
       width: max-content;
-      max-width: 260px;
+      max-width: 480px;
       background: #fff;
       border: 1px solid #dbe3ee;
       border-radius: 10px;
@@ -1043,9 +1043,10 @@ function injectAiToolbarStyles() {
     }
     .ai-toolbar-buttons {
       display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 4px;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
       padding: 8px;
     }
     .ai-toolbar-btn {
