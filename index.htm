@@ -921,6 +921,61 @@
       cursor: not-allowed;
     }
 
+    /* آیتم جدید: پنل عملیات (⋮) - افقی و عریض (به‌اندازهٔ کل ردیف)،
+       هم‌الگو با نوار عملیاتِ جست‌وجوی مفهومی/گفتگو - برخلاف ⚙️ که یه
+       فهرست عمودی باریکه. عرض/جای‌گیری دقیقش با positionOperationsMenu
+       در جاوااسکریپت تنظیم می‌شه؛ این‌ها فقط پیش‌فرض بی‌ضرر قبل از اونه. */
+    .operations-menu {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 10002;
+      max-height: 70vh;
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.20);
+      padding: 8px;
+    }
+
+    .operations-menu.is-open {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .operations-menu-btn {
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      border-radius: 6px;
+      padding: 5px 10px;
+      font: inherit;
+      font-size: 0.83rem;
+      color: #1f2937;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .operations-menu-btn:hover:not(:disabled) {
+      background: #eff6ff;
+      border-color: #93c5fd;
+    }
+
+    .operations-menu-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .operations-menu-badge {
+      display: inline-block;
+      margin-right: 4px;
+      color: #64748b;
+      font-size: 0.75rem;
+    }
+
     .settings-menu .settings-badge {
       color: #64748b;
       font-size: 0.74rem;
@@ -2467,6 +2522,21 @@
             <input id="siteShowDerivatives" type="checkbox">
             مشاهده مشتقات
           </label>
+
+          <div class="settings-wrap">
+            <button
+              id="siteOperationsToggle"
+              type="button"
+              class="settings-gear"
+              title="عملیات (انتخاب، کپی، خروجی، نشانه، آرشیو)"
+              aria-label="عملیات"
+              aria-haspopup="true"
+              aria-expanded="false">
+              ⋮
+            </button>
+
+            <div id="siteOperationsMenu" class="operations-menu" role="menu"></div>
+          </div>
 
           <button
             id="siteSearchScopeToggle"
@@ -6391,6 +6461,210 @@
       }
     }
 
+    let operationsMenuReflowHandler = null;
+
+    function renderOperationsMenu() {
+      const menu = document.getElementById("siteOperationsMenu");
+
+      if (!menu) {
+        return;
+      }
+
+      const selectedCount = selectedResultIndexes.size;
+      const hasResults = currentResults.length > 0;
+      const hasSelection = selectedCount > 0;
+      const archiveCount = loadArchive().length;
+      const bookmarksCount = loadBookmarks().length;
+
+      menu.innerHTML = `
+        <button type="button" class="operations-menu-btn" id="siteMenuSelectAll" title="انتخاب همهٔ نتایج فعلی جست‌وجو (تمام صفحه‌ها)، برای کپی/آرشیو/خروجی گرفتن گروهی از آن‌ها" ${hasResults ? "" : "disabled"}>انتخاب همهٔ نتایج</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuClearSelection" title="برداشتن علامت انتخاب از تمام نتایجی که تاکنون انتخاب کرده‌اید" ${hasSelection ? "" : "disabled"}>حذف انتخاب</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuRemoveSelected" title="پاک‌کردن موارد انتخاب‌شده از فهرست نتایج (فقط از این فهرست)" ${hasSelection ? "" : "disabled"}>حذف موارد انتخاب‌شده${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuCopySelected" title="کپی متن موارد انتخاب‌شده در حافظه؛ با پیست‌کردن، لینک منبع هم همراه متن اضافه می‌شود" ${hasSelection ? "" : "disabled"}>کپی</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuExportText" title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره" ${hasSelection ? "" : "disabled"}>Text</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuExportWord" title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره" ${hasSelection ? "" : "disabled"}>Word</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuExportPdf" title="دریافت موارد انتخاب‌شده به‌صورت یک فایل PDF قابل ذخیره" ${hasSelection ? "" : "disabled"}>PDF</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuAddToBookmarks" title="افزودن موارد انتخاب‌شده به نشانه‌ها همراه با برچسب دلخواه" ${hasSelection ? "" : "disabled"}>افزودن به نشانه${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuOpenBookmarks" title="باز کردن نشانه‌هایی که تاکنون در نتایج جست‌وجو یا کادر داخل‌صفحه ذخیره کرده‌اید">مشاهدهٔ نشانه‌ها${bookmarksCount > 0 ? `<span class="operations-menu-badge">${bookmarksCount}</span>` : ""}</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuAddToArchive" title="افزودن موارد انتخاب‌شده به آرشیو، برای مراجعه و استفاده بعدی" ${hasSelection ? "" : "disabled"}>افزودن به آرشیو${hasSelection ? `<span class="operations-menu-badge">${selectedCount}</span>` : ""}</button>
+        <button type="button" class="operations-menu-btn" id="siteMenuOpenArchive" title="باز کردن آرشیوی که پیش‌تر نتایج جست‌وجو را در آن ذخیره کرده‌اید">آرشیو${archiveCount > 0 ? `<span class="operations-menu-badge">${archiveCount}</span>` : ""}</button>
+      `;
+
+      const bind = (id, handler) => {
+        const el = menu.querySelector(`#${id}`);
+        if (el) el.addEventListener("click", handler);
+      };
+
+      bind("siteMenuSelectAll", () => {
+        currentResults.forEach((_, index) => selectedResultIndexes.add(index));
+        syncCheckboxStates();
+        updateCopyButtonState();
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuClearSelection", () => {
+        selectedResultIndexes.clear();
+        syncCheckboxStates();
+        updateCopyButtonState();
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuRemoveSelected", () => {
+        removeSelectedResults();
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuOpenArchive", () => {
+        openArchivePanel();
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuAddToArchive", () => {
+        addSelectedToArchive();
+        renderOperationsMenu();
+      });
+
+      bind("siteMenuOpenBookmarks", () => {
+        openBookmarksPanel();
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuAddToBookmarks", event => {
+        if (event) {
+          event.stopPropagation();
+        }
+
+        const toggle = document.getElementById("siteOperationsToggle");
+        openBookmarkTagPopover(toggle ? toggle.getBoundingClientRect() : null);
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuCopySelected", () => {
+        handleCopySelectedResults();
+      });
+
+      bind("siteMenuExportText", () => {
+        exportSelectedAsText();
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuExportWord", () => {
+        exportSelectedAsWord();
+        closeOperationsMenu();
+      });
+
+      bind("siteMenuExportPdf", () => {
+        exportSelectedAsPdf();
+        closeOperationsMenu();
+      });
+    }
+
+    function positionOperationsMenu() {
+      const menu = document.getElementById("siteOperationsMenu");
+      const toggle = document.getElementById("siteOperationsToggle");
+      const row = document.querySelector(".search-toolbar");
+
+      if (!menu || !toggle || !row || !menu.classList.contains("is-open")) {
+        return;
+      }
+
+      const GAP = 6;
+      const EDGE_MARGIN = 8;
+      const MIN_USABLE = 200;
+
+      const toggleRect = toggle.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - toggleRect.bottom - GAP - EDGE_MARGIN;
+      const spaceAbove = toggleRect.top - GAP - EDGE_MARGIN;
+      const openUpward = spaceBelow < MIN_USABLE && spaceAbove > spaceBelow;
+
+      // آیتم جدید: شروع این پنل باید با شروع خودِ ردیف (کادر جستجو) یکی
+      // باشه - نه فقط زیر خودِ دکمهٔ ⋮ - و عرضش هم به‌اندازهٔ کل ردیفه،
+      // تا بیشترین فضای ممکن برای یک‌خط‌شدن دکمه‌ها فراهم باشه.
+      menu.style.width = rowRect.width + "px";
+      let left = rowRect.right - menu.offsetWidth;
+      left = Math.max(EDGE_MARGIN, Math.min(left, window.innerWidth - menu.offsetWidth - EDGE_MARGIN));
+      menu.style.left = left + "px";
+
+      if (openUpward) {
+        menu.style.top = "auto";
+        menu.style.bottom = (window.innerHeight - toggleRect.top + GAP) + "px";
+      } else {
+        menu.style.top = (toggleRect.bottom + GAP) + "px";
+        menu.style.bottom = "auto";
+      }
+
+      const available = Math.max(openUpward ? spaceAbove : spaceBelow, MIN_USABLE);
+      menu.style.maxHeight = Math.min(available, window.innerHeight * 0.7) + "px";
+    }
+
+    function openOperationsMenu() {
+      renderOperationsMenu();
+
+      const menu = document.getElementById("siteOperationsMenu");
+      const toggle = document.getElementById("siteOperationsToggle");
+
+      if (menu) menu.classList.add("is-open");
+      if (toggle) toggle.setAttribute("aria-expanded", "true");
+
+      positionOperationsMenu();
+
+      if (!operationsMenuReflowHandler) {
+        operationsMenuReflowHandler = () => positionOperationsMenu();
+        window.addEventListener("resize", operationsMenuReflowHandler);
+        window.addEventListener("scroll", operationsMenuReflowHandler, true);
+      }
+    }
+
+    function closeOperationsMenu() {
+      const menu = document.getElementById("siteOperationsMenu");
+      const toggle = document.getElementById("siteOperationsToggle");
+
+      if (menu) {
+        menu.classList.remove("is-open");
+        menu.style.maxHeight = "";
+        menu.style.left = "";
+        menu.style.top = "";
+        menu.style.bottom = "";
+        menu.style.width = "";
+      }
+
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+
+      if (operationsMenuReflowHandler) {
+        window.removeEventListener("resize", operationsMenuReflowHandler);
+        window.removeEventListener("scroll", operationsMenuReflowHandler, true);
+        operationsMenuReflowHandler = null;
+      }
+    }
+
+    const siteOperationsToggle = document.getElementById("siteOperationsToggle");
+    if (siteOperationsToggle) {
+      siteOperationsToggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const menu = document.getElementById("siteOperationsMenu");
+        const isOpen = menu && menu.classList.contains("is-open");
+        if (isOpen) {
+          closeOperationsMenu();
+        } else {
+          closeSettingsMenu();
+          openOperationsMenu();
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        const menu = document.getElementById("siteOperationsMenu");
+        if (
+          menu &&
+          menu.classList.contains("is-open") &&
+          !menu.contains(event.target) &&
+          event.target !== siteOperationsToggle
+        ) {
+          closeOperationsMenu();
+        }
+      });
+    }
+
     function removeSelectedResults() {
       const selectedObjects = new Set(getSelectedResultsInOrder());
 
@@ -6416,113 +6690,7 @@
         return;
       }
 
-      const selectedCount = selectedResultIndexes.size;
-      const hasResults = currentResults.length > 0;
-      const hasSelection = selectedCount > 0;
-      const archiveCount = loadArchive().length;
-      const bookmarksCount = loadBookmarks().length;
-
       menu.innerHTML = `
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuSelectAll"
-          title="انتخاب همهٔ نتایج فعلی جست‌وجو (تمام صفحه‌ها)، برای کپی/آرشیو/خروجی گرفتن گروهی از آن‌ها"
-          ${hasResults ? "" : "disabled"}>
-          <span>انتخاب همهٔ نتایج</span>
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuClearSelection"
-          title="برداشتن علامت انتخاب از تمام نتایجی که تاکنون انتخاب کرده‌اید"
-          ${hasSelection ? "" : "disabled"}>
-          <span>حذف انتخاب</span>
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuRemoveSelected"
-          title="پاک‌کردن موارد انتخاب‌شده از فهرست نتایج (فقط از این فهرست)"
-          ${hasSelection ? "" : "disabled"}>
-          <span>حذف موارد انتخاب‌شده</span>
-          ${hasSelection ? `<span class="settings-badge">${selectedCount}</span>` : ""}
-        </button>
-
-        <div class="settings-separator"></div>
-
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuOpenArchive"
-          title="باز کردن آرشیوی که پیش‌تر نتایج جست‌وجو را در آن ذخیره کرده‌اید">
-          <span>آرشیو</span>
-          ${archiveCount > 0 ? `<span class="settings-badge">${archiveCount}</span>` : ""}
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuAddToArchive"
-          title="افزودن موارد انتخاب‌شده به آرشیو، برای مراجعه و استفاده بعدی"
-          ${hasSelection ? "" : "disabled"}>
-          <span>افزودن به آرشیو</span>
-          ${hasSelection ? `<span class="settings-badge">${selectedCount}</span>` : ""}
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuOpenBookmarks"
-          title="باز کردن نشانه‌هایی که تاکنون در نتایج جست‌وجو یا کادر داخل‌صفحه ذخیره کرده‌اید">
-          <span>نشانه‌ها</span>
-          ${bookmarksCount > 0 ? `<span class="settings-badge">${bookmarksCount}</span>` : ""}
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuAddToBookmarks"
-          title="افزودن موارد انتخاب‌شده به نشانه‌ها همراه با برچسب دلخواه"
-          ${hasSelection ? "" : "disabled"}>
-          <span>افزودن نشانه به انتخاب‌شده‌ها</span>
-          ${hasSelection ? `<span class="settings-badge">${selectedCount}</span>` : ""}
-        </button>
-
-        <div class="settings-separator"></div>
-
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuCopySelected"
-          title="کپی متن موارد انتخاب‌شده در حافظه؛ با پیست‌کردن، لینک منبع هم همراه متن اضافه می‌شود"
-          ${hasSelection ? "" : "disabled"}>
-          <span>کپی موارد انتخاب‌شده</span>
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuExportText"
-          title="دریافت موارد انتخاب‌شده به‌صورت یک فایل متنی ساده (txt.) قابل ذخیره"
-          ${hasSelection ? "" : "disabled"}>
-          <span>Text</span>
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuExportWord"
-          title="دریافت موارد انتخاب‌شده به‌صورت یک فایل ورد (doc.) قابل ذخیره"
-          ${hasSelection ? "" : "disabled"}>
-          <span>Word</span>
-        </button>
-        <button
-          type="button"
-          class="settings-item"
-          id="siteMenuExportPdf"
-          title="دریافت موارد انتخاب‌شده به‌صورت یک فایل PDF قابل ذخیره"
-          ${hasSelection ? "" : "disabled"}>
-          <span>PDF</span>
-        </button>
-
-        <div class="settings-separator"></div>
-
         <div class="settings-section-label">مرتب‌سازی نتایج</div>
         <label
           class="settings-radio"
@@ -6630,78 +6798,6 @@
           مقایسهٔ نتایج در کتاب‌های مختلف (کنار هم)
         </label>
       `;
-
-      const bind = (id, handler) => {
-        const el = menu.querySelector(`#${id}`);
-        if (el) el.addEventListener("click", handler);
-      };
-
-      bind("siteMenuSelectAll", () => {
-        currentResults.forEach((_, index) => selectedResultIndexes.add(index));
-        syncCheckboxStates();
-        updateCopyButtonState();
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuClearSelection", () => {
-        selectedResultIndexes.clear();
-        syncCheckboxStates();
-        updateCopyButtonState();
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuRemoveSelected", () => {
-        removeSelectedResults();
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuOpenArchive", () => {
-        openArchivePanel();
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuAddToArchive", () => {
-        addSelectedToArchive();
-        renderSettingsMenu();
-      });
-
-      bind("siteMenuOpenBookmarks", () => {
-        openBookmarksPanel();
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuAddToBookmarks", event => {
-        // Item جدید (رفع همون اشکالی که در in-page-search.js پیدا شد):
-        // بدون این خط، کلیک تا سطح document بابل می‌کرد و شنوندهٔ
-        // «کلیک بیرون از پاپ‌آور» فوراً در همون تیک، پاپ‌آوری که تازه
-        // باز شده بود را می‌بست.
-        if (event) {
-          event.stopPropagation();
-        }
-
-        const gear = document.getElementById("siteSettingsGear");
-        openBookmarkTagPopover(gear ? gear.getBoundingClientRect() : null);
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuCopySelected", () => {
-        handleCopySelectedResults();
-      });
-
-      bind("siteMenuExportText", () => {
-        exportSelectedAsText();
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuExportWord", () => {
-        exportSelectedAsWord();
-        closeSettingsMenu();
-      });
-
-      bind("siteMenuExportPdf", () => {
-        exportSelectedAsPdf();
-        closeSettingsMenu();
-      });
 
       menu.querySelectorAll('input[name="siteSortMode"]').forEach(radio => {
         radio.addEventListener("change", () => {
@@ -6883,6 +6979,7 @@
         if (menu && menu.classList.contains("is-open")) {
           closeSettingsMenu();
         } else {
+          closeOperationsMenu();
           openSettingsMenu();
         }
       });
