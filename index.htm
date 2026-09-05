@@ -1137,28 +1137,30 @@
     .ai-settings-gear-panel {
       position: absolute;
       top: 100%;
-      left: 0;
+      left: 20px;
       z-index: 21;
       margin-top: 6px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
       background: #fff;
       border: 1px solid #dbe3ee;
       border-radius: 10px;
       box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
       padding: 10px 12px;
-      min-width: 220px;
+      width: max-content;
       font-size: 0.85rem;
     }
 
     .ai-settings-gear-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       gap: 10px;
-      padding: 6px 0;
+      padding: 0 10px;
     }
 
     .ai-settings-gear-row + .ai-settings-gear-row {
-      border-top: 1px solid #e2e8f0;
+      border-right: 1px solid #e2e8f0;
     }
 
     .ai-zoom-controls {
@@ -2521,13 +2523,12 @@
               aria-expanded="false">
               ⚙️
             </button>
-          </div>
 
-          <div id="aiSettingsGearPanel" class="ai-settings-gear-panel" style="display:none;">
-            <div class="ai-settings-gear-row">
-              <span>بزرگ‌نمایی این تب</span>
-              <div class="ai-zoom-controls">
-                <button type="button" id="aiZoomOut" title="کوچک‌تر">－</button>
+            <div id="aiSettingsGearPanel" class="ai-settings-gear-panel" style="display:none;">
+              <div class="ai-settings-gear-row">
+                <span>بزرگ‌نمایی این تب</span>
+                <div class="ai-zoom-controls">
+                  <button type="button" id="aiZoomOut" title="کوچک‌تر">－</button>
                 <span id="aiZoomLevel">۱۰۰٪</span>
                 <button type="button" id="aiZoomIn" title="بزرگ‌تر">＋</button>
                 <button type="button" id="aiZoomReset" title="بازنشانی">↺</button>
@@ -2540,6 +2541,7 @@
                 <option value="book">بر اساس عنوان کتاب</option>
               </select>
             </div>
+          </div>
           </div>
 
           <div class="ai-search-results-dropdown" style="display:none;">
@@ -2612,7 +2614,7 @@
 
           <!-- بلوک سوم: حالت پاسخ‌دهی + هشدار -->
           <div class="ai-chat-bottom-block">
-            <span class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند؛ پیش از استناد، عبارات نقل‌شده را با مراجعه به مأخذ ذکرشده تطبیق دهید.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ با مأخذ تطبیق دهید.</span>
+            <span class="ai-chat-tabs-notice" title="پاسخ‌ها به‌صورت خودکار و بر پایهٔ متون آرشیو تولید می‌شوند و ممکن است خطا داشته باشند.">⚠️ پاسخ‌ها ممکن است خطا داشته باشند؛ لطفاً بررسی کنید.</span>
             <div class="ai-chat-mode-toggle" role="radiogroup" aria-label="حالت پاسخ‌دهی">
               <label>
                 <input type="radio" name="aiChatMode" value="grounded" checked>
@@ -2620,7 +2622,7 @@
               </label>
               <label>
                 <input type="radio" name="aiChatMode" value="general">
-                پاسخ بر اساس دانش عمومی
+                بر اساس دانش عمومی
               </label>
             </div>
           </div>

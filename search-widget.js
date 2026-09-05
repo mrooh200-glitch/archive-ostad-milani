@@ -536,6 +536,21 @@ function normalizeQuestionTextAi(text) {
 // Item جدید: خط «پاسخ از کتاب...» برای خروجی‌های گفتگو - هر کتاب یک‌بار،
 // با شماره صفحه‌اش کنارش (فقط اگه آن کتاب صفحه داشته باشه). این نسخه
 // فقط اسم کتاب‌ها رو برمی‌گردونه (برای متن ساده)؛ لینک‌ها جدا اضافه می‌شن.
+// Item جدید: وقتی خودِ متنِ پاسخ می‌گه چیزی تو منابع پیدا نشده (طبق
+// دستورالعملی که تو سیستم‌پرامپت Worker به Gemini دادیم)، نشون‌دادن
+// یه لیست منابع کنار همچین پاسخی گمراه‌کننده‌ست - چون اون تکه‌متن‌ها
+// واقعاً به سؤال ربطی نداشتن، فقط نزدیک‌ترین چیزی بودن که جست‌وجوی
+// معنایی پیدا کرده. این تابع چند الگوی رایج «یافت نشد» رو تشخیص می‌ده.
+function answerIndicatesNotFoundAi(answerText) {
+  const patterns = [
+    /یافت\s*نشد/,
+    /پیدا\s*نشد/,
+    /موجود\s*نیست/,
+    /اطلاعاتی\s*(در|درباره).*(نیست|ندار)/,
+  ];
+  return patterns.some((pattern) => pattern.test(answerText || ""));
+}
+
 function formatSourcesInfoLineAi(sourcesInfo) {
   if (!Array.isArray(sourcesInfo) || sourcesInfo.length === 0) return "";
   return sourcesInfo
@@ -1432,7 +1447,10 @@ document.addEventListener("DOMContentLoaded", () => {
       renderChatTurns();
       aiChatOutput.insertAdjacentHTML(
         "afterbegin",
-        `<div class="ai-chat-pending" id="aiChatPending-${myToken}">در حال بررسی و تنظیم پاسخ…</div>`
+        `<div class="ai-chat-turn" id="aiChatPending-${myToken}">
+          <div class="ai-chat-bubble ai-chat-bubble-user">${question}</div>
+          <div class="ai-chat-bubble ai-chat-bubble-assistant ai-chat-pending">در حال بررسی و تنظیم پاسخ…</div>
+        </div>`
       );
       aiChatOutput.scrollTop = 0;
 
@@ -1464,9 +1482,14 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         });
 
-        const sourceLinksHtml = sourcesInfo
-          .map((s) => `<a href="${s.url}" target="_blank" rel="noopener">${s.book}</a>`)
-          .join("، ");
+        // Item جدید: اگه پاسخ خودش می‌گه چیزی تو منابع یافت نشده، خط
+        // «منابع» اصلاً ساخته نمی‌شه (خالی می‌مونه، و طبق رفع قبلی،
+        // خط منابع وقتی خالیه اصلاً نمایش داده نمی‌شه).
+        const sourceLinksHtml = answerIndicatesNotFoundAi(answer)
+          ? ""
+          : sourcesInfo
+              .map((s) => `<a href="${s.url}" target="_blank" rel="noopener">${s.book}</a>`)
+              .join("، ");
 
         chatTurns.push({
           question,
@@ -1478,10 +1501,12 @@ document.addEventListener("DOMContentLoaded", () => {
         renderChatTurns();
       } catch (err) {
         if (myToken !== chatToken) return;
-        const pendingEl = document.getElementById(`aiChatPending-${myToken}`);
+        const pendingTurnEl = document.getElementById(`aiChatPending-${myToken}`);
+        const pendingEl = pendingTurnEl ? pendingTurnEl.querySelector(".ai-chat-pending") : null;
         const message = err.message || "در دریافت پاسخ خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
         if (pendingEl) {
           pendingEl.textContent = message;
+          pendingEl.classList.add("ai-chat-error");
         } else {
           aiChatOutput.insertAdjacentHTML("afterbegin", `<div class="ai-chat-error">${message}</div>`);
         }
