@@ -1066,7 +1066,7 @@
         id="inPageSelectionTagInput"
         name="bookmarkTagInput"
         autocomplete="on"
-        placeholder="برچسب (اختیاری، با کاما جدا کنید)">
+        placeholder="برچسب (اختیاری، با ویرگول جدا کنید)">
       <div class="in-page-selection-tag-popover-actions">
         <button type="submit" id="inPageSelectionTagSave">ذخیره</button>
         <button type="button" id="inPageSelectionTagCancel">انصراف</button>
