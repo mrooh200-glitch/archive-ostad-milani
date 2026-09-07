@@ -6753,12 +6753,41 @@
     }
   }
 
+  // Item جدید: وقتی کاربر فایل html کتاب را دانلود کرده و مستقیم در
+  // مرورگر خودش باز می‌کند (پروتکل file://)، پایین صفحه نام سایت +
+  // لینک را نشان بده. وقتی همین فایل از طریق خود سایت باز می‌شود
+  // (پروتکل https:، چه در تب جدید و چه داخل iframeِ «مطالعه تطبیقی»)،
+  // این بخش اصلاً اضافه نمی‌شود.
+  function showSiteCreditIfOpenedLocally() {
+    if (window.location.protocol !== "file:") {
+      return;
+    }
+
+    const credit = document.createElement("div");
+    credit.id = "site-credit";
+    credit.style.cssText =
+      "text-align:center;margin-top:24px;padding:14px 0;border-top:1px solid #ccc;" +
+      "direction:rtl;font-family:Tahoma, Scheherazade, sans-serif;font-size:13pt;";
+
+    const link = document.createElement("a");
+    link.href = "https://mrooh200-glitch.github.io/archive-ostad-milani/";
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.style.cssText = "text-decoration:none;color:#2e5c3e;";
+    link.textContent = "پایگاه علمی‌پژوهشی استاد میلانی";
+
+    credit.appendChild(link);
+    document.body.appendChild(credit);
+  }
+
   function initialize() {
     // Item 5: make the browser tab (and the window/history entry)
     // show the Persian/Arabic title of this book instead of falling
     // back to the raw URL, which is what a page with no <title> text
     // shows in the tab.
     document.title = getPageTitle();
+
+    showSiteCreditIfOpenedLocally();
 
     // Item جدید: باید قبل از createSearchBox() اجرا شود - وگرنه خودِ
     // کادر جست‌وجو هم داخل wrapper گیر می‌افتد و دوباره تحت تأثیر zoom
