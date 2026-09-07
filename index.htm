@@ -3092,6 +3092,7 @@
         const zip = new JSZip();
         const usedNames = new Set();
         let failedCount = 0;
+        let hasHtmlFile = false;
 
         for (const url of urls) {
           const item = searchableItems.find(el => {
@@ -3124,9 +3125,30 @@
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const blob = await res.blob();
             zip.file(uniqueName, blob);
+            if (!isPdf) {
+              hasHtmlFile = true;
+            }
           } catch (fileError) {
             failedCount++;
             console.error(`دانلود «${uniqueName}» برای بسته‌بندی زیپ ناموفق بود:`, fileError);
+          }
+        }
+
+        // Item جدید (اسکریپت همراه در دانلود): فایل‌های htm کتاب‌ها به
+        // in-page-search.js وابسته‌اند (جست‌وجوی داخل متن، حالت شب،
+        // نشانک‌گذاری، و نمایش نام سایت هنگام باز شدن مستقل). بدون آن،
+        // این تگ در فایل دانلودشده به یک فایل ناموجود اشاره می‌کند.
+        // پس یک نسخه از آن را - فقط یک‌بار، صرف‌نظر از تعداد کتاب‌های
+        // انتخاب‌شده - کنار فایل‌های htm داخل همان zip قرار می‌دهیم.
+        if (hasHtmlFile) {
+          try {
+            const scriptRes = await fetch("in-page-search.js");
+            if (scriptRes.ok) {
+              const scriptBlob = await scriptRes.blob();
+              zip.file("in-page-search.js", scriptBlob);
+            }
+          } catch (scriptError) {
+            console.error("دانلود in-page-search.js برای بسته‌بندی زیپ ناموفق بود:", scriptError);
           }
         }
 
