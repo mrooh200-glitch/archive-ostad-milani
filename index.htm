@@ -730,7 +730,7 @@
          (روی .panel-scroll-area تنظیم می‌شود) دقیقاً ارتفاع هدر/فیلتر
          بالای فهرست است، تا این تب‌ها درست زیر آن‌ها بچسبند. */
       position: sticky;
-      top: var(--bookmark-sticky-offset, 0px);
+      top: var(--bookmark-sticky-offset, 48px);
       z-index: 3;
       background: #ffffff;
     }
@@ -4510,22 +4510,31 @@
         </div>
       `;
 
-      // Item ۲۴ (رفع باگ: تب‌های عنوان کتاب نصفه/روی هدر افتاده بودند):
-      // اندازه‌گیریِ ارتفاع هدر بلافاصله بعد از innerHTML گاهی زودتر از
-      // تثبیت نهاییِ چیدمان مرورگر اجرا می‌شد (مخصوصاً وقتی هدر چند خط
-      // می‌شد) و عدد نادرست/صفر می‌داد - یعنی تب عنوان به‌جای چسبیدن زیر
-      // هدر، دقیقاً روی آن (top:0) می‌چسبید و هر دو نصفه به‌نظر می‌رسیدند.
-      // حالا اندازه‌گیری به فریم بعدی (بعد از تثبیت کامل چیدمان) موکول
-      // می‌شود.
+      // Item ۲۴ (رفع باگ: تب‌های عنوان کتاب اصلاً ثابت نمی‌شدند): تلاش‌های
+      // قبلی، ارتفاع هدر را فقط یک‌بار (بلافاصله بعد یا یک فریم بعد از
+      // innerHTML) اندازه می‌گرفتند - و ظاهراً همان اندازه‌گیریِ زودهنگام،
+      // در برخی حالت‌ها هنوز عدد درستی نمی‌داد؛ نتیجه این بود که تب عنوان
+      // با top:0 (پشت خودِ هدر) می‌چسبید و اصلاً دیده نمی‌شد - انگار اصلاً
+      // ثابت نشده. راه‌حل قطعی: به‌جای اندازه‌گیری فقط در لحظهٔ رندر،
+      // ارتفاع هدر هر بار که کاربر اسکرول می‌کند دوباره محاسبه و تنظیم
+      // می‌شود - در لحظهٔ اسکرول، چیدمان مرورگر همیشه صد‌درصد تثبیت‌شده
+      // است، پس این اندازه‌گیری هیچ‌وقت اشتباه نمی‌شود.
       const bmScrollArea = panel.querySelector(".panel-scroll-area");
       const bmHeaderEl = panel.querySelector(".archive-header");
-      requestAnimationFrame(() => {
+
+      function updateBookmarkStickyOffset() {
+        if (!bmScrollArea || !bmHeaderEl) return;
         const bmTagFilterEl = panel.querySelector(".bookmark-tag-filter");
-        if (bmScrollArea && bmHeaderEl) {
-          const stickyOffset = bmHeaderEl.offsetHeight + (bmTagFilterEl ? bmTagFilterEl.offsetHeight : 0);
-          bmScrollArea.style.setProperty("--bookmark-sticky-offset", `${stickyOffset}px`);
-        }
-      });
+        const stickyOffset = bmHeaderEl.offsetHeight + (bmTagFilterEl ? bmTagFilterEl.offsetHeight : 0);
+        bmScrollArea.style.setProperty("--bookmark-sticky-offset", `${stickyOffset}px`);
+      }
+
+      updateBookmarkStickyOffset();
+      requestAnimationFrame(updateBookmarkStickyOffset);
+
+      if (bmScrollArea) {
+        bmScrollArea.addEventListener("scroll", updateBookmarkStickyOffset, { passive: true });
+      }
 
       const clearButton = panel.querySelector("#bookmarksClearButton");
       if (clearButton) {
