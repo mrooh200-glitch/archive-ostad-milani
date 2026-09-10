@@ -725,14 +725,18 @@
       color: #94a3b8;
       font-size: 0.72rem;
       font-weight: bold;
-      /* آیتم ۲۴: تب‌های عنوان (نام کتاب) باید مثل تب‌های بالای بلوک،
-         موقع اسکرول ثابت بمانند - not شناور شوند. --bookmark-sticky-offset
-         (روی .panel-scroll-area تنظیم می‌شود) دقیقاً ارتفاع هدر/فیلتر
-         بالای فهرست است، تا این تب‌ها درست زیر آن‌ها بچسبند. */
-      position: sticky;
-      top: var(--bookmark-sticky-offset, 48px);
-      z-index: 3;
-      background: #ffffff;
+    }
+
+    /* آیتم ۲۴ (رفع نهایی): بعد از چند تلاش ناموفق با position:sticky
+       دو‌سطحی (که ظاهراً به‌خاطر تعامل غیرقابل‌پیش‌بینی مرورگر با
+       overflow/سلسله‌مراتب کار نمی‌کرد)، رویکرد را عوض کردیم - به‌جای
+       این‌که خودِ تب عنوان کتاب را sticky کنیم، نام کتابِ جاری را داخل
+       خودِ هدر (که قبلاً و همیشه به‌درستی ثابت بوده) نشان می‌دهیم. این
+       دیگر به هیچ مکانیزم sticky جدیدی متکی نیست. */
+    .bookmark-current-group-label {
+      font-weight: normal;
+      color: #64748b;
+      font-size: 0.85em;
     }
 
     .bookmark-group-tag {
@@ -4483,7 +4487,7 @@
         <button type="button" class="panel-close-x" id="bookmarksCloseButton" title="بستن" aria-label="بستن">×</button>
         <div class="panel-scroll-area">
           <div class="archive-header">
-            <span>نشانه‌ها (${all.length})</span>
+            <span>نشانه‌ها (${all.length})<span class="bookmark-current-group-label" id="bookmarksCurrentGroupLabel"></span></span>
             <div class="archive-header-actions">
               <button
                 type="button"
@@ -4510,30 +4514,54 @@
         </div>
       `;
 
-      // Item ۲۴ (رفع باگ: تب‌های عنوان کتاب اصلاً ثابت نمی‌شدند): تلاش‌های
-      // قبلی، ارتفاع هدر را فقط یک‌بار (بلافاصله بعد یا یک فریم بعد از
-      // innerHTML) اندازه می‌گرفتند - و ظاهراً همان اندازه‌گیریِ زودهنگام،
-      // در برخی حالت‌ها هنوز عدد درستی نمی‌داد؛ نتیجه این بود که تب عنوان
-      // با top:0 (پشت خودِ هدر) می‌چسبید و اصلاً دیده نمی‌شد - انگار اصلاً
-      // ثابت نشده. راه‌حل قطعی: به‌جای اندازه‌گیری فقط در لحظهٔ رندر،
-      // ارتفاع هدر هر بار که کاربر اسکرول می‌کند دوباره محاسبه و تنظیم
-      // می‌شود - در لحظهٔ اسکرول، چیدمان مرورگر همیشه صد‌درصد تثبیت‌شده
-      // است، پس این اندازه‌گیری هیچ‌وقت اشتباه نمی‌شود.
+      // Item ۲۴ (رفع نهایی: تب‌های عنوان کتاب هیچ‌وقت واقعاً sticky
+      // نمی‌شدند - بعد از چند تلاش با position:sticky دوسطحی که هربار
+      // شکست خورد): این‌بار به‌جای sticky-کردن خودِ تب عنوان، نام کتابِ
+      // جاری را داخل خودِ هدر (که قبلاً و همیشه درست ثابت بوده، خودتان
+      // هم تأیید کردید) نشان می‌دهیم. با هر بار اسکرول، آخرین
+      // «.bookmark-group-book» که از زیر هدر رد شده را پیدا می‌کنیم و
+      // نامش را در برچسب داخل هدر می‌نویسیم - دیگر به هیچ sticky جدیدی
+      // متکی نیست، فقط از همون هدرِ ثابتِ موجود استفاده می‌کند.
       const bmScrollArea = panel.querySelector(".panel-scroll-area");
       const bmHeaderEl = panel.querySelector(".archive-header");
+      const bmGroupLabel = panel.querySelector("#bookmarksCurrentGroupLabel");
 
-      function updateBookmarkStickyOffset() {
-        if (!bmScrollArea || !bmHeaderEl) return;
-        const bmTagFilterEl = panel.querySelector(".bookmark-tag-filter");
-        const stickyOffset = bmHeaderEl.offsetHeight + (bmTagFilterEl ? bmTagFilterEl.offsetHeight : 0);
-        bmScrollArea.style.setProperty("--bookmark-sticky-offset", `${stickyOffset}px`);
+      function updateBookmarkCurrentGroupLabel() {
+        if (!bmScrollArea || !bmHeaderEl || !bmGroupLabel) return;
+
+        const headerBottom = bmHeaderEl.getBoundingClientRect().bottom;
+
+        // Item جدید (تکمیل مورد ۲۴): وقتی از یک کتاب، چند برچسب/تگ جدا
+        // (مثل «ب» و «ج») ساخته شده، این‌ها به‌صورت زیرعنوان‌های جداگانه
+        // (bookmark-group-tag) زیرِ همون عنوان کتاب (bookmark-group-book)
+        // می‌آیند. با هر اسکرول، هم آخرین عنوان کتاب و هم آخرین زیرعنوانِ
+        // برچسبِ همون کتاب (که با رسیدن به یک عنوان کتابِ جدید دوباره از
+        // صفر شروع می‌شود) را پیدا می‌کنیم، تا برچسب هدر دقیقاً هر دو
+        // سطح را نشان دهد.
+        const groupEls = panel.querySelectorAll(".bookmark-group-book, .bookmark-group-tag");
+        let currentBook = "";
+        let currentTag = "";
+
+        groupEls.forEach(el => {
+          if (el.getBoundingClientRect().top <= headerBottom + 1) {
+            if (el.classList.contains("bookmark-group-book")) {
+              currentBook = el.textContent;
+              currentTag = "";
+            } else {
+              currentTag = el.textContent;
+            }
+          }
+        });
+
+        bmGroupLabel.textContent = currentBook
+          ? ` — ${currentBook}${currentTag ? ` / ${currentTag}` : ""}`
+          : "";
       }
 
-      updateBookmarkStickyOffset();
-      requestAnimationFrame(updateBookmarkStickyOffset);
+      updateBookmarkCurrentGroupLabel();
 
       if (bmScrollArea) {
-        bmScrollArea.addEventListener("scroll", updateBookmarkStickyOffset, { passive: true });
+        bmScrollArea.addEventListener("scroll", updateBookmarkCurrentGroupLabel, { passive: true });
       }
 
       const clearButton = panel.querySelector("#bookmarksClearButton");
