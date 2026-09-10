@@ -2279,19 +2279,6 @@
                 </a>
               </li>
 
-              <li
-                class="searchable-item"
-                data-title="عرفان و تصوف در تشیع"
-                data-url="Erfan_va_Tasavvof_dar_Tashayyo.htm">
-                <a
-                  class="html-link"
-                  href="Erfan_va_Tasavvof_dar_Tashayyo.htm"
-                  target="_blank"
-                  rel="noopener">
-                  عرفان و تصوف در تشیع
-                </a>
-              </li>
-
             </ul>
           </div>
         </div>
@@ -2312,20 +2299,6 @@
                   target="_blank"
                   rel="noopener">
                   معرفة الله تعالی بالله
-                </a>
-              </li>
-
-              <li
-                class="searchable-item"
-                data-title="عرفان و تصوف در تشیع"
-                data-url="Erfan_va_Tasavvof_dar_Tashayyo.pdf"
-                data-pdf="true">
-                <a
-                  class="pdf-link"
-                  href="Erfan_va_Tasavvof_dar_Tashayyo.pdf"
-                  target="_blank"
-                  rel="noopener">
-                  عرفان و تصوف در تشیع
                 </a>
               </li>
             </ul>
@@ -4091,6 +4064,37 @@
     // جست‌وجوی کلمه‌ای همین صفحه) یکسان نمایش داده بشن.
     const BOOKMARK_NO_TAG_LABEL = "بدون برچسب";
 
+    // Item جدید (رفع باگ ۶: وقتی هوش به چند آدرس مستند می‌کرد، نشانهٔ
+    // ساخته‌شده فقط اولین آدرس رو نگه می‌داشت): item.sourcesInfo (اگه
+    // وجود داشته باشه - یعنی این نشانه از یک تبادل گفتگو ساخته شده)
+    // همهٔ آدرس‌های واقعی رو داره؛ این تابع برای هرکدوم یک لینک
+    // جداگانه با برچسب «کتاب (صفحهٔ N)» می‌سازه - هم‌ارز
+    // formatSourcesInfoHtmlAi در search-widget.js، اما به شکل دکمه‌های
+    // مجزا در ردیف عملیات (به‌جای یک لینک متنی داخل عنوان).
+    function bookmarkSourceLinksHtml(item) {
+      const sourcesInfo = Array.isArray(item.sourcesInfo) ? item.sourcesInfo : null;
+
+      if (!sourcesInfo || sourcesInfo.length === 0) {
+        return item.hasRealSource === false
+          ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
+          : `<a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">بازکردن</a>`;
+      }
+
+      const links = [];
+      sourcesInfo.forEach(source => {
+        const entries = source.entries && source.entries.length ? source.entries : [{ page: null, url: source.url }];
+        entries.forEach((entry, i) => {
+          if (!entry.url) return;
+          const label = entries.length > 1
+            ? `${source.book} (${entry.page ? `ص ${entry.page}` : `بخش ${i + 1}`})`
+            : source.book;
+          links.push(`<a href="${escapeHtml(entry.url)}" target="_blank" rel="noopener">${escapeHtml(label)}</a>`);
+        });
+      });
+
+      return links.length > 0 ? links.join("") : `<span class="archive-item-nolink">بازکردن</span>`;
+    }
+
     function compareFa(a, b) {
       return (a || "").localeCompare(b || "", "fa");
     }
@@ -4422,9 +4426,7 @@
                     ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(String(item.page))}</span>` : ""}
                     <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
                     <div class="archive-item-actions">
-                      ${item.hasRealSource === false
-                        ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
-                        : `<a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">بازکردن</a>`}
+                      ${bookmarkSourceLinksHtml(item)}
                       <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
                         حذف
                       </button>

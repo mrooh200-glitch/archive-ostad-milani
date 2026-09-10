@@ -6730,27 +6730,54 @@
       return;
     }
 
-    input.value = incomingQuery;
-
     if (rootToggle && params.get("root") === "1") {
       rootToggle.checked = true;
       updateDerivativesToggleVisibility();
     }
 
-    performSearch();
-
-    // Land on the exact occurrence the link pointed at, if it can be
-    // found among this file's matches; otherwise leave performSearch's
-    // default of match #1.
+    // Item جدید (رفع باگ ۵: بازکردن یک نشانه/نتیجه، کل فایل و کادر
+    // جست‌وجو را رنگی می‌کرد): این تابع تا این‌جا دقیقاً مثل یک
+    // جست‌وجوی دستیِ کاربر عمل می‌کرد - کادر جست‌وجو را با عبارتِ
+    // لنگر (۶ کلمهٔ اول متن) پر می‌کرد و performSearch را صدا
+    // می‌زد؛ performSearch هم *همهٔ* رخدادهای آن عبارت را در کل فایل
+    // هایلایت می‌کند. برای عبارت‌های تکراری/فرمولی (مثل آغاز مشترکِ
+    // چند روایت - «قال ابوعبدالله علیه‌السلام» و مانند آن)، این یعنی
+    // ده‌ها جای فایل هم‌زمان رنگی می‌شدند، در حالی که کاربر فقط
+    // می‌خواست به همان یک تکهٔ مشخص برسد. راه‌حل: به‌جای پرکردن کادر
+    // و اجرای یک جست‌وجوی کامل روی کل فایل، فقط همان یک رخداد مشخص
+    // (بر اساس frag/occ) پیدا و هایلایت می‌شود؛ کادر جست‌وجو دست‌نخورده
+    // (خالی) می‌ماند تا اگر کاربر بعداً خودش چیزی جست‌وجو کرد، تحت
+    // تأثیر این ورود خودکار قرار نگیرد.
+    const allMatchesForTarget = highlightMatches(incomingQuery);
     const targetIndex = findMatchIndexForFragment(
       getTextFragmentFromHash(),
       getOccurrenceFromUrl()
     );
 
-    if (targetIndex !== -1) {
-      // تأخیر کوتاه برای اطمینان از تکمیل رندر و جلوگیری از تداخل با اسکرول مرورگر
-      setTimeout(() => showMatch(targetIndex), 0);
+    if (targetIndex === -1) {
+      // نتونستیم رخداد دقیق رو پیدا کنیم - رفتار قدیمی (پرکردن کادر
+      // و جست‌وجوی کامل) به‌عنوان جایگزین امن، تا کاربر دست‌کم به یک
+      // نتیجه برسد.
+      removeHighlights();
+      input.value = incomingQuery;
+      performSearch();
+      return;
     }
+
+    // فقط همون رخداد هدف، به‌عنوان نتیجهٔ زنده نگه داشته می‌شه - بقیهٔ
+    // رخدادها (که فقط برای پیداکردن رخداد هدف لازم بودند) به متن ساده
+    // برمی‌گردند تا رنگی نمونند.
+    allMatchesForTarget.forEach((mark, index) => {
+      if (index !== targetIndex) {
+        unwrapMatch(mark);
+      }
+    });
+
+    matches = [allMatchesForTarget[targetIndex]];
+    updateButtons();
+
+    // تأخیر کوتاه برای اطمینان از تکمیل رندر و جلوگیری از تداخل با اسکرول مرورگر
+    setTimeout(() => showMatch(0), 0);
   }
 
   // Item جدید: وقتی کاربر فایل html کتاب را دانلود کرده و مستقیم در

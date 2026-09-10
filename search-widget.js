@@ -576,6 +576,20 @@ function removeChatConversationAi(id) {
   renderChatArchivePanelAi();
 }
 
+// Item جدید (رفع باگ ۱: انتخاب همه/لغو انتخاب/حذف موارد انتخاب‌شده در
+// آرشیو گفتگوها فعال نبود): هم‌ساختار با selectedBookmarkIds در
+// index.htm - کدام گفتگوهای آرشیوشده با چک‌باکس علامت خورده‌اند.
+const chatArchiveSelectedIds = new Set();
+
+function removeSelectedChatConversationsAi() {
+  if (chatArchiveSelectedIds.size === 0) return;
+  saveChatArchiveAi(
+    loadChatArchiveAi().filter((c) => !chatArchiveSelectedIds.has(c.id))
+  );
+  chatArchiveSelectedIds.clear();
+  renderChatArchivePanelAi();
+}
+
 // Item جدید: هر گفتگوی آرشیوشده، دقیقاً با همون قالب سؤال/پاسخ‌ازکتاب
 // که برای خروجی تک‌تبادلی ساختیم رندر می‌شه - فقط پشت‌سرهم، برای همهٔ
 // تبادل‌های همون گفتگو.
@@ -584,6 +598,16 @@ function renderChatArchivePanelAi() {
   if (!panel) return;
 
   const conversations = loadChatArchiveAi().slice().reverse();
+
+  // Item جدید (رفع باگ ۱): گفتگویی که حذف شده دیگه تو
+  // chatArchiveSelectedIds نمی‌مونه.
+  Array.from(chatArchiveSelectedIds).forEach((id) => {
+    if (!conversations.some((c) => c.id === id)) {
+      chatArchiveSelectedIds.delete(id);
+    }
+  });
+
+  const hasSelection = chatArchiveSelectedIds.size > 0;
 
   const listHtml = conversations.length === 0
     ? `<p class="archive-empty">هنوز گفتگویی در آرشیو ذخیره نشده است.</p>`
@@ -605,11 +629,21 @@ function renderChatArchivePanelAi() {
 
           return `
             <div class="archive-item">
-              <div class="archive-item-title">${headerSources || "کتاب‌های نامشخص"}</div>
-              ${turnsHtml}
-              <div class="archive-item-actions">
-                <button type="button" data-chat-archive-continue="${escapeHtmlAi(conv.id)}">ادامهٔ گفتگو</button>
-                <button type="button" data-chat-archive-id="${escapeHtmlAi(conv.id)}">حذف</button>
+              <div class="bookmark-item-row">
+                <input
+                  type="checkbox"
+                  class="in-page-bookmark-checkbox"
+                  data-chat-archive-select="${escapeHtmlAi(conv.id)}"
+                  ${chatArchiveSelectedIds.has(conv.id) ? "checked" : ""}
+                  aria-label="انتخاب این گفتگو">
+                <div class="bookmark-item-content">
+                  <div class="archive-item-title">${headerSources || "کتاب‌های نامشخص"}</div>
+                  ${turnsHtml}
+                  <div class="archive-item-actions">
+                    <button type="button" data-chat-archive-continue="${escapeHtmlAi(conv.id)}">ادامهٔ گفتگو</button>
+                    <button type="button" data-chat-archive-id="${escapeHtmlAi(conv.id)}">حذف</button>
+                  </div>
+                </div>
               </div>
             </div>
           `;
@@ -620,6 +654,26 @@ function renderChatArchivePanelAi() {
     <button type="button" class="panel-close-x" id="aiChatArchiveClose" title="بستن" aria-label="بستن">×</button>
     <div class="archive-header">
       <span>آرشیو گفتگوها (${conversations.length})</span>
+      <div class="archive-header-actions">
+        <button
+          type="button"
+          id="aiChatArchiveSelectAll"
+          title="انتخاب تمام گفتگوهای این فهرست"
+          ${conversations.length === 0 ? "disabled" : ""}>انتخاب همه</button>
+        <button
+          type="button"
+          id="aiChatArchiveClearSelection"
+          title="لغو انتخاب تمام گفتگوهایی که انتخاب کرده‌اید"
+          ${hasSelection ? "" : "disabled"}>
+          لغو انتخاب
+          ${hasSelection ? `<span class="bookmark-selection-badge">(${chatArchiveSelectedIds.size})</span>` : ""}
+        </button>
+        <button
+          type="button"
+          id="aiChatArchiveDeleteSelected"
+          title="حذف فقط گفتگوهای انتخاب‌شده"
+          ${hasSelection ? "" : "disabled"}>حذف موارد انتخاب‌شده</button>
+      </div>
     </div>
     ${listHtml}
   `;
@@ -628,6 +682,42 @@ function renderChatArchivePanelAi() {
   if (closeButton) {
     closeButton.addEventListener("click", closeChatArchivePanelAi);
   }
+
+  const selectAllButton = panel.querySelector("#aiChatArchiveSelectAll");
+  if (selectAllButton) {
+    selectAllButton.addEventListener("click", () => {
+      chatArchiveSelectedIds.clear();
+      conversations.forEach((conv) => chatArchiveSelectedIds.add(conv.id));
+      renderChatArchivePanelAi();
+    });
+  }
+
+  const clearSelectionButton = panel.querySelector("#aiChatArchiveClearSelection");
+  if (clearSelectionButton) {
+    clearSelectionButton.addEventListener("click", () => {
+      chatArchiveSelectedIds.clear();
+      renderChatArchivePanelAi();
+    });
+  }
+
+  const deleteSelectedButton = panel.querySelector("#aiChatArchiveDeleteSelected");
+  if (deleteSelectedButton) {
+    deleteSelectedButton.addEventListener("click", removeSelectedChatConversationsAi);
+  }
+
+  panel.querySelectorAll("[data-chat-archive-select]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const id = checkbox.dataset.chatArchiveSelect;
+
+      if (checkbox.checked) {
+        chatArchiveSelectedIds.add(id);
+      } else {
+        chatArchiveSelectedIds.delete(id);
+      }
+
+      renderChatArchivePanelAi();
+    });
+  });
 
   panel.querySelectorAll("[data-chat-archive-id]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -644,9 +734,21 @@ function renderChatArchivePanelAi() {
       const conversation = loadChatArchiveAi().find((c) => c.id === id);
       if (!conversation) return;
 
-      document.dispatchEvent(new CustomEvent("ai-chat-continue-conversation", { detail: conversation }));
+      // Item جدید (رفع باگ ۲۳: بعد از «ادامهٔ گفتگو»، سؤال/جواب برمی‌گشت
+      // اما کادر تایپ اجازه نمی‌داد): قبلاً اول رویداد ادامهٔ گفتگو صادر
+      // می‌شد (که در انتهایش aiChatInput.focus() صدا زده می‌شود) و فقط
+      // بعد از آن پنل آرشیو بسته می‌شد - یعنی focus() درست وسط
+      // بسته‌شدنِ پنل/همپوشانِ overlay اجرا می‌شد و مرورگر آن را از
+      // دست می‌داد یا نادیده می‌گرفت. حالا اول پنل و overlay کاملاً
+      // بسته می‌شوند، و فقط در تیکِ بعدیِ event loop (بعد از این‌که
+      // overlay واقعاً از صفحه کنار رفت) گفتگو جایگزین و به کادر
+      // فوکوس داده می‌شود.
       removeChatConversationAi(id);
       closeChatArchivePanelAi();
+
+      setTimeout(() => {
+        document.dispatchEvent(new CustomEvent("ai-chat-continue-conversation", { detail: conversation }));
+      }, 0);
     });
   });
 }
@@ -715,7 +817,7 @@ function formatSourcesInfoHtmlAi(sourcesInfo) {
         const entry = entries[0];
         const label = entry.page ? `${escapeHtmlAi(s.book)} (صفحهٔ ${escapeHtmlAi(String(entry.page))})` : escapeHtmlAi(s.book);
         return entry.url
-          ? `<a href="${escapeHtmlAi(entry.url)}" style="color:#1d4ed8;text-decoration:none;">${label}</a>`
+          ? `<a href="${escapeHtmlAi(entry.url)}" target="_blank" rel="noopener" style="color:#1d4ed8;text-decoration:none;">${label}</a>`
           : label;
       }
 
@@ -727,7 +829,7 @@ function formatSourcesInfoHtmlAi(sourcesInfo) {
         .map((entry, i) => {
           const partLabel = entry.page ? `صفحهٔ ${escapeHtmlAi(String(entry.page))}` : `بخش ${i + 1}`;
           return entry.url
-            ? `<a href="${escapeHtmlAi(entry.url)}" style="color:#1d4ed8;text-decoration:none;">${partLabel}</a>`
+            ? `<a href="${escapeHtmlAi(entry.url)}" target="_blank" rel="noopener" style="color:#1d4ed8;text-decoration:none;">${partLabel}</a>`
             : partLabel;
         })
         .join("، ");
