@@ -298,7 +298,8 @@
 
   async function loadPdf() {
     try {
-      const loadingTask = pdfjsLib.getDocument(fileParam);
+      const resolvedUrl = new URL(fileParam, location.href).href;
+      const loadingTask = pdfjsLib.getDocument(resolvedUrl);
       pdfDoc = await loadingTask.promise;
       pageCountLabel.textContent = `از ${pdfDoc.numPages}`;
       pageNumberInput.max = pdfDoc.numPages;
@@ -307,10 +308,21 @@
     } catch (err) {
       console.error(err);
       loadingNote.className = "error-note";
-      loadingNote.textContent = "بارگذاری این فایل PDF ناموفق بود. ممکن است آدرس فایل درست نباشد یا فایل در دسترس نباشد.";
+      const resolvedUrl = (() => { try { return new URL(fileParam, location.href).href; } catch { return fileParam; } })();
+      loadingNote.innerHTML =
+        "بارگذاری این فایل PDF ناموفق بود: " +
+        escapeForDisplay(err && err.message ? err.message : String(err)) +
+        `<br><small style="color:#94a3b8;">آدرسی که امتحان شد: ${escapeForDisplay(resolvedUrl)}</small>`;
       loadingNote.style.display = "block";
       pageContainer.style.display = "none";
     }
+  }
+
+  function escapeForDisplay(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
   }
 
   async function renderPage(pageNum) {
