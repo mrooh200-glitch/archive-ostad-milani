@@ -2058,6 +2058,27 @@
       white-space: nowrap;
     }
 
+    /* Item ۱۷: لینک «بازکردن در PDF» - وقتی معلومه این نتیجه از کدوم
+       کتاب و کدوم صفحه اومده و اون کتاب نسخهٔ PDF هم داره، کاربر
+       می‌تونه مستقیم با ویوئر اختصاصی (pdf-viewer.html) به همون صفحه
+       و پاراگراف برسه، به‌جای این‌که مجبور باشه دستی داخل PDF بگرده. */
+    .result-pdf-open-link {
+      display: inline-block;
+      margin-inline-start: 8px;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 0.72rem;
+      font-weight: normal;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
+    .result-pdf-open-link:hover {
+      background: #fde68a;
+    }
+
     .result-snippet-link {
       display: block;
       margin: 10px 0 0;
@@ -5442,17 +5463,27 @@
         const isAyah = block.classList.contains("quran-ayah");
         const isHadith = block.classList.contains("hadith-text");
 
+        // Item ۱۷ (بازنگری ارجاع به PDF): هم‌ارز همون چیزی که
+        // scripts/build-embeddings.js موقع ساختِ پایگاه‌دادهٔ جست‌وجو
+        // انجام می‌ده - اگه این پاراگراف داخل یک
+        // <section class="pdf-page" data-page-number="N"> باشه (یعنی
+        // از پایپ‌لاین صفحه‌بندی‌شده میاد)، شماره صفحهٔ چاپی/PDF رو هم
+        // نگه می‌داریم تا بشه بعداً مستقیم به همون صفحه از PDF لینک داد.
+        const pageSection = block.closest("section.pdf-page[data-page-number]");
+        const pdfPage = pageSection ? pageSection.getAttribute("data-page-number") : null;
+
         if (seen.has(text)) {
           const existing = seen.get(text);
           seen.set(text, {
             isFootnote: existing.isFootnote && isFootnote,
             isAyah: existing.isAyah || isAyah,
-            isHadith: existing.isHadith || isHadith
+            isHadith: existing.isHadith || isHadith,
+            pdfPage: existing.pdfPage || pdfPage
           });
           return;
         }
 
-        seen.set(text, { isFootnote, isAyah, isHadith });
+        seen.set(text, { isFootnote, isAyah, isHadith, pdfPage });
         order.push(text);
       });
 
@@ -5460,7 +5491,8 @@
         paragraphs: order,
         footnoteFlags: order.map(text => !!seen.get(text).isFootnote),
         ayahFlags: order.map(text => !!seen.get(text).isAyah),
-        hadithFlags: order.map(text => !!seen.get(text).isHadith)
+        hadithFlags: order.map(text => !!seen.get(text).isHadith),
+        pdfPageNumbers: order.map(text => seen.get(text).pdfPage || null)
       };
     }
 
@@ -5991,7 +6023,7 @@
             }
 
             const html = await response.text();
-            const { paragraphs, footnoteFlags, ayahFlags, hadithFlags } = getParagraphsFromHtml(html);
+            const { paragraphs, footnoteFlags, ayahFlags, hadithFlags, pdfPageNumbers } = getParagraphsFromHtml(html);
 
             documents.push({
               type: "html",
@@ -6000,7 +6032,8 @@
               paragraphs: paragraphs,
               footnoteFlags: footnoteFlags,
               ayahFlags: ayahFlags,
-              hadithFlags: hadithFlags
+              hadithFlags: hadithFlags,
+              pdfPageNumbers: pdfPageNumbers
             });
           } catch (error) {
             console.warn("Text file not loaded:", url, error);
@@ -6231,9 +6264,15 @@
               </a>
 
               ${result.pdfPageNumber ? `
-                <span class="result-pdf-location">
-                  صفحهٔ ${result.pdfPageNumber} — پاراگراف ${result.pdfParagraphOnPage}
-                </span>
+                <span class="result-pdf-location">صفحهٔ ${escapeHtml(String(result.pdfPageNumber))}</span>
+              ` : ""}
+
+              ${result.pdfUrl && result.pdfPageNumber ? `
+                <a
+                  class="result-pdf-open-link"
+                  href="pdf-viewer.html?file=${encodeURIComponent(result.pdfUrl)}&title=${encodeURIComponent(result.title)}&page=${encodeURIComponent(result.pdfPageNumber)}&q=${encodeURIComponent(result.fragmentText || result.snippet.slice(0, 120))}"
+                  target="_blank"
+                  rel="noopener">📄 بازکردن در PDF</a>
               ` : ""}
             </div>
 
@@ -7400,11 +7439,16 @@
             }
           }
 
-          // Item جدید: برای نتایج PDF، شمارهٔ صفحه و شمارهٔ پاراگراف
-          // (در همون صفحه) رو هم به نتیجه اضافه می‌کنیم تا در بلوک
-          // نمایش نتایج نشون داده بشه.
-          const pdfPageNumber = document.type === "pdf" ? document.pageNumbers[paragraphIndex] : null;
-          const pdfParagraphOnPage = document.type === "pdf" ? document.paragraphOnPage[paragraphIndex] : null;
+          // Item ۱۷ (بازنگری ارجاع به PDF): قبلاً این فقط برای اسناد
+          // type==="pdf" پر می‌شد - که دیگر هیچ‌وقت اتفاق نمی‌افتد
+          // (PDFها از جست‌وجوی متنی حذف شدند، رجوع کنید به
+          // loadTextDocuments). حالا از document.pdfPageNumbers استفاده
+          // می‌کنیم - که برای *هر* سند HTMLِ صفحه‌بندی‌شده (چه اسم فایلش
+          // .pdf باشه چه نباشه) پر می‌شه، چون شمارهٔ صفحه از خودِ
+          // <section class="pdf-page" data-page-number> در HTML میاد،
+          // نه از پردازش یک فایل PDF واقعی.
+          const pdfPageNumber = document.pdfPageNumbers ? document.pdfPageNumbers[paragraphIndex] : null;
+          const pdfInfo = getPdfInfoForBookTitle(document.title);
 
           if (proximitySearchEnabled) {
             const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
@@ -7422,7 +7466,7 @@
                 snippet: getProximitySentenceSnippet(paragraph, proximityWords, proximityDistance),
                 sortKey: normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
+                pdfUrl: pdfInfo ? pdfInfo.url : null,
                 url: buildResultUrl(
                   document, paragraphIndex, query, false,
                   fragmentText, occurrenceIndex
@@ -7463,7 +7507,7 @@
                 matchedWordKeys: matchedWordKeys,
                 sortKey: matchedWordKeys[0] || normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
+                pdfUrl: pdfInfo ? pdfInfo.url : null,
                 url: buildResultUrl(
                   document, paragraphIndex, query, rootMode,
                   fragmentText, occurrenceIndex
@@ -7488,7 +7532,7 @@
                 snippet: getProximitySentenceSnippet(paragraph, andOrWords, UNLIMITED_PROXIMITY_DISTANCE),
                 sortKey: normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
+                pdfUrl: pdfInfo ? pdfInfo.url : null,
                 url: buildResultUrl(
                   document, paragraphIndex, query, false,
                   fragmentText, occurrenceIndex
@@ -7512,7 +7556,7 @@
                 snippet: getSentenceSnippet(paragraph, matchedWord),
                 sortKey: normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
+                pdfUrl: pdfInfo ? pdfInfo.url : null,
                 url: buildResultUrl(
                   document, paragraphIndex, query, false,
                   fragmentText, occurrenceIndex
@@ -7529,7 +7573,7 @@
               snippet: getSentenceSnippet(paragraph, query),
               sortKey: normalize(fragmentText),
               pdfPageNumber: pdfPageNumber,
-              pdfParagraphOnPage: pdfParagraphOnPage,
+              pdfUrl: pdfInfo ? pdfInfo.url : null,
               url: buildResultUrl(
                 document, paragraphIndex, query, rootMode,
                 fragmentText, occurrenceIndex
@@ -7746,6 +7790,38 @@
     // (in-page-search.js) بتواند همان فیلتر را خودش هم اعمال کند.
     // نتیجه‌ها را خودشان دست‌نمی‌زند (چون rootBaseResults/currentResults
     // یک آرایه‌اند)، فقط در لحظهٔ رندر hrefِ نمایش‌داده‌شده را می‌سازد.
+    // Item ۱۷ (بازنگری ارجاع به PDF): پیدا کردن فایل PDF متناظر با یک
+    // کتاب، از روی عنوانش - نه از روی حدسِ اسم فایل، چون اسم فایل
+    // HTML و PDF یک کتاب لزوماً یکی نیست (مثلاً
+    // Ma_refatollah_Ta_ala_Bellah.htm در برابر
+    // Marefat-Taala-Allah-bellah.pdf). هر دو ستون HTML و PDF در فهرست
+    // کتابخانه (بخش «مطالعه») برای یک کتاب، data-title یکسانی دارند -
+    // همون چیزی که این تابع براش می‌گرده.
+    // Item ۱۷ (بازنگری ارجاع به PDF): لینک‌های ستون PDF در فهرست کتابخانه
+    // (که قبلاً مستقیم فایل PDF را با ویوئر پیش‌فرض مرورگر باز می‌کردند)
+    // را به ویوئر اختصاصی جدید (pdf-viewer.html) هدایت می‌کنیم - چون آن
+    // ویوئر، هم امکان جست‌وجوی متنی واقعی دارد، هم می‌تواند مستقیم روی
+    // صفحه‌ی درخواستی باز شود. صفحه بدون پارامتر page باز می‌شود (یعنی
+    // از صفحهٔ اول)، چون از همین‌جا (فهرست کتابخانه) اطلاعی از صفحهٔ
+    // خاصی در دست نیست؛ نتایج جست‌وجو (بالاتر) پارامتر page را هم اضافه
+    // می‌کنند.
+    document.querySelectorAll(".pdf-link").forEach(link => {
+      const li = link.closest(".searchable-item");
+      if (!li || !li.dataset.url) return;
+      const params = new URLSearchParams({ file: li.dataset.url });
+      if (li.dataset.title) params.set("title", li.dataset.title);
+      link.href = `pdf-viewer.html?${params.toString()}`;
+    });
+
+    function getPdfInfoForBookTitle(title) {
+      if (!title) return null;
+      const pdfItem = document.querySelector(
+        `.searchable-item[data-pdf="true"][data-title="${CSS.escape(title)}"]`
+      );
+      if (!pdfItem) return null;
+      return { url: pdfItem.dataset.url, title };
+    }
+
     function resultHrefWithDerivFilter(result) {
       if (activeDerivativeKeys.size !== 1) {
         return result.url;

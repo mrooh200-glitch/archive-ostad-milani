@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>نمایشگر PDF - آرشیو استاد میلانی</title>
+<!--
+  Item ۱۷ (بازنگری ارجاع به PDF): این صفحه یک ویوئر اختصاصی PDF است
+  (به‌جای تکیه بر ویوئر پیش‌فرض مرورگر داخل iframe) که با کتابخانهٔ
+  متن‌باز PDF.js ساخته شده. دو قابلیت اصلی که ویوئر پیش‌فرض نداشت را
+  اضافه می‌کند:
+    ۱. باز شدن مستقیم روی صفحه و پاراگراف درخواستی، با هایلایت خودکار
+       همان متن - دقیقاً مثل تجربه‌ای که در گفتگو با کلود دیده شد.
+    ۲. جست‌وجوی متنی واقعی در کل فایل PDF (نه فقط تکیه بر Ctrl+F خودِ
+       مرورگر که نیاز به یک کلیکِ اولیهٔ دستی داشت).
+
+  پارامترهای آدرس:
+    file  - نام/مسیر فایل PDF (اجباری)
+    title - عنوان کتاب برای نمایش در بالای صفحه (اختیاری)
+    page  - شماره صفحه‌ای که باید اول باز شود (اختیاری، پیش‌فرض ۱)
+    q     - متنی که باید در همان صفحه پیدا و هایلایت شود (اختیاری)
+-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<style>
+  :root {
+    --brand-blue: #173b63;
+    --accent-teal: #0f766e;
+    --highlight: #fde68a;
+    --highlight-current: #fbbf24;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Tahoma, Arial, sans-serif;
+    background: #e5e9f0;
+    color: #1f2937;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #ffffff;
+    border-bottom: 1px solid #d7dee8;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+  }
+
+  .book-title {
+    font-weight: bold;
+    color: var(--brand-blue);
+    flex: 1 1 auto;
+    min-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-top a.back-link {
+    color: #64748b;
+    text-decoration: none;
+    font-size: 0.85rem;
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+  }
+
+  .header-top a.back-link:hover {
+    background: #f1f5f9;
+  }
+
+  .page-nav {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .page-nav button, .search-row button {
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+    font: inherit;
+    color: #334155;
+  }
+
+  .page-nav button:hover, .search-row button:hover {
+    background: #f1f5f9;
+  }
+
+  .page-nav button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .page-nav input {
+    width: 52px;
+    text-align: center;
+    padding: 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+  }
+
+  .search-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-top: 1px solid #eef2f7;
+  }
+
+  .search-row input[type="text"] {
+    flex: 1 1 auto;
+    min-width: 140px;
+    padding: 8px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    font: inherit;
+  }
+
+  .search-status {
+    font-size: 0.8rem;
+    color: #64748b;
+    white-space: nowrap;
+  }
+
+  main {
+    display: flex;
+    justify-content: center;
+    padding: 20px 12px 60px;
+  }
+
+  #pageContainer {
+    position: relative;
+    background: #ffffff;
+    box-shadow: 0 6px 24px rgba(15, 23, 42, 0.18);
+  }
+
+  #pdfCanvas {
+    display: block;
+  }
+
+  .textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    line-height: 1;
+    opacity: 1;
+  }
+
+  .textLayer span {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    transform-origin: 0% 0%;
+  }
+
+  .textLayer mark.pdf-match {
+    background: var(--highlight);
+    color: transparent;
+    border-radius: 2px;
+  }
+
+  .textLayer mark.pdf-match.is-current {
+    background: var(--highlight-current);
+    outline: 2px solid #ea580c;
+  }
+
+  .loading-note, .error-note {
+    text-align: center;
+    color: #64748b;
+    padding: 40px 16px;
+  }
+
+  .error-note {
+    color: #b91c1c;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <a class="back-link" id="backLink" href="index.htm">← بازگشت به سایت</a>
+    <span class="book-title" id="bookTitleLabel"></span>
+    <div class="page-nav">
+      <button type="button" id="prevPageBtn" title="صفحهٔ قبل">▶</button>
+      <input type="number" id="pageNumberInput" min="1" value="1" aria-label="شمارهٔ صفحه">
+      <span id="pageCountLabel" style="color:#64748b; font-size:0.85rem;"></span>
+      <button type="button" id="nextPageBtn" title="صفحهٔ بعد">◀</button>
+    </div>
+  </div>
+  <div class="search-row">
+    <input type="text" id="pdfSearchInput" placeholder="جست‌وجو در متن این PDF…">
+    <button type="button" id="pdfSearchPrev" title="نتیجهٔ قبلی">▲</button>
+    <button type="button" id="pdfSearchNext" title="نتیجهٔ بعدی">▼</button>
+    <span class="search-status" id="pdfSearchStatus"></span>
+  </div>
+</header>
+
+<main>
+  <div id="pageContainer">
+    <canvas id="pdfCanvas"></canvas>
+    <div class="textLayer" id="textLayer"></div>
+  </div>
+</main>
+
+<div class="loading-note" id="loadingNote">در حال بارگذاری PDF…</div>
+
+<script>
+(function () {
+  "use strict";
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+
+  const params = new URLSearchParams(location.search);
+  const fileParam = params.get("file");
+  const titleParam = params.get("title") || "";
+  const initialPage = Math.max(1, parseInt(params.get("page"), 10) || 1);
+  const initialQuery = params.get("q") || "";
+
+  const bookTitleLabel = document.getElementById("bookTitleLabel");
+  const pageContainer = document.getElementById("pageContainer");
+  const canvas = document.getElementById("pdfCanvas");
+  const textLayerDiv = document.getElementById("textLayer");
+  const loadingNote = document.getElementById("loadingNote");
+  const pageNumberInput = document.getElementById("pageNumberInput");
+  const pageCountLabel = document.getElementById("pageCountLabel");
+  const prevPageBtn = document.getElementById("prevPageBtn");
+  const nextPageBtn = document.getElementById("nextPageBtn");
+  const searchInput = document.getElementById("pdfSearchInput");
+  const searchPrevBtn = document.getElementById("pdfSearchPrev");
+  const searchNextBtn = document.getElementById("pdfSearchNext");
+  const searchStatus = document.getElementById("pdfSearchStatus");
+  const backLink = document.getElementById("backLink");
+
+  if (titleParam) {
+    bookTitleLabel.textContent = titleParam;
+    document.title = titleParam + " - نمایشگر PDF";
+  }
+
+  // اگر این صفحه از داخل سایت (index.htm در همان پوشه) باز شده،
+  // لینک بازگشت را هم به‌طور طبیعی به همان‌جا نگه می‌داریم - چیزی
+  // برای تغییر لازم نیست چون هر دو فایل کنار هم روی همان دامنه‌اند.
+
+  if (!fileParam) {
+    loadingNote.textContent = "";
+    loadingNote.className = "error-note";
+    loadingNote.textContent = "آدرس فایل PDF مشخص نشده است.";
+    pageContainer.style.display = "none";
+    return;
+  }
+
+  // ---------- نرمال‌سازی متن عربی/فارسی برای جست‌وجو و تطبیق (هم‌ارز
+  // normalize در index.htm/in-page-search.js) ----------
+  function normalize(text) {
+    return (text || "")
+      .toLowerCase()
+      .replace(/[يى]/g, "ی")
+      .replace(/ك/g, "ک")
+      .replace(/ۀ/g, "ه")
+      .replace(/ة/g, "ه")
+      .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  let pdfDoc = null;
+  let currentPageNum = initialPage;
+  let currentScale = 1.4;
+  let renderTask = null;
+
+  // کش متن استخراج‌شدهٔ هر صفحه، برای جست‌وجوی سراسری (فقط یک‌بار در
+  // اولین جست‌وجو ساخته می‌شود، نه در بارگذاری اولیه - تا باز کردن
+  // اولیهٔ فایل کند نشود).
+  let allPagesTextCache = null; // Array<string> - index 0 = page 1
+  let searchMatches = []; // [{ page, index }]
+  let currentSearchMatchIndex = -1;
+  let pendingHighlightQuery = initialQuery;
+
+  function setStatus(text) {
+    searchStatus.textContent = text;
+  }
+
+  async function loadPdf() {
+    try {
+      const loadingTask = pdfjsLib.getDocument(fileParam);
+      pdfDoc = await loadingTask.promise;
+      pageCountLabel.textContent = `از ${pdfDoc.numPages}`;
+      pageNumberInput.max = pdfDoc.numPages;
+      loadingNote.style.display = "none";
+      await renderPage(Math.min(currentPageNum, pdfDoc.numPages));
+    } catch (err) {
+      console.error(err);
+      loadingNote.className = "error-note";
+      loadingNote.textContent = "بارگذاری این فایل PDF ناموفق بود. ممکن است آدرس فایل درست نباشد یا فایل در دسترس نباشد.";
+      loadingNote.style.display = "block";
+      pageContainer.style.display = "none";
+    }
+  }
+
+  async function renderPage(pageNum) {
+    if (!pdfDoc) return;
+    pageNum = Math.min(Math.max(1, pageNum), pdfDoc.numPages);
+    currentPageNum = pageNum;
+    pageNumberInput.value = pageNum;
+    prevPageBtn.disabled = pageNum <= 1;
+    nextPageBtn.disabled = pageNum >= pdfDoc.numPages;
+
+    if (renderTask) {
+      try { renderTask.cancel(); } catch { /* بی‌اهمیت - رندر قبلی هنوز در حال اجرا بود */ }
+    }
+
+    const page = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: currentScale });
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    pageContainer.style.width = viewport.width + "px";
+    pageContainer.style.height = viewport.height + "px";
+    textLayerDiv.style.width = viewport.width + "px";
+    textLayerDiv.style.height = viewport.height + "px";
+    textLayerDiv.innerHTML = "";
+
+    const ctx = canvas.getContext("2d");
+    renderTask = page.render({ canvasContext: ctx, viewport });
+    await renderTask.promise;
+
+    const textContent = await page.getTextContent();
+    await pdfjsLib.renderTextLayer({
+      textContentSource: textContent,
+      container: textLayerDiv,
+      viewport,
+      textDivs: [],
+    }).promise;
+
+    // بعد از رندرِ لایهٔ متن، اگر عبارتی برای هایلایتِ خودکار داریم
+    // (از پارامتر q، یا از یک نتیجهٔ جست‌وجوی سراسری)، همین‌جا انجامش
+    // می‌دهیم.
+    if (pendingHighlightQuery) {
+      highlightInCurrentTextLayer(pendingHighlightQuery, true);
+      pendingHighlightQuery = "";
+    } else if (currentSearchMatchIndex !== -1 && searchMatches[currentSearchMatchIndex]?.page === pageNum) {
+      highlightInCurrentTextLayer(searchInput.value.trim(), true);
+    }
+  }
+
+  // پیداکردن و هایلایت‌کردنِ یک عبارت، داخل لایهٔ متنِ صفحهٔ *فعلاً
+  // رندرشده* - با اسکن spanهای تک‌تک و ادغامِ متنِ چندین span پشت‌سرهم
+  // (چون در PDF.js معمولاً هر چند کلمه یک span جداست، نه کل پاراگراف).
+  function highlightInCurrentTextLayer(query, scrollTo) {
+    const spans = Array.from(textLayerDiv.querySelectorAll("span"));
+    spans.forEach(span => {
+      // هایلایت‌های قبلی را پاک کن (اگر بود)
+      if (span.querySelector("mark.pdf-match")) {
+        span.textContent = span.textContent; // ساده‌ترین راه پاک‌سازی
+      }
+    });
+
+    const normalizedQuery = normalize(query).slice(0, 200);
+    if (!normalizedQuery) return null;
+
+    // متن کل صفحه را با مرزهای هر span (شروع/پایان در متنِ ادغام‌شده)
+    // می‌سازیم تا بشود عبارتی که از وسط یک span تا وسط spanِ بعدی
+    // کشیده شده را هم پیدا کرد.
+    let combined = "";
+    const boundaries = []; // { span, start, end } بر اساس combined نرمال‌شده
+
+    spans.forEach(span => {
+      const raw = span.textContent || "";
+      const normalized = normalize(raw);
+      if (!normalized) return;
+      const start = combined.length ? combined.length + 1 : 0;
+      combined = combined ? combined + " " + normalized : normalized;
+      boundaries.push({ span, start, end: combined.length, raw });
+    });
+
+    const matchStart = combined.indexOf(normalizedQuery);
+    if (matchStart === -1) return null;
+    const matchEnd = matchStart + normalizedQuery.length;
+
+    let firstMatchedSpan = null;
+    boundaries.forEach(b => {
+      if (b.end > matchStart && b.start < matchEnd) {
+        b.span.classList.add("pdf-match-span");
+        b.span.style.background = "var(--highlight)";
+        b.span.style.color = "transparent";
+        b.span.style.borderRadius = "2px";
+        if (!firstMatchedSpan) firstMatchedSpan = b.span;
+      }
+    });
+
+    if (firstMatchedSpan && scrollTo) {
+      firstMatchedSpan.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+
+    return firstMatchedSpan;
+  }
+
+  // ---------- جست‌وجوی سراسری در کل فایل (مورد ۱۷: «فعال‌کردن
+  // جست‌وجوی متنی از PDF») ----------
+  async function ensureAllPagesTextCache() {
+    if (allPagesTextCache) return allPagesTextCache;
+    setStatus("در حال آماده‌سازی نمایهٔ جست‌وجو…");
+    const pages = [];
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = await pdfDoc.getPage(i);
+      const textContent = await page.getTextContent();
+      const text = textContent.items.map(it => it.str).join(" ");
+      pages.push(normalize(text));
+    }
+    allPagesTextCache = pages;
+    return pages;
+  }
+
+  async function runSearch(query) {
+    const normalizedQuery = normalize(query);
+    if (!normalizedQuery) {
+      searchMatches = [];
+      currentSearchMatchIndex = -1;
+      setStatus("");
+      return;
+    }
+
+    const pages = await ensureAllPagesTextCache();
+    searchMatches = [];
+    pages.forEach((pageText, idx) => {
+      let from = 0;
+      while (true) {
+        const found = pageText.indexOf(normalizedQuery, from);
+        if (found === -1) break;
+        searchMatches.push({ page: idx + 1 });
+        from = found + normalizedQuery.length;
+      }
+    });
+
+    if (searchMatches.length === 0) {
+      currentSearchMatchIndex = -1;
+      setStatus("نتیجه‌ای پیدا نشد");
+      return;
+    }
+
+    currentSearchMatchIndex = 0;
+    await goToSearchMatch();
+  }
+
+  async function goToSearchMatch() {
+    if (currentSearchMatchIndex < 0 || currentSearchMatchIndex >= searchMatches.length) return;
+    const match = searchMatches[currentSearchMatchIndex];
+    setStatus(`نتیجهٔ ${currentSearchMatchIndex + 1} از ${searchMatches.length}`);
+    if (match.page === currentPageNum) {
+      highlightInCurrentTextLayer(searchInput.value.trim(), true);
+    } else {
+      await renderPage(match.page);
+    }
+  }
+
+  prevPageBtn.addEventListener("click", () => renderPage(currentPageNum - 1));
+  nextPageBtn.addEventListener("click", () => renderPage(currentPageNum + 1));
+
+  pageNumberInput.addEventListener("change", () => {
+    const n = parseInt(pageNumberInput.value, 10);
+    if (Number.isInteger(n)) renderPage(n);
+  });
+
+  searchInput.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      runSearch(searchInput.value.trim());
+    }
+  });
+
+  searchNextBtn.addEventListener("click", async () => {
+    if (searchMatches.length === 0) {
+      await runSearch(searchInput.value.trim());
+      return;
+    }
+    currentSearchMatchIndex = (currentSearchMatchIndex + 1) % searchMatches.length;
+    await goToSearchMatch();
+  });
+
+  searchPrevBtn.addEventListener("click", async () => {
+    if (searchMatches.length === 0) {
+      await runSearch(searchInput.value.trim());
+      return;
+    }
+    currentSearchMatchIndex = (currentSearchMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+    await goToSearchMatch();
+  });
+
+  if (initialQuery) {
+    searchInput.value = initialQuery;
+  }
+
+  loadPdf();
+})();
+</script>
+
+</body>
+</html>
