@@ -22,7 +22,6 @@
     page  - شماره صفحه‌ای که باید اول باز شود (اختیاری، پیش‌فرض ۱)
     q     - متنی که باید در همان صفحه پیدا و هایلایت شود (اختیاری)
 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root {
     --brand-blue: #173b63;
@@ -220,12 +219,20 @@
 
 <div class="loading-note" id="loadingNote">در حال بارگذاری PDF…</div>
 
-<script>
+<script type="module">
+// Item ۱۷ (رفع باگ: حروف عربی/فارسی داخل صفحه‌ی رندرشده به‌هم‌ریخته
+// نشون داده می‌شد): این مشکل مربوط به یک باگ شناخته‌شده در نسخه‌های
+// قدیمی‌ترِ PDF.js (۳.x) در رندر برخی فونت‌های عربیِ توکار PDF بود؛
+// نسخه‌های جدیدتر این مشکل رو ندارن. چون از نسخه‌ی ۴ به بعد PDF.js
+// دیگه فقط به‌صورت ماژول (import/mjs) منتشر می‌شه (نه اسکریپت
+// سراسری قدیمی)، این بخش به import تبدیل شد.
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
+
 (function () {
   "use strict";
 
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
 
   const params = new URLSearchParams(location.search);
   const fileParam = params.get("file");
