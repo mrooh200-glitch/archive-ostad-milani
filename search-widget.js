@@ -617,9 +617,11 @@ function renderChatArchivePanelAi() {
               const sourcesLine = formatSourcesInfoHtmlAi(turn.sourcesInfo);
               return `
                 <div class="ai-chat-turn">
-                  <div class="ai-chat-question">${escapeHtmlAi(normalizeQuestionTextAi(turn.question))}</div>
-                  ${sourcesLine ? `<div class="ai-chat-sources">پاسخ از کتاب ${sourcesLine}</div>` : ""}
-                  <div class="ai-chat-answer">${turn.answer}</div>
+                  <div class="ai-chat-bubble ai-chat-bubble-user">${escapeHtmlAi(normalizeQuestionTextAi(turn.question))}</div>
+                  <div class="ai-chat-bubble ai-chat-bubble-assistant">
+                    ${turn.answer}
+                    ${sourcesLine ? `<div class="ai-chat-sources">پاسخ از کتاب ${sourcesLine}</div>` : ""}
+                  </div>
                 </div>
               `;
             })
@@ -650,6 +652,7 @@ function renderChatArchivePanelAi() {
 
   panel.innerHTML = `
     <button type="button" class="panel-close-x" id="aiChatArchiveClose" title="بستن" aria-label="بستن">×</button>
+    <div class="panel-scroll-area">
     <div class="archive-header">
       <span>آرشیو گفتگوها (${conversations.length})</span>
       <div class="archive-header-actions">
@@ -674,6 +677,7 @@ function renderChatArchivePanelAi() {
       </div>
     </div>
     ${listHtml}
+    </div>
   `;
 
   const closeButton = panel.querySelector("#aiChatArchiveClose");

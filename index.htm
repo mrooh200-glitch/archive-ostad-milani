@@ -515,7 +515,6 @@
       position: relative;
       width: min(728px, 100%);
       max-height: 80vh;
-      overflow-y: auto;
       background: #ffffff;
       border-radius: 14px;
       box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
@@ -544,17 +543,27 @@
       color: #1f2937;
     }
 
-    /* آیتم ۸ (رفع باگ: × با محتوا شناور/اسکرول می‌شد): بلوک نشانه‌ها
-       خودش دیگه اسکرول نمی‌شه - این کار رو یه لایه‌ی داخلی
-       (panel-scroll-area) انجام می‌ده؛ × چون بیرون از این لایه‌ست،
-       ثابت می‌مونه، دقیقاً مثل خودِ تب‌های بالای بلوک. */
-    #bookmarksPanel {
+    /* آیتم ۸ و ۳ (رفع باگ: × با محتوا شناور/اسکرول می‌شد): هر سه بلوک
+       (آرشیو نتایج، نشانه‌ها، آرشیو گفتگوها) خودشان دیگر اسکرول
+       نمی‌شوند - این کار را یک لایهٔ داخلی (panel-scroll-area) انجام
+       می‌دهد؛ × چون بیرون از این لایه‌ست، ثابت می‌ماند، دقیقاً مثل
+       خودِ تب‌های بالای بلوک. قبلاً این تکنیک فقط برای بلوک نشانه‌ها
+       اعمال شده بود.*/
+    #archivePanel,
+    #bookmarksPanel,
+    #aiChatArchivePanel {
       overflow: hidden;
     }
 
-    #bookmarksPanel .panel-scroll-area {
+    #archivePanel .panel-scroll-area,
+    #bookmarksPanel .panel-scroll-area,
+    #aiChatArchivePanel .panel-scroll-area {
       max-height: 80vh;
       overflow-y: auto;
+      /* آیتم ۲۴: مبنای موقعیت sticky برای تب‌های عنوان (bookmark-group-book)
+         - با جاوااسکریپت، بر اساس ارتفاع واقعیِ هدر/فیلتر برچسب، مقدار
+         می‌گیرد؛ صفر یعنی هنوز اندازه‌گیری نشده. */
+      --bookmark-sticky-offset: 0px;
     }
 
     #archivePanel .archive-header,
@@ -712,6 +721,14 @@
       color: #94a3b8;
       font-size: 0.72rem;
       font-weight: bold;
+      /* آیتم ۲۴: تب‌های عنوان (نام کتاب) باید مثل تب‌های بالای بلوک،
+         موقع اسکرول ثابت بمانند - not شناور شوند. --bookmark-sticky-offset
+         (روی .panel-scroll-area تنظیم می‌شود) دقیقاً ارتفاع هدر/فیلتر
+         بالای فهرست است، تا این تب‌ها درست زیر آن‌ها بچسبند. */
+      position: sticky;
+      top: var(--bookmark-sticky-offset, 0px);
+      z-index: 3;
+      background: #ffffff;
     }
 
     .bookmark-group-tag {
@@ -3935,13 +3952,15 @@
 
       panel.innerHTML = `
         <button type="button" class="panel-close-x" id="archiveCloseButton" title="بستن" aria-label="بستن">×</button>
-        <div class="archive-header">
-          <span>آرشیو نتایج (${items.length})</span>
-          <div class="archive-header-actions">
-            <button type="button" id="archiveClearButton">پاک‌کردن همه</button>
+        <div class="panel-scroll-area">
+          <div class="archive-header">
+            <span>آرشیو نتایج (${items.length})</span>
+            <div class="archive-header-actions">
+              <button type="button" id="archiveClearButton">پاک‌کردن همه</button>
+            </div>
           </div>
-        </div>
         ${listHtml}
+        </div>
       `;
 
       const clearButton = panel.querySelector("#archiveClearButton");
@@ -4486,6 +4505,18 @@
           ${listHtml}
         </div>
       `;
+
+      // Item ۲۴: بعد از رندر، ارتفاع واقعیِ هدر (+ ردیف فیلتر برچسب، اگر
+      // بود) را اندازه می‌گیریم و به‌عنوان نقطهٔ چسبیدنِ تب‌های عنوان کتاب
+      // (bookmark-group-book) تنظیم می‌کنیم - چون ارتفاع هدر بسته به تعداد
+      // دکمه‌ها/شکستن خط، ثابت نیست.
+      const bmScrollArea = panel.querySelector(".panel-scroll-area");
+      const bmHeaderEl = panel.querySelector(".archive-header");
+      const bmTagFilterEl = panel.querySelector(".bookmark-tag-filter");
+      if (bmScrollArea && bmHeaderEl) {
+        const stickyOffset = bmHeaderEl.offsetHeight + (bmTagFilterEl ? bmTagFilterEl.offsetHeight : 0);
+        bmScrollArea.style.setProperty("--bookmark-sticky-offset", `${stickyOffset}px`);
+      }
 
       const clearButton = panel.querySelector("#bookmarksClearButton");
       if (clearButton) {
