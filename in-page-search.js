@@ -6116,6 +6116,15 @@
         syncSearchBoxWithActiveDerivative();
         updatePageMarkVisibility();
 
+        // Item جدید (رفع باگ: شمارنده هنگام افزودنِ یک مشتقِ دوم به‌روز
+        // نمی‌شد): پایین‌تر updateStatus فقط به‌طور غیرمستقیم و از داخل
+        // showMatch صدا زده می‌شد - و showMatch فقط وقتی اجرا می‌شد که
+        // مورد فعلی دیگر قابل‌مشاهده نبود. با *افزودنِ* یک مشتق (برخلاف
+        // برداشتنش)، مورد فعلی همچنان قابل‌مشاهده می‌ماند، پس showMatch
+        // هیچ‌وقت اجرا نمی‌شد و شمارنده روی عدد قدیمی می‌ماند. حالا صریحاً
+        // صدا زده می‌شود.
+        updateStatus();
+
         // Item جدید (رفع اشکال): تا اینجا فقط کادر جست‌وجو و پنل نتایج
         // با فیلتر مشتق هماهنگ می‌شدند، اما مورد فعلیِ هایلایت‌شدهٔ
         // روی خودِ صفحه دست‌نخورده می‌ماند - یعنی اگر آن مورد دیگر با
@@ -6738,6 +6747,33 @@
     ) : -1;
   }
 
+  // Item جدید (رفع بخشی از باگ ۲: کلیک روی نتیجهٔ جستجوی متنیِ سایت
+  // هنگام فعال‌بودن یک مشتق خاص، فایل مقصد را روی رخداد اولین کلمهٔ
+  // هم‌ریشهٔ آن پاراگراف می‌برد - نه لزوماً همان مشتق انتخاب‌شده، چون
+  // frag/occ در لحظهٔ ساخت نتایج (پیش از هرگونه انتخاب مشتق) محاسبه
+  // شده بودند): وقتی پارامتر derivKey در آدرس باشد، رخداد Nاُم را فقط
+  // در میان مارک‌هایی می‌گردد که دقیقاً همان مشتق (کلید بصری) را دارند.
+  function findMatchIndexForDerivative(derivKey, occurrenceIndex, allMatches) {
+    if (!derivKey) {
+      return -1;
+    }
+
+    const wantedOccurrence = occurrenceIndex > 0 ? occurrenceIndex : 1;
+    let seen = 0;
+
+    for (let i = 0; i < allMatches.length; i++) {
+      if (getMatchVisualKey(allMatches[i]) === derivKey) {
+        seen++;
+
+        if (seen === wantedOccurrence) {
+          return i;
+        }
+      }
+    }
+
+    return -1;
+  }
+
   function applyIncomingQueryFromUrl() {
     const params = new URLSearchParams(location.search);
     const incomingQuery = params.get("q");
@@ -6783,10 +6819,30 @@
     // (خالی) می‌ماند تا اگر کاربر بعداً خودش چیزی جست‌وجو کرد، تحت
     // تأثیر این ورود خودکار قرار نگیرد.
     const allMatchesForTarget = highlightMatches(incomingQuery);
-    const targetIndex = findMatchIndexForFragment(
+    let targetIndex = findMatchIndexForFragment(
       getTextFragmentFromHash(),
       getOccurrenceFromUrl()
     );
+
+    // Item جدید (رفع بخشی از باگ ۲): اگر لینک برای یک مشتق مشخص
+    // (derivKey) ساخته شده، ولی frag/occ (که مستقل از فیلتر مشتق
+    // محاسبه شده بودند) رخدادی از یک مشتق دیگر را پیدا کرده - رخداد
+    // درست را دوباره، این‌بار فقط در میان همان مشتق، پیدا می‌کنیم.
+    const derivKeyParam = params.get("derivKey");
+    if (
+      derivKeyParam &&
+      (targetIndex === -1 || getMatchVisualKey(allMatchesForTarget[targetIndex]) !== derivKeyParam)
+    ) {
+      const derivIndex = findMatchIndexForDerivative(
+        derivKeyParam,
+        getOccurrenceFromUrl(),
+        allMatchesForTarget
+      );
+
+      if (derivIndex !== -1) {
+        targetIndex = derivIndex;
+      }
+    }
 
     if (targetIndex === -1) {
       // نتونستیم رخداد دقیق رو پیدا کنیم - رفتار قدیمی (پرکردن کادر

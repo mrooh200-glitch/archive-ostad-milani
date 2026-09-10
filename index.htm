@@ -5633,17 +5633,30 @@
       );
     }
 
-    function highlightStemText(text, queryStems) {
+    // Item جدید (رفع بخشی از باگ ۲: وقتی یک مشتق خاص فعال بود، هایلایتِ
+    // داخل خودِ قطعهٔ نمایش‌داده‌شده همچنان *همهٔ* کلمات هم‌ریشه را رنگی
+    // می‌کرد، نه فقط همان مشتق انتخاب‌شده): پارامتر سوم اختیاری -
+    // activeDerivKeys - وقتی پر باشد (Set غیرخالی)، فقط کلمه‌ای که علاوه
+    // بر هم‌ریشه‌بودن، کلید بصری‌اش هم داخل این Set باشد هایلایت می‌شود؛
+    // وقتی خالی/نامشخص باشد، رفتار قبلی (هایلایت همهٔ هم‌ریشه‌ها) حفظ
+    // می‌شود.
+    function highlightStemText(text, queryStems, activeDerivKeys) {
       const words = findWordsInText(text);
       let result = "";
       let lastIndex = 0;
 
       words.forEach(word => {
-        if (word.stem && queryStems.includes(word.stem)) {
-          result += escapeHtml(text.slice(lastIndex, word.start));
-          result += `<mark>${escapeHtml(text.slice(word.start, word.end))}</mark>`;
-          lastIndex = word.end;
+        if (!word.stem || !queryStems.includes(word.stem)) {
+          return;
         }
+
+        if (activeDerivKeys && activeDerivKeys.size > 0 && !activeDerivKeys.has(getVisualWordKey(word.text))) {
+          return;
+        }
+
+        result += escapeHtml(text.slice(lastIndex, word.start));
+        result += `<mark>${escapeHtml(text.slice(word.start, word.end))}</mark>`;
+        lastIndex = word.end;
       });
 
       result += escapeHtml(text.slice(lastIndex));
@@ -6033,11 +6046,11 @@
         const remaining = items.length - shown.length;
 
         const itemsHtml = shown.map(result => `
-          <a class="compare-result-link" href="${escapeHtml(result.url)}" target="_blank" rel="noopener">${
+          <a class="compare-result-link" href="${escapeHtml(resultHrefWithDerivFilter(result))}" target="_blank" rel="noopener">${
             currentProximityMode ?
               highlightProximityText(result.snippet, currentProximityWords, currentProximityDistance) :
               currentRootMode ?
-                highlightStemText(result.snippet, getQueryStems(currentQuery)) :
+                highlightStemText(result.snippet, getQueryStems(currentQuery), activeDerivativeKeys) :
                 currentOrWords.length > 0 ?
                   highlightAnyWordText(result.snippet, currentOrWords) :
                   highlightText(result.snippet, currentQuery)
@@ -6102,7 +6115,7 @@
 
               <a
                 class="result-title"
-                href="${escapeHtml(result.url)}"
+                href="${escapeHtml(resultHrefWithDerivFilter(result))}"
                 target="_blank"
                 rel="noopener">
                 ${escapeHtml(result.title)}
@@ -6117,13 +6130,13 @@
 
             <a
               class="result-snippet-link"
-              href="${escapeHtml(result.url)}"
+              href="${escapeHtml(resultHrefWithDerivFilter(result))}"
               target="_blank"
               rel="noopener">${
               currentProximityMode ?
                 highlightProximityText(result.snippet, currentProximityWords, currentProximityDistance) :
                 currentRootMode ?
-                  highlightStemText(result.snippet, getQueryStems(currentQuery)) :
+                  highlightStemText(result.snippet, getQueryStems(currentQuery), activeDerivativeKeys) :
                   currentOrWords.length > 0 ?
                     highlightAnyWordText(result.snippet, currentOrWords) :
                     highlightText(result.snippet, currentQuery)
@@ -7615,6 +7628,28 @@
           }
         });
       });
+    }
+
+    // Item جدید (رفع بخشی از باگ ۲: کلیک روی نتیجه هنگام فعال‌بودن یک
+    // مشتق خاص، فایل مقصد را با هایلایت *همهٔ* مشتقات باز می‌کرد، نه
+    // فقط همان مشتق انتخاب‌شده): وقتی دقیقاً یک مشتق فعال است، کلید آن
+    // را به‌عنوان derivKey به آدرس اضافه می‌کند تا صفحهٔ مقصد
+    // (in-page-search.js) بتواند همان فیلتر را خودش هم اعمال کند.
+    // نتیجه‌ها را خودشان دست‌نمی‌زند (چون rootBaseResults/currentResults
+    // یک آرایه‌اند)، فقط در لحظهٔ رندر hrefِ نمایش‌داده‌شده را می‌سازد.
+    function resultHrefWithDerivFilter(result) {
+      if (activeDerivativeKeys.size !== 1) {
+        return result.url;
+      }
+
+      try {
+        const urlObj = new URL(result.url, location.href);
+        const [key] = activeDerivativeKeys;
+        urlObj.searchParams.set("derivKey", key);
+        return urlObj.href;
+      } catch {
+        return result.url;
+      }
     }
 
     function toggleDerivative(key) {
