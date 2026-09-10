@@ -391,6 +391,33 @@ function escapeHtmlAi(text) {
     .replace(/"/g, "&quot;");
 }
 
+// Item جدید (رفع باگ ۱۱: لینک‌هایی که هوش در گفتگوی آزاد می‌فرستاد، روی
+// خودِ سایت کلیک‌پذیر نبودند): پاسخِ خام مستقیماً از سرور می‌آید و نه
+// لینک‌های به‌سبک مارک‌داون ([متن](آدرس)) نه آدرس‌های خامِ ساده به <a>
+// تبدیل می‌شوند - فقط متن ساده روی صفحه می‌نشینند (برای همین در کپی‌کردن
+// به یک ادیتور دیگر که خودش این‌ها را تشخیص می‌دهد، کلیک‌پذیر به‌نظر
+// می‌رسیدند، ولی خودِ سایت هیچ‌کدام را تبدیل نمی‌کرد). این تابع هر دو
+// حالت را به لینک واقعی و کلیک‌پذیر تبدیل می‌کند - دقیقاً مثل محیط‌های
+// چت معمولی.
+function linkifyAnswerAi(text) {
+  if (!text) return text;
+
+  // اول لینک‌های به‌سبک مارک‌داون: [متن](آدرس)
+  let result = String(text).replace(
+    /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+    (match, label, url) => `<a href="${url}" target="_blank" rel="noopener">${label}</a>`
+  );
+
+  // بعد هر آدرس خامی که از قبل داخل یک href="..." نیست (تا لینک‌هایی که
+  // همین بالا ساختیم دوباره لینک نشن).
+  result = result.replace(
+    /(^|[^"'>])(https?:\/\/[^\s<]+[^\s<.,;:!؟)\]}"'])/g,
+    (match, prefix, url) => `${prefix}<a href="${url}" target="_blank" rel="noopener">${url}</a>`
+  );
+
+  return result;
+}
+
 function downloadTextFileAi(filename, content, mimeType) {
   const blob = new Blob([content], { type: mimeType || "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -619,7 +646,7 @@ function renderChatArchivePanelAi() {
                 <div class="ai-chat-turn">
                   <div class="ai-chat-bubble ai-chat-bubble-user">${escapeHtmlAi(normalizeQuestionTextAi(turn.question))}</div>
                   <div class="ai-chat-bubble ai-chat-bubble-assistant">
-                    ${turn.answer}
+                    ${linkifyAnswerAi(turn.answer)}
                     ${sourcesLine ? `<div class="ai-chat-sources">پاسخ از کتاب ${sourcesLine}</div>` : ""}
                   </div>
                 </div>
@@ -1700,7 +1727,7 @@ document.addEventListener("DOMContentLoaded", () => {
               </div>
               <div class="ai-chat-bubble ai-chat-bubble-user">${turn.question}</div>
               <div class="ai-chat-bubble ai-chat-bubble-assistant">
-                <div>${turn.answer}</div>
+                <div>${linkifyAnswerAi(turn.answer)}</div>
                 ${turn.sourceLinksHtml ? `<div class="ai-chat-sources">منابع: ${turn.sourceLinksHtml}</div>` : ""}
               </div>
             </div>

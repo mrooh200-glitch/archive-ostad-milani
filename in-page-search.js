@@ -1558,6 +1558,15 @@
         background: #fbbf24;
       }
 
+      /* Item جدید (رفع باگ ۱۵: وقتی یک مشتق خاص فعال بود، پنل نتایج
+         درست فیلتر می‌شد، اما روی خودِ صفحه همچنان *همهٔ* مشتقات زرد
+         می‌ماندند): موردی که با فیلتر مشتق فعلی مطابقت ندارد، رنگش
+         برداشته می‌شود - فقط مشتق انتخاب‌شده روی صفحه زرد می‌ماند. */
+      mark.in-page-search-match.deriv-filtered-out {
+        background: transparent;
+        color: inherit;
+      }
+
       /* Item جدید: حالت شب برای صفحهٔ مطالعه - چون این کلاس‌ها روی کل
          html اعمال می‌شوند و خودِ کادر جست‌وجو هم زیرمجموعهٔ همان html
          است، دوباره معکوسش می‌کنیم تا رنگ عادی (نه معکوس) بماند و
@@ -5946,6 +5955,16 @@
     return mark ? activeDerivativeKeys.has(getMatchVisualKey(mark)) : false;
   }
 
+  // Item جدید (رفع باگ ۱۵): هایلایتِ روی خودِ صفحه را با فیلتر مشتقِ
+  // فعلی هماهنگ می‌کند - هر مورد که isMatchVisible برایش false برگرداند
+  // (یعنی مشتقِ فعلاً انتخاب‌شده نیست)، رنگش روی صفحه برداشته می‌شود؛
+  // هر جا activeDerivativeKeys تغییر می‌کند باید صدا زده شود.
+  function updatePageMarkVisibility() {
+    matches.forEach((mark, index) => {
+      mark.classList.toggle("deriv-filtered-out", !isMatchVisible(index));
+    });
+  }
+
   // Item جدید (رفع اشکال قدیمی، جدا از دو تغییر خواسته‌شده): دکمه‌های
   // بعدی/قبلی (و Enter/Shift+Enter) قبلاً همیشه ساده +۱/−۱ روی
   // آرایهٔ کامل matches حرکت می‌کردند - یعنی وقتی یک مشتق خاص فعال
@@ -6095,6 +6114,7 @@
         renderDerivativesBlock();
         renderResultsPanel();
         syncSearchBoxWithActiveDerivative();
+        updatePageMarkVisibility();
 
         // Item جدید (رفع اشکال): تا اینجا فقط کادر جست‌وجو و پنل نتایج
         // با فیلتر مشتق هماهنگ می‌شدند، اما مورد فعلیِ هایلایت‌شدهٔ
@@ -6199,12 +6219,17 @@
         .filter(item => isMatchVisible(item.index))
     );
 
-    // Item 5: each result shows its ordinal position among the
-    // document's matches (index + 1), independent of the current
-    // sort/filter, so a reader can always tell "این نتیجهٔ چندم است"
-    // regardless of how the list is currently ordered.
+    // Item ۱۴ (رفع باگ: شماره‌گذاری مشتقات بر اساس شماره‌گذاری ریشه
+    // بود): قبلاً همیشه از موقعیت مورد در کل آرایهٔ matches (بدون فیلتر)
+    // استفاده می‌شد - یعنی وقتی یک مشتق خاص فعال بود، به‌جای شماره‌گذاری
+    // پیوستهٔ ۱،۲،۳... مخصوص همان مشتق، شماره‌های ریشه (با فاصله‌های
+    // نامنظم، چون بقیهٔ مشتق‌ها حساب می‌شدند ولی دیده نمی‌شدند) نشان داده
+    // می‌شد. حالا: وقتی فیلتر مشتق فعاله، شماره‌گذاری از نو و پیوسته
+    // مخصوص همون زیرمجموعهٔ دیده‌شده است؛ وقتی فیلتری فعال نیست (حالت
+    // معمول)، همون شمارهٔ اصلی حفظ می‌شه تا با «چندمین رخداد در کل سند»
+    // هم‌خوان بمونه، حتی زیر مرتب‌سازیِ «پرتکرارترین».
     const items = visibleMatches
-      .map(({ mark, index }) => {
+      .map(({ mark, index }, position) => {
         const snippetHtml = buildSnippetHtml(mark);
         const activeClass = index === currentMatch ? " active" : "";
         const checkedAttr = selectedMatchIndexes.has(index) ? "checked" : "";
@@ -6212,12 +6237,13 @@
         const pageBadge = pageNumber ?
           `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(pageNumber)}</span>` :
           "";
+        const displayNumber = activeDerivativeKeys.size > 0 ? position + 1 : index + 1;
 
         return (
           `<div class="in-page-search-result-item${activeClass}" data-index="${index}">` +
             `<div class="in-page-result-marker">` +
               `<input type="checkbox" class="in-page-result-checkbox" data-index="${index}" ${checkedAttr} aria-label="انتخاب این نتیجه">` +
-              `<span class="in-page-result-number">${index + 1}</span>` +
+              `<span class="in-page-result-number">${displayNumber}</span>` +
               pageBadge +
             `</div>` +
             `<button type="button" class="in-page-search-result-jump" data-index="${index}">` +
@@ -6991,6 +7017,7 @@
         if (!showDerivativesToggle.checked) {
           activeDerivativeKeys.clear();
           renderResultsPanel();
+          updatePageMarkVisibility();
         }
 
         renderDerivativesBlock();
