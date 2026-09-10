@@ -4748,7 +4748,15 @@
       }
     }
 
-    updateInPageBookmarkCurrentGroupBar();
+    // Item جدید (رفع باگ اصلی مورد ۲۴ - «کلاً خنثی»): openBookmarksPanel
+    // این تابع رندر را *قبل* از باز کردن overlay صدا می‌زند (کلاس "open"
+    // را بعداً اضافه می‌کند) - یعنی در همین لحظه که این تابع اجرا می‌شود،
+    // پنل هنوز display:none است و getBoundingClientRect روی هر عنصری
+    // مستطیلِ صفر برمی‌گرداند؛ محاسبه بر این اساس بی‌معنی/نادرست می‌شد.
+    // با موکول‌کردن به فریم بعدی، تا آن موقع overlay قطعاً باز شده (چون
+    // افزودن کلاس "open" همان لحظه، هم‌زمان با این تابع، اجرا می‌شود) و
+    // اندازه‌گیری درست انجام می‌شود.
+    requestAnimationFrame(updateInPageBookmarkCurrentGroupBar);
 
     if (ipbmScrollArea) {
       ipbmScrollArea.addEventListener("scroll", updateInPageBookmarkCurrentGroupBar, { passive: true });

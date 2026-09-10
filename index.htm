@@ -4605,7 +4605,12 @@
         }
       }
 
-      updateBookmarkCurrentGroupLabel();
+      // Item جدید (رفع باگ اصلی مورد ۲۴): openBookmarksPanel رندر را
+      // *قبل* از باز کردن overlay صدا می‌زند - یعنی این‌جا هنوز
+      // display:none است و اندازه‌گیری بی‌معنی می‌شد. با موکول‌کردن به
+      // فریم بعدی (که تا آن موقع overlay قطعاً باز شده)، اندازه‌گیری
+      // درست انجام می‌شود.
+      requestAnimationFrame(updateBookmarkCurrentGroupLabel);
 
       if (bmScrollArea) {
         bmScrollArea.addEventListener("scroll", updateBookmarkCurrentGroupLabel, { passive: true });
