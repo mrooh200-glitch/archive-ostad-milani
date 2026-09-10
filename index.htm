@@ -579,6 +579,10 @@
       background: #f8fafc;
       color: #173b63;
       font-weight: bold;
+      /* آیتم ۲۴: هدر باید همیشه بالاتر از تب‌های عنوان کتاب بنشیند - حتی
+         اگر (به هر دلیلی) لحظه‌ای هم‌پوشانی پیش بیاید، هدر روی تب عنوان
+         افتاده نمی‌شود، نه برعکس. */
+      z-index: 4;
     }
 
     #archivePanel .archive-header-actions,
@@ -4506,17 +4510,22 @@
         </div>
       `;
 
-      // Item ۲۴: بعد از رندر، ارتفاع واقعیِ هدر (+ ردیف فیلتر برچسب، اگر
-      // بود) را اندازه می‌گیریم و به‌عنوان نقطهٔ چسبیدنِ تب‌های عنوان کتاب
-      // (bookmark-group-book) تنظیم می‌کنیم - چون ارتفاع هدر بسته به تعداد
-      // دکمه‌ها/شکستن خط، ثابت نیست.
+      // Item ۲۴ (رفع باگ: تب‌های عنوان کتاب نصفه/روی هدر افتاده بودند):
+      // اندازه‌گیریِ ارتفاع هدر بلافاصله بعد از innerHTML گاهی زودتر از
+      // تثبیت نهاییِ چیدمان مرورگر اجرا می‌شد (مخصوصاً وقتی هدر چند خط
+      // می‌شد) و عدد نادرست/صفر می‌داد - یعنی تب عنوان به‌جای چسبیدن زیر
+      // هدر، دقیقاً روی آن (top:0) می‌چسبید و هر دو نصفه به‌نظر می‌رسیدند.
+      // حالا اندازه‌گیری به فریم بعدی (بعد از تثبیت کامل چیدمان) موکول
+      // می‌شود.
       const bmScrollArea = panel.querySelector(".panel-scroll-area");
       const bmHeaderEl = panel.querySelector(".archive-header");
-      const bmTagFilterEl = panel.querySelector(".bookmark-tag-filter");
-      if (bmScrollArea && bmHeaderEl) {
-        const stickyOffset = bmHeaderEl.offsetHeight + (bmTagFilterEl ? bmTagFilterEl.offsetHeight : 0);
-        bmScrollArea.style.setProperty("--bookmark-sticky-offset", `${stickyOffset}px`);
-      }
+      requestAnimationFrame(() => {
+        const bmTagFilterEl = panel.querySelector(".bookmark-tag-filter");
+        if (bmScrollArea && bmHeaderEl) {
+          const stickyOffset = bmHeaderEl.offsetHeight + (bmTagFilterEl ? bmTagFilterEl.offsetHeight : 0);
+          bmScrollArea.style.setProperty("--bookmark-sticky-offset", `${stickyOffset}px`);
+        }
+      });
 
       const clearButton = panel.querySelector("#bookmarksClearButton");
       if (clearButton) {
