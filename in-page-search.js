@@ -6690,10 +6690,16 @@
 
     inPageVoiceRecognition.addEventListener("result", event => {
       const transcript = event.results[0][0].transcript;
+      // Item ۱۳ (رفع باگ: تایپ صوتی بدون تاییدِ کاربر مستقیم اجرا
+      // می‌شد): قبلاً همین‌جا performSearch/pushSearchHistory هم صدا
+      // زده می‌شد - یعنی به‌محض تشخیص صدا، فوراً «ثبت» هم می‌شد. حالا
+      // فقط متن داخل کادر نوشته می‌شه و رویداد input شبیه‌سازی می‌شه
+      // (دقیقاً مثل تایپ دستی، که جست‌وجوی زنده رو نشون می‌ده)؛ ثبت در
+      // تاریخچه فقط با تاییدِ خودِ کاربر (Enter یا خروج از کادر) انجام
+      // می‌شه.
       input.value = transcript;
-      performSearch();
-      pushSearchHistory(transcript);
-      closeSearchHistoryDropdown();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
     });
 
     inPageVoiceRecognition.addEventListener("error", event => {

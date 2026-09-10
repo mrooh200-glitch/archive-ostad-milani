@@ -4890,10 +4890,16 @@
 
       siteVoiceRecognition.addEventListener("result", event => {
         const transcript = event.results[0][0].transcript;
+        // Item ۱۳ (رفع باگ: تایپ صوتی بدون تاییدِ کاربر مستقیم اجرا
+        // می‌شد): قبلاً همین‌جا renderResults/pushSearchHistory هم صدا
+        // زده می‌شد - یعنی به محض تشخیص صدا، فوراً «ثبت» هم می‌شد، بدون
+        // این‌که کاربر فرصت مرور/اصلاح متن رو داشته باشه. حالا فقط متن
+        // داخل کادر نشون داده می‌شه (دقیقاً مثل تایپ دستی، که نتایج
+        // زنده نشونش می‌ده) و کاربر با زدن Enter (همون رفتار همیشگی
+        // تاییدِ جست‌وجو) اون رو نهایی می‌کنه.
         searchInput.value = transcript;
-        renderResults(transcript);
-        pushSearchHistory(transcript);
-        closeSearchHistoryDropdown();
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+        searchInput.focus();
       });
 
       siteVoiceRecognition.addEventListener("error", event => {
@@ -5055,10 +5061,15 @@
 
       aiChatVoiceRecognition.addEventListener("result", event => {
         const transcript = event.results[0][0].transcript;
+        // Item ۱۳ (رفع باگ: تایپ صوتی بدون تاییدِ کاربر مستقیم اجرا
+        // می‌شد): این مورد از همه مهم‌تر بود - قبلاً به‌محض تشخیص صدا،
+        // فرم گفتگو *فوراً* ارسال می‌شد (یعنی سؤال مستقیم برای هوش
+        // فرستاده می‌شد) بدون این‌که کاربر فرصتی برای دیدن/اصلاح متن
+        // تشخیص‌داده‌شده داشته باشه. حالا فقط متن داخل کادر نوشته و
+        // فوکوس می‌شه؛ ارسال واقعی فقط با تاییدِ خودِ کاربر (زدن Enter
+        // یا کلیک روی دکمهٔ ارسال) انجام می‌شه.
         input.value = transcript;
-        if (form && typeof form.requestSubmit === "function") {
-          form.requestSubmit();
-        }
+        input.focus();
       });
 
       aiChatVoiceRecognition.addEventListener("error", event => {
