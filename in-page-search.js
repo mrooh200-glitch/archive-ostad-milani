@@ -1937,7 +1937,6 @@
         position: relative;
         width: min(728px, 100%);
         max-height: 80vh;
-        overflow-y: auto;
         background: #ffffff;
         border-radius: 14px;
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
@@ -1946,8 +1945,16 @@
         text-align: right;
       }
 
-      #inPageArchivePanel .archive-header,
-      #inPageBookmarksPanel .archive-header {
+      #inPageArchivePanel {
+        overflow: hidden;
+      }
+
+      #inPageArchivePanel .panel-scroll-area {
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+
+      #inPageArchivePanel .archive-header {
         position: sticky;
         top: 0;
         display: flex;
@@ -1958,6 +1965,54 @@
         background: #f8fafc;
         color: #173b63;
         font-weight: bold;
+      }
+
+      /* آیتم ۳ و ۲۴ (هم‌ارز اصلاحاتی که در index.htm انجام شد - این
+         پنل، یک کپی کاملاً جداست و قبلاً اصلاً به این اصلاحات نرسیده
+         بود): #inPageBookmarksPanel دیگر خودش اسکرول نمی‌شود - یک
+         لایهٔ داخلی (panel-scroll-area) این کار را می‌کند، تا × بیرون
+         از آن، همیشه ثابت بماند. هدر هم دیگر خودش جدا sticky نیست -
+         به‌همراه نوار «کتاب/برچسبِ جاری»، هر دو داخل یک wrapper واحد
+         (archive-sticky-header) sticky هستند - چون دو sticky مستقلِ
+         هم‌جوار (که در index.htm هم امتحان شد) قابل‌اعتماد نبود. */
+      #inPageBookmarksPanel {
+        overflow: hidden;
+      }
+
+      #inPageBookmarksPanel .panel-scroll-area {
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+
+      #inPageBookmarksPanel .archive-sticky-header {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+        background: #ffffff;
+      }
+
+      #inPageBookmarksPanel .archive-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px 12px 44px;
+        border-bottom: 1px solid #e2e8f0;
+        background: #f8fafc;
+        color: #173b63;
+        font-weight: bold;
+      }
+
+      .bookmark-current-group-bar {
+        display: none;
+        padding: 6px 16px;
+        font-size: 0.78rem;
+        color: #475569;
+        background: #f1f5f9;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      .bookmark-current-group-bar.is-visible {
+        display: block;
       }
 
       #inPageArchivePanel .archive-header-actions,
@@ -2066,7 +2121,6 @@
         position: relative;
         width: min(728px, 100%);
         max-height: 80vh;
-        overflow-y: auto;
         background: #ffffff;
         border-radius: 14px;
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
@@ -3700,6 +3754,7 @@
 
     panel.innerHTML = `
       <button type="button" class="panel-close-x" id="inPageArchiveClose" title="بستن" aria-label="بستن">×</button>
+      <div class="panel-scroll-area">
       <div class="archive-header">
         <span>آرشیو نتایج (${items.length})</span>
         <div class="archive-header-actions">
@@ -3707,6 +3762,7 @@
         </div>
       </div>
       ${listHtml}
+      </div>
     `;
 
     const clearButton = panel.querySelector("#inPageArchiveClear");
@@ -4608,6 +4664,7 @@
     panel.innerHTML = `
       <button type="button" class="panel-close-x" id="inPageBookmarksClose" title="بستن" aria-label="بستن">×</button>
       <div class="panel-scroll-area">
+      <div class="archive-sticky-header">
       <div class="archive-header">
         <span>نشانه‌ها (${all.length})</span>
         <div class="archive-header-actions">
@@ -4647,10 +4704,55 @@
             ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
         </div>
       </div>
+      <div class="bookmark-current-group-bar" id="inPageBookmarksCurrentGroupBar"></div>
+      </div>
       ${tagChipsHtml}
       ${listHtml}
       </div>
     `;
+
+    // Item ۲۴ (هم‌ارز اصلاح index.htm): یک wrapper sticky واحد (هدر +
+    // نوار کتاب/برچسبِ جاری) - به‌جای دو sticky مستقل که قابل‌اعتماد
+    // نبود.
+    const ipbmScrollArea = panel.querySelector(".panel-scroll-area");
+    const ipbmStickyWrapper = panel.querySelector(".archive-sticky-header");
+    const ipbmGroupBar = panel.querySelector("#inPageBookmarksCurrentGroupBar");
+
+    function updateInPageBookmarkCurrentGroupBar() {
+      if (!ipbmScrollArea || !ipbmStickyWrapper || !ipbmGroupBar) return;
+
+      const headerEl = ipbmStickyWrapper.querySelector(".archive-header");
+      const boundary = (headerEl || ipbmStickyWrapper).getBoundingClientRect().bottom;
+
+      const groupEls = panel.querySelectorAll(".bookmark-group-book, .bookmark-group-tag");
+      let currentBook = "";
+      let currentTag = "";
+
+      groupEls.forEach(el => {
+        if (el.getBoundingClientRect().top <= boundary + 1) {
+          if (el.classList.contains("bookmark-group-book")) {
+            currentBook = el.textContent;
+            currentTag = "";
+          } else {
+            currentTag = el.textContent;
+          }
+        }
+      });
+
+      if (currentBook) {
+        ipbmGroupBar.textContent = currentTag ? `${currentBook} / ${currentTag}` : currentBook;
+        ipbmGroupBar.classList.add("is-visible");
+      } else {
+        ipbmGroupBar.textContent = "";
+        ipbmGroupBar.classList.remove("is-visible");
+      }
+    }
+
+    updateInPageBookmarkCurrentGroupBar();
+
+    if (ipbmScrollArea) {
+      ipbmScrollArea.addEventListener("scroll", updateInPageBookmarkCurrentGroupBar, { passive: true });
+    }
 
     const clearButton = panel.querySelector("#inPageBookmarksClear");
     if (clearButton) {

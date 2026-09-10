@@ -567,7 +567,6 @@
     }
 
     #archivePanel .archive-header,
-    #bookmarksPanel .archive-header,
     #aiChatArchivePanel .archive-header {
       position: sticky;
       top: 0;
@@ -579,10 +578,49 @@
       background: #f8fafc;
       color: #173b63;
       font-weight: bold;
-      /* آیتم ۲۴: هدر باید همیشه بالاتر از تب‌های عنوان کتاب بنشیند - حتی
-         اگر (به هر دلیلی) لحظه‌ای هم‌پوشانی پیش بیاید، هدر روی تب عنوان
-         افتاده نمی‌شود، نه برعکس. */
       z-index: 4;
+    }
+
+    /* آیتم ۲۴ (تلاش نهایی - واقعاً نهایی): چند بار position:sticky
+       دوسطحی (هدر + تب عنوان، هرکدام جدا sticky با آفست محاسبه‌شده)
+       امتحان شد و هربار روی سایت واقعی کار نکرد - به‌نظر می‌رسد
+       دوتا sticky مستقل که باید هماهنگ کنار هم بشینند، در محیط واقعی
+       سایت قابل‌اعتماد نیست. راه‌حل قطعی: به‌جای دو عنصر sticky جدا،
+       فقط *یک* عنصر sticky داریم (این wrapper) که خودِ هدر و نوار
+       «کتاب/برچسبِ جاری» هر دو داخلش هستند - پس هیچ‌وقت مجبور به
+       هماهنگ‌کردن دو sticky مستقل نیستیم، دقیقاً مثل خودِ هدر که
+       همیشه درست کار کرده.
+       #bookmarksPanel .archive-header دیگر خودش sticky نیست - این
+       wrapper به‌جایش این کار را می‌کند. */
+    #bookmarksPanel .archive-sticky-header {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      background: #ffffff;
+    }
+
+    #bookmarksPanel .archive-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px 12px 44px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #173b63;
+      font-weight: bold;
+    }
+
+    .bookmark-current-group-bar {
+      display: none;
+      padding: 6px 16px;
+      font-size: 0.78rem;
+      color: #475569;
+      background: #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .bookmark-current-group-bar.is-visible {
+      display: block;
     }
 
     #archivePanel .archive-header-actions,
@@ -4486,28 +4524,31 @@
       panel.innerHTML = `
         <button type="button" class="panel-close-x" id="bookmarksCloseButton" title="بستن" aria-label="بستن">×</button>
         <div class="panel-scroll-area">
-          <div class="archive-header">
-            <span>نشانه‌ها (${all.length})<span class="bookmark-current-group-label" id="bookmarksCurrentGroupLabel"></span></span>
-            <div class="archive-header-actions">
-              <button
-                type="button"
-                id="bookmarksSelectAll"
-                title="انتخاب تمام نشانه‌های نمایش‌داده‌شده در همین فهرست"
-                ${items.length === 0 ? "disabled" : ""}>انتخاب همه</button>
-              <button
-                type="button"
-                id="bookmarksClearSelection"
-                title="برداشتن علامت انتخاب از تمام نشانه‌هایی که تاکنون انتخاب کرده‌اید"
-                ${hasBookmarkSelection ? "" : "disabled"}>
-                پاک‌کردن انتخاب
-                ${hasBookmarkSelection ? `<span class="bookmark-selection-badge">(${selectedBookmarkIds.size})</span>` : ""}
-              </button>
-              <button type="button" id="bookmarksClearButton">پاک‌کردن همه</button>
-              <button type="button" id="bookmarksCopy" ${exportItems.length === 0 ? "disabled" : ""}>کپی</button>
-              <button type="button" id="bookmarksExportPdf" ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
-              <button type="button" id="bookmarksExportWord" ${exportItems.length === 0 ? "disabled" : ""}>Word</button>
-              <button type="button" id="bookmarksExportText" ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
+          <div class="archive-sticky-header">
+            <div class="archive-header">
+              <span>نشانه‌ها (${all.length})</span>
+              <div class="archive-header-actions">
+                <button
+                  type="button"
+                  id="bookmarksSelectAll"
+                  title="انتخاب تمام نشانه‌های نمایش‌داده‌شده در همین فهرست"
+                  ${items.length === 0 ? "disabled" : ""}>انتخاب همه</button>
+                <button
+                  type="button"
+                  id="bookmarksClearSelection"
+                  title="برداشتن علامت انتخاب از تمام نشانه‌هایی که تاکنون انتخاب کرده‌اید"
+                  ${hasBookmarkSelection ? "" : "disabled"}>
+                  پاک‌کردن انتخاب
+                  ${hasBookmarkSelection ? `<span class="bookmark-selection-badge">(${selectedBookmarkIds.size})</span>` : ""}
+                </button>
+                <button type="button" id="bookmarksClearButton">پاک‌کردن همه</button>
+                <button type="button" id="bookmarksCopy" ${exportItems.length === 0 ? "disabled" : ""}>کپی</button>
+                <button type="button" id="bookmarksExportPdf" ${exportItems.length === 0 ? "disabled" : ""}>PDF</button>
+                <button type="button" id="bookmarksExportWord" ${exportItems.length === 0 ? "disabled" : ""}>Word</button>
+                <button type="button" id="bookmarksExportText" ${exportItems.length === 0 ? "disabled" : ""}>Text</button>
+              </div>
             </div>
+            <div class="bookmark-current-group-bar" id="bookmarksCurrentGroupBar"></div>
           </div>
           ${tagChipsHtml}
           ${listHtml}
@@ -4522,28 +4563,30 @@
       // «.bookmark-group-book» که از زیر هدر رد شده را پیدا می‌کنیم و
       // نامش را در برچسب داخل هدر می‌نویسیم - دیگر به هیچ sticky جدیدی
       // متکی نیست، فقط از همون هدرِ ثابتِ موجود استفاده می‌کند.
+      // Item ۲۴ (تکمیل): اکنون خودِ wrapper (archive-sticky-header) با
+      // هدر و نوار «کتاب/برچسبِ جاری» با هم یک واحد sticky واحدند - پس
+      // مرز مرجع برای «از زیر هدر رد شده یا نه» پایینِ همین wrapper است،
+      // نه فقط پایینِ خودِ هدر.
       const bmScrollArea = panel.querySelector(".panel-scroll-area");
-      const bmHeaderEl = panel.querySelector(".archive-header");
-      const bmGroupLabel = panel.querySelector("#bookmarksCurrentGroupLabel");
+      const bmStickyWrapper = panel.querySelector(".archive-sticky-header");
+      const bmGroupBar = panel.querySelector("#bookmarksCurrentGroupBar");
 
       function updateBookmarkCurrentGroupLabel() {
-        if (!bmScrollArea || !bmHeaderEl || !bmGroupLabel) return;
+        if (!bmScrollArea || !bmStickyWrapper || !bmGroupBar) return;
 
-        const headerBottom = bmHeaderEl.getBoundingClientRect().bottom;
+        // نوار «کتاب/برچسبِ جاری» خودش هم داخل wrapper است، پس ارتفاعش
+        // را کنار می‌گذاریم و فقط لبهٔ پایینِ خودِ هدر (نه کل wrapper)
+        // را به‌عنوان مرز در نظر می‌گیریم - وگرنه با نمایش خودِ نوار،
+        // مرز هی جابه‌جا می‌شد.
+        const headerEl = bmStickyWrapper.querySelector(".archive-header");
+        const boundary = (headerEl || bmStickyWrapper).getBoundingClientRect().bottom;
 
-        // Item جدید (تکمیل مورد ۲۴): وقتی از یک کتاب، چند برچسب/تگ جدا
-        // (مثل «ب» و «ج») ساخته شده، این‌ها به‌صورت زیرعنوان‌های جداگانه
-        // (bookmark-group-tag) زیرِ همون عنوان کتاب (bookmark-group-book)
-        // می‌آیند. با هر اسکرول، هم آخرین عنوان کتاب و هم آخرین زیرعنوانِ
-        // برچسبِ همون کتاب (که با رسیدن به یک عنوان کتابِ جدید دوباره از
-        // صفر شروع می‌شود) را پیدا می‌کنیم، تا برچسب هدر دقیقاً هر دو
-        // سطح را نشان دهد.
         const groupEls = panel.querySelectorAll(".bookmark-group-book, .bookmark-group-tag");
         let currentBook = "";
         let currentTag = "";
 
         groupEls.forEach(el => {
-          if (el.getBoundingClientRect().top <= headerBottom + 1) {
+          if (el.getBoundingClientRect().top <= boundary + 1) {
             if (el.classList.contains("bookmark-group-book")) {
               currentBook = el.textContent;
               currentTag = "";
@@ -4553,9 +4596,13 @@
           }
         });
 
-        bmGroupLabel.textContent = currentBook
-          ? ` — ${currentBook}${currentTag ? ` / ${currentTag}` : ""}`
-          : "";
+        if (currentBook) {
+          bmGroupBar.textContent = currentTag ? `${currentBook} / ${currentTag}` : currentBook;
+          bmGroupBar.classList.add("is-visible");
+        } else {
+          bmGroupBar.textContent = "";
+          bmGroupBar.classList.remove("is-visible");
+        }
       }
 
       updateBookmarkCurrentGroupLabel();
