@@ -6,6 +6,12 @@
 
   <title>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</title>
 
+  <!-- Item ۲۵ (حالت آفلاین): manifest برای نصب/PWA + رنگ نوار مرورگر -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#173b63">
+  <link rel="icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
   <style>
     * {
       box-sizing: border-box;
@@ -8292,5 +8298,18 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="search-widget.js"></script>
+
+  <!-- Item ۲۵ (حالت آفلاین): ثبت Service Worker - اگر مرورگر پشتیبانی
+       نکند یا فایل sw.js هنوز روی سایت نباشد، بی‌سروصدا نادیده گرفته
+       می‌شود؛ بقیهٔ سایت هیچ وابستگی‌ای به موفقیت این ثبت ندارد. -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(err => {
+          console.warn("ثبت Service Worker (حالت آفلاین) ناموفق بود:", err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

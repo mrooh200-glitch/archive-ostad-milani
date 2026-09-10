@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>نمایشگر PDF - آرشیو استاد میلانی</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#173b63">
 <!--
   Item ۱۷ (بازنگری ارجاع به PDF): این صفحه یک ویوئر اختصاصی PDF است
   (به‌جای تکیه بر ویوئر پیش‌فرض مرورگر داخل iframe) که با کتابخانهٔ
@@ -20,7 +22,7 @@
     page  - شماره صفحه‌ای که باید اول باز شود (اختیاری، پیش‌فرض ۱)
     q     - متنی که باید در همان صفحه پیدا و هایلایت شود (اختیاری)
 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root {
     --brand-blue: #173b63;
@@ -223,7 +225,7 @@
   "use strict";
 
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
   const params = new URLSearchParams(location.search);
   const fileParam = params.get("file");
@@ -332,6 +334,7 @@
     pageContainer.style.height = viewport.height + "px";
     textLayerDiv.style.width = viewport.width + "px";
     textLayerDiv.style.height = viewport.height + "px";
+    textLayerDiv.style.setProperty("--scale-factor", currentScale);
     textLayerDiv.innerHTML = "";
 
     const ctx = canvas.getContext("2d");
