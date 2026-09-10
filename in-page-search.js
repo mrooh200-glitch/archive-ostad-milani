@@ -3064,7 +3064,12 @@
       params.set("page", pageNumber);
     }
 
-    return `${base}?${params.toString()}#:~:text=${encodeURIComponent(fragmentText)}`;
+    // Item جدید (رفع باگ: هایلایت اضافیِ بومیِ مرورگر): قبلاً یک
+    // #:~:text= هم به انتهای لینک اضافه می‌شد - چون هایلایت دقیق خودِ
+    // سایت (بر پایهٔ q/frag/occ بالا) از قبل این مورد رو پوشش می‌ده،
+    // و ویژگی بومیِ مرورگر می‌تونست (برای متن‌های طولانی/تکراری) رخداد
+    // اشتباهی رو هایلایت کنه، این بخش حذف شد.
+    return `${base}?${params.toString()}`;
   }
 
   // ---- Item جدید (شماره‌ی پاورقی داخل متن + آدرس‌های داخل پاورقی) -----
@@ -3803,7 +3808,10 @@
       params.set("page", page);
     }
 
-    return `${base}?${params.toString()}#:~:text=${encodeURIComponent(fragment)}`;
+    // Item جدید (رفع باگ: هایلایت اضافیِ بومیِ مرورگر - هم‌سو با
+    // buildMatchUrl): #:~:text= بومی حذف شد، چون هایلایت خودِ سایت
+    // (q/frag/occ) کافی و دقیق‌تره.
+    return `${base}?${params.toString()}`;
   }
 
   function addBookmark({ text, url, tags, occurrenceIndex, links, page }) {
