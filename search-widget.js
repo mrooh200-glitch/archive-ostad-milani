@@ -342,7 +342,19 @@ async function askQuestion(question, history = [], mode = "grounded", image = nu
   const chatRes = await fetch(`${WORKER_URL}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, context: contextTexts, history, mode, image }),
+    body: JSON.stringify({
+      question,
+      context: contextTexts,
+      history,
+      mode,
+      image,
+      // Item ۱۲: خصوصیاتِ دلخواهِ ذخیره‌شدهٔ کاربر (اگر تنظیم کرده باشد) -
+      // نکتهٔ مهم: اعمال واقعیِ این متن در پاسخ، به تغییری در سمتِ
+      // Worker نیاز دارد (اضافه‌شدنش به system prompt)؛ فایل worker در
+      // این گفتگو موجود نیست، پس فعلاً فقط فرستاده می‌شود بدون تضمین
+      // این‌که Worker فعلی از آن استفاده می‌کند.
+      customInstructions: getAiCustomInstructionsAi() || undefined,
+    }),
   });
   if (!chatRes.ok) {
     let message = "خطا در دریافت پاسخ از دستیار";
@@ -382,6 +394,35 @@ async function askQuestion(question, history = [], mode = "grounded", image = nu
 // ============================================================
 
 const AI_BOOKMARKS_STORAGE_KEY = "milaniBookmarks";
+
+// Item ۱۲ (خصوصیاتِ شخصی‌سازیِ گفتگو): متنِ دلخواهی که کاربر یک‌بار
+// ذخیره می‌کند و هوش با هر سؤال آن را می‌بیند - مثل «همیشه به زبان ساده
+// جواب بده» یا «پاسخ‌ها کوتاه باشد». محلی روی همین مرورگر ذخیره می‌شود
+// (بین گفتگوها/جلسات باقی می‌ماند، اما بین دستگاه‌های مختلف کاربر
+// همگام نمی‌شود).
+const AI_CUSTOM_INSTRUCTIONS_KEY = "milaniAiCustomInstructions";
+
+function getAiCustomInstructionsAi() {
+  try {
+    return localStorage.getItem(AI_CUSTOM_INSTRUCTIONS_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
+function setAiCustomInstructionsAi(text) {
+  try {
+    if (text) {
+      localStorage.setItem(AI_CUSTOM_INSTRUCTIONS_KEY, text);
+    } else {
+      localStorage.removeItem(AI_CUSTOM_INSTRUCTIONS_KEY);
+    }
+  } catch {
+    // ذخیره‌سازی محلی در دسترس نبود (حالت خصوصی/ناشناس و مانند آن) -
+    // بی‌سروصدا نادیده گرفته می‌شود، مثل بقیهٔ استفاده‌های localStorage
+    // در این فایل.
+  }
+}
 
 function escapeHtmlAi(text) {
   return String(text || "")
@@ -1074,6 +1115,7 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
       <button type="button" class="ai-toolbar-btn" data-action="bookmark">⭐ افزودن به نشانه</button>
       <button type="button" class="ai-toolbar-btn" data-action="view-bookmarks">🔖 مشاهدهٔ نشانه‌ها</button>
       ${archiveButtonHtml}
+      <button type="button" class="ai-toolbar-btn" data-action="settings">⚙️ خصوصیات گفتگو</button>
       <span class="ai-toolbar-status" aria-live="polite"></span>
     </div>
   `;
@@ -1097,6 +1139,24 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
       if (typeof openBookmarksPanel === "function") {
         openBookmarksPanel();
       }
+      return;
+    }
+
+    // Item ۱۲ (خصوصیاتِ شخصی‌سازیِ گفتگو): کاربر یک متن دلخواه ذخیره
+    // می‌کند (مثلاً «پاسخ‌ها را کوتاه و ساده بده») که با هر سؤال، همراه
+    // درخواست برای Worker فرستاده می‌شود (نگاه کنید به askQuestion).
+    if (action === "settings") {
+      const current = getAiCustomInstructionsAi();
+      const next = prompt(
+        "چه خصوصیاتی می‌خواهید هوش هنگام گفتگو با شما رعایت کند؟ (مثلاً لحن، طول پاسخ، سطح توضیح). برای پاک‌کردن، خالی بگذارید و تایید کنید.",
+        current
+      );
+
+      if (next !== null) {
+        setAiCustomInstructionsAi(next.trim());
+        setStatus(next.trim() ? "ذخیره شد" : "پاک شد");
+      }
+
       return;
     }
 
