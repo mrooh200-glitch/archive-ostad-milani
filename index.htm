@@ -5451,17 +5451,35 @@
         const isAyah = block.classList.contains("quran-ayah");
         const isHadith = block.classList.contains("hadith-text");
 
+        // Item ۹ (شماره صفحه در همه‌جا): اگه این پاراگراف داخل یک
+        // <section class="pdf-page" data-page-number="N"> باشه (یعنی
+        // فایل از پایپ‌لاین صفحه‌بندی‌شده میاد)، شماره صفحهٔ چاپی رو هم
+        // نگه می‌داریم - قبلاً این فقط برای فایل‌هایی کار می‌کرد که
+        // document.type==="pdf" بود (که هیچ‌وقت اتفاق نمی‌افته، چون
+        // PDFها از جست‌وجوی متنی حذف شدند)؛ حالا برای *هر* فایل HTML
+        // صفحه‌بندی‌شده کار می‌کنه.
+        // Item ۹ (رفع اصلی: ساختار واقعیِ فایل‌ها با فرضِ قبلی فرق داشت):
+        // شمارهٔ صفحه در واقع با <section class="page" data-display="N">
+        // مشخص می‌شه (نه class="pdf-page" و data-page-number که قبلاً
+        // فرض کرده بودیم و هیچ‌وقت با فایل واقعی مطابقت نداشت).
+        // data-display="0" مخصوص جلد/صفحات بی‌شماره‌ست، پس نادیده گرفته
+        // می‌شه.
+        const pageSection = block.closest("section.page[data-display]");
+        const rawPageNumber = pageSection ? pageSection.getAttribute("data-display") : null;
+        const pageNumber = rawPageNumber && rawPageNumber !== "0" ? rawPageNumber : null;
+
         if (seen.has(text)) {
           const existing = seen.get(text);
           seen.set(text, {
             isFootnote: existing.isFootnote && isFootnote,
             isAyah: existing.isAyah || isAyah,
-            isHadith: existing.isHadith || isHadith
+            isHadith: existing.isHadith || isHadith,
+            pageNumber: existing.pageNumber || pageNumber
           });
           return;
         }
 
-        seen.set(text, { isFootnote, isAyah, isHadith });
+        seen.set(text, { isFootnote, isAyah, isHadith, pageNumber });
         order.push(text);
       });
 
@@ -5469,7 +5487,8 @@
         paragraphs: order,
         footnoteFlags: order.map(text => !!seen.get(text).isFootnote),
         ayahFlags: order.map(text => !!seen.get(text).isAyah),
-        hadithFlags: order.map(text => !!seen.get(text).isHadith)
+        hadithFlags: order.map(text => !!seen.get(text).isHadith),
+        pageNumbers: order.map(text => seen.get(text).pageNumber || null)
       };
     }
 
@@ -6000,7 +6019,7 @@
             }
 
             const html = await response.text();
-            const { paragraphs, footnoteFlags, ayahFlags, hadithFlags } = getParagraphsFromHtml(html);
+            const { paragraphs, footnoteFlags, ayahFlags, hadithFlags, pageNumbers } = getParagraphsFromHtml(html);
 
             documents.push({
               type: "html",
@@ -6009,7 +6028,8 @@
               paragraphs: paragraphs,
               footnoteFlags: footnoteFlags,
               ayahFlags: ayahFlags,
-              hadithFlags: hadithFlags
+              hadithFlags: hadithFlags,
+              pageNumbers: pageNumbers
             });
           } catch (error) {
             console.warn("Text file not loaded:", url, error);
@@ -6240,9 +6260,7 @@
               </a>
 
               ${result.pdfPageNumber ? `
-                <span class="result-pdf-location">
-                  صفحهٔ ${result.pdfPageNumber} — پاراگراف ${result.pdfParagraphOnPage}
-                </span>
+                <span class="result-pdf-location">صفحهٔ ${escapeHtml(String(result.pdfPageNumber))}</span>
               ` : ""}
             </div>
 
@@ -7412,8 +7430,13 @@
           // Item جدید: برای نتایج PDF، شمارهٔ صفحه و شمارهٔ پاراگراف
           // (در همون صفحه) رو هم به نتیجه اضافه می‌کنیم تا در بلوک
           // نمایش نتایج نشون داده بشه.
-          const pdfPageNumber = document.type === "pdf" ? document.pageNumbers[paragraphIndex] : null;
-          const pdfParagraphOnPage = document.type === "pdf" ? document.paragraphOnPage[paragraphIndex] : null;
+          // Item ۹ (شماره صفحه در همه‌جا): قبلاً این فقط برای اسناد
+          // type==="pdf" پر می‌شد - که هیچ‌وقت اتفاق نمی‌افتد (PDFها از
+          // جست‌وجوی متنی حذف شدند). حالا از document.pageNumbers
+          // استفاده می‌کنیم - که برای *هر* سند HTMLِ صفحه‌بندی‌شده پر
+          // می‌شه، چون شمارهٔ صفحه از خودِ
+          // <section class="pdf-page" data-page-number> در HTML میاد.
+          const pdfPageNumber = document.pageNumbers ? document.pageNumbers[paragraphIndex] : null;
 
           if (proximitySearchEnabled) {
             const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
@@ -7431,7 +7454,6 @@
                 snippet: getProximitySentenceSnippet(paragraph, proximityWords, proximityDistance),
                 sortKey: normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
                 url: buildResultUrl(
                   document, paragraphIndex, query, false,
                   fragmentText, occurrenceIndex
@@ -7472,7 +7494,6 @@
                 matchedWordKeys: matchedWordKeys,
                 sortKey: matchedWordKeys[0] || normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
                 url: buildResultUrl(
                   document, paragraphIndex, query, rootMode,
                   fragmentText, occurrenceIndex
@@ -7497,7 +7518,6 @@
                 snippet: getProximitySentenceSnippet(paragraph, andOrWords, UNLIMITED_PROXIMITY_DISTANCE),
                 sortKey: normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
                 url: buildResultUrl(
                   document, paragraphIndex, query, false,
                   fragmentText, occurrenceIndex
@@ -7521,7 +7541,6 @@
                 snippet: getSentenceSnippet(paragraph, matchedWord),
                 sortKey: normalize(fragmentText),
                 pdfPageNumber: pdfPageNumber,
-                pdfParagraphOnPage: pdfParagraphOnPage,
                 url: buildResultUrl(
                   document, paragraphIndex, query, false,
                   fragmentText, occurrenceIndex
@@ -7538,7 +7557,6 @@
               snippet: getSentenceSnippet(paragraph, query),
               sortKey: normalize(fragmentText),
               pdfPageNumber: pdfPageNumber,
-              pdfParagraphOnPage: pdfParagraphOnPage,
               url: buildResultUrl(
                 document, paragraphIndex, query, rootMode,
                 fragmentText, occurrenceIndex

@@ -128,12 +128,15 @@ function extractBookTitle($, filePath, titleIndex) {
 }
 
 // ---------- ۵. استخراج عنوان و پاراگراف‌های تمیز از هر فایل htm ----------
-// Item جدید (شمارهٔ صفحهٔ چاپی): برای فایل‌هایی که از پایپ‌لاین
-// صفحه‌بندی‌شده ساخته شده‌اند (مثل Osoul-al-Maaref-al-Elahiyya.htm)، هر
-// پاراگراف داخل <section class="pdf-page" data-page-number="N"> قرار
-// داره. اینجا همراه با متن هر پاراگراف، همون شماره صفحه (اگه وجود
-// داشته باشه) رو هم نگه می‌داریم تا بعداً تو embeddings.json ذخیره بشه.
-// برای فایل‌های خام Word که این ساختار رو ندارن، page همیشه null می‌مونه.
+// Item جدید (شمارهٔ صفحهٔ چاپی - رفع مورد ۹: ساختار واقعی فایل‌ها با
+// فرضِ اولیه فرق داشت): برای فایل‌هایی که از پایپ‌لاین صفحه‌بندی‌شده
+// ساخته شده‌اند، هر پاراگراف داخل <section class="page" data-display="N">
+// قرار داره (نه class="pdf-page" و data-page-number که قبلاً فرض شده
+// بود). اینجا همراه با متن هر پاراگراف، همون شماره صفحهٔ نمایشی (اگه
+// وجود داشته باشه) رو هم نگه می‌داریم تا بعداً تو embeddings.json ذخیره
+// بشه. data-display="0" مخصوص جلد/صفحات بی‌شماره‌ست و نادیده گرفته
+// می‌شه. برای فایل‌های خام Word که این ساختار رو ندارن، page همیشه
+// null می‌مونه.
 function extractBookContent(filePath, titleIndex) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const $ = cheerio.load(raw);
@@ -145,8 +148,9 @@ function extractBookContent(filePath, titleIndex) {
   $("p").each((_, el) => {
     const text = $(el).text().replace(/\s+/g, " ").trim();
     if (text.length > 0) {
-      const pageSection = $(el).closest("section.pdf-page[data-page-number]");
-      const page = pageSection.length ? pageSection.attr("data-page-number") : null;
+      const pageSection = $(el).closest("section.page[data-display]");
+      const rawPage = pageSection.length ? pageSection.attr("data-display") : null;
+      const page = rawPage && rawPage !== "0" ? rawPage : null;
       paragraphs.push({ text, page });
     }
   });

@@ -28,7 +28,7 @@
 // in-page-search.js) تغییر مهمی می‌کنند، این عدد را
 // بالا ببرید تا کاربرها نسخهٔ کش‌شدهٔ قدیمی را دور بیندازند و نسخهٔ
 // جدید را بگیرند.
-const CACHE_VERSION = "milani-cache-v9";
+const CACHE_VERSION = "milani-cache-v11";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

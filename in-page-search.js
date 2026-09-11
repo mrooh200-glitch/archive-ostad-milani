@@ -2964,9 +2964,14 @@
     }
 
     const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-    const pageEl = el && el.closest ? el.closest("section.pdf-page[data-page-number]") : null;
+    // Item ۹ (رفع اصلی): ساختار واقعیِ فایل‌ها <section class="page"
+    // data-display="N"> است - نه class="pdf-page" و data-page-number
+    // که قبلاً فرض شده بود و هیچ‌وقت مطابقت پیدا نمی‌کرد.
+    // data-display="0" مخصوص جلد/صفحات بی‌شماره‌ست.
+    const pageEl = el && el.closest ? el.closest("section.page[data-display]") : null;
+    const raw = pageEl ? pageEl.getAttribute("data-display") : null;
 
-    return pageEl ? pageEl.getAttribute("data-page-number") : null;
+    return raw && raw !== "0" ? raw : null;
   }
 
   // Item جدید (رفع باگ: نشانه‌ی دوم به بعد رنگ نمی‌گیره - تلاش دوم):
