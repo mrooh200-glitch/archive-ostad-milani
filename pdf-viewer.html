@@ -226,13 +226,13 @@
 // نسخه‌های جدیدتر این مشکل رو ندارن. چون از نسخه‌ی ۴ به بعد PDF.js
 // دیگه فقط به‌صورت ماژول (import/mjs) منتشر می‌شه (نه اسکریپت
 // سراسری قدیمی)، این بخش به import تبدیل شد.
-import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs";
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";
 
 (function () {
   "use strict";
 
   pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs";
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs";
 
   const params = new URLSearchParams(location.search);
   const fileParam = params.get("file");
@@ -361,12 +361,15 @@ import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379
     await renderTask.promise;
 
     const textContent = await page.getTextContent();
-    await pdfjsLib.renderTextLayer({
+    // Item ۱۷ (سازگاری با نسخه‌ی جدید PDF.js): از نسخه‌ی ۴.۳ به بعد،
+    // تابع قدیمیِ renderTextLayer برداشته شده و باید از کلاس جدید
+    // TextLayer استفاده کرد.
+    const textLayer = new pdfjsLib.TextLayer({
       textContentSource: textContent,
       container: textLayerDiv,
       viewport,
-      textDivs: [],
-    }).promise;
+    });
+    await textLayer.render();
 
     // بعد از رندرِ لایهٔ متن، اگر عبارتی برای هایلایتِ خودکار داریم
     // (از پارامتر q، یا از یک نتیجهٔ جست‌وجوی سراسری)، همین‌جا انجامش
