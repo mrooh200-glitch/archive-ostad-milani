@@ -306,7 +306,19 @@ import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289
   async function loadPdf() {
     try {
       const resolvedUrl = new URL(fileParam, location.href).href;
-      const loadingTask = pdfjsLib.getDocument({ url: resolvedUrl });
+      // Item ۱۷ (رفع باگ «Bad end offset»): این خطا وقتی پیش میاد که
+      // PDF.js تلاش می‌کنه فایل رو تکه‌تکه (با HTTP Range Request)
+      // بگیره، ولی نحوه‌ی پاسخ‌دهیِ سرور به این نوع درخواست‌ها با
+      // انتظار PDF.js نمی‌خونه - نتیجه یک فایل به‌ظاهر خراب/ناقص در
+      // سمت PDF.js می‌شه، با این‌که خودِ فایل کاملاً سالمه (که با
+      // دانلود مستقیم و باز کردن با Preview قبلاً تأیید شد). با غیرفعال
+      // کردن Range/Stream، کل فایل یک‌جا و ساده دانلود می‌شه - کمی
+      // کندتر برای فایل‌های خیلی حجیم، ولی قابل‌اعتماد.
+      const loadingTask = pdfjsLib.getDocument({
+        url: resolvedUrl,
+        disableRange: true,
+        disableStream: true,
+      });
       pdfDoc = await loadingTask.promise;
       pageCountLabel.textContent = `از ${pdfDoc.numPages}`;
       pageNumberInput.max = pdfDoc.numPages;
