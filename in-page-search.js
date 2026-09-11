@@ -4978,6 +4978,52 @@
     ));
   }
 
+  // ---- Item ۲۱ (معجم کلیک‌پذیر) -------------------------------------------
+  // دابل‌کلیک روی یک کلمه (که خودِ مرورگر با دابل‌کلیک، همون یک کلمه رو
+  // به‌طور طبیعی انتخاب می‌کنه - رفتار استاندارد، بدون نیاز به کد
+  // جداگانه برای پیداکردن مرز کلمه) → یک تب جدید به یک دیکشنری آنلاین
+  // با همون کلمه باز می‌شه. راه‌حلِ کم‌ریسک (نسخه‌ی اول): به‌جای ساختن
+  // یک دیکشنریِ اختصاصی داخل سایت (که نیاز به منبع داده‌ای داره که در
+  // اختیار نداریم)، از دو دیکشنری آنلاینِ موجود استفاده می‌کنیم.
+  //
+  // تشخیص فارسی/عربی: هیچ راه قطعی‌ای نیست (چون رسم‌الخط مشترکه)، پس
+  // از یک قاعده‌ی ساده استفاده می‌کنیم - اگه کلمه حاوی یکی از چهار
+  // حرفِ ویژه‌ی فارسی (پ چ ژ گ، که در عربی نیستن) باشه، فارسی در نظر
+  // گرفته می‌شه؛ وگرنه عربی.
+  function isWithinAppInterfaceOrLink(el) {
+    return isWithinAppInterface(el) || !!(el && el.closest("a"));
+  }
+
+  function buildDictionaryUrlForWord(word) {
+    const clean = word.trim();
+    const isPersianSpecific = /[پچژگ]/.test(clean);
+
+    return isPersianSpecific
+      ? `https://vajehyab.com/?q=${encodeURIComponent(clean)}`
+      : `https://www.almaany.com/fa/dict/ar-fa/${encodeURIComponent(clean)}/`;
+  }
+
+  document.addEventListener("dblclick", event => {
+    // روی خودِ بلوک‌های سایت (کادر جست‌وجو، پنل‌ها، لینک‌ها) کاری نکن -
+    // فقط روی متنِ اصلیِ کتاب.
+    if (isWithinAppInterfaceOrLink(event.target)) {
+      return;
+    }
+
+    const selection = window.getSelection();
+    const word = selection ? selection.toString().trim() : "";
+
+    // اگه دابل‌کلیک به‌جای یک کلمه، چند کلمه یا یک جملهٔ کامل رو انتخاب
+    // کرده باشه (مثلاً روی یک عدد/علامت که خودِ مرورگر چیز عجیبی
+    // انتخاب کرده)، از این ویژگی صرف‌نظر می‌کنیم - این فقط برای لغت
+    // تکی طراحی شده.
+    if (!word || /\s/.test(word) || word.length > 40) {
+      return;
+    }
+
+    window.open(buildDictionaryUrlForWord(word), "_blank", "noopener");
+  });
+
   function positionFloatingElementNearRect(el, rect) {
     const GAP = 8;
     const elRect = el.getBoundingClientRect();
