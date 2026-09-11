@@ -1,6 +1,28 @@
 (function () {
   "use strict";
 
+  // Item ۸ (آمار سایت): این فایل روی هر صفحهٔ کتاب جداگانه لود می‌شه و
+  // WORKER_URL خودِ search-widget.js رو (که ممکنه اصلاً روی این صفحه
+  // لود نشده باشه) نداره - برای همین آدرس رو این‌جا هم جدا نگه می‌داریم.
+  const STATS_WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
+
+  function trackEvent(type, detail) {
+    try {
+      fetch(`${STATS_WORKER_URL}/track`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, detail }),
+        keepalive: true,
+      }).catch(() => {
+        // آمار غیرحیاتیه - اگه ثبت نشد، به کار کاربر لطمه‌ای نمی‌زنه.
+      });
+    } catch {
+      // fetch حتی صدا هم زده نشد - بی‌خیالش می‌شیم.
+    }
+  }
+
+  trackEvent("pageview");
+
   const ignoredTags = new Set([
     "SCRIPT",
     "STYLE",
@@ -324,6 +346,11 @@
     if (!trimmed) {
       return;
     }
+
+    // Item ۸ (آمار سایت): این‌جا (نه هر کلیدی که تایپ می‌شه) بهترین جای
+    // ثبت یک «جست‌وجو»ست، چون فقط وقتی صدا زده می‌شه که کاربر واقعاً
+    // جست‌وجو رو تایید کرده باشه.
+    trackEvent("search", trimmed);
 
     const existing = loadSearchHistory().filter(item => item !== trimmed);
     existing.unshift(trimmed);
