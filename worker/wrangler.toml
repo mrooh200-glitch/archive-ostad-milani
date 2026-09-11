@@ -5,8 +5,13 @@ compatibility_date = "2025-01-01"
 # کش مشترک بین کاربران برای عبارت‌های جست‌وجوی تکراری (KV namespace).
 # این خط باعث می‌شه بایندینگ حتی بعد از هر بار wrangler deploy (از طریق
 # GitHub Action) هم باقی بمونه و پاک نشه.
+#
+# STATS_KV (مورد ۸ - آمار سایت) هم به همین دلیل این‌جا اضافه شد: قبلاً
+# فقط از داشبورد Cloudflare اضافه شده بود و با هر deploy جدید از GitHub
+# Action پاک می‌شد (همون چیزی که باعث شد آمار قطع‌وصل بشه).
 kv_namespaces = [
-  { binding = "EMBEDDING_CACHE", id = "5f532c24edbc40d6823cf9ab4768c966" }
+  { binding = "EMBEDDING_CACHE", id = "5f532c24edbc40d6823cf9ab4768c966" },
+  { binding = "STATS_KV", id = "4f2101adf4054f6690d470f5766f38f9" }
 ]
 
 # اتصال به Workers AI (برای مدل BGE-M3) -- نیازی به کلید نداره
