@@ -306,7 +306,7 @@ import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289
   async function loadPdf() {
     try {
       const resolvedUrl = new URL(fileParam, location.href).href;
-      const loadingTask = pdfjsLib.getDocument(resolvedUrl);
+      const loadingTask = pdfjsLib.getDocument({ url: resolvedUrl });
       pdfDoc = await loadingTask.promise;
       pageCountLabel.textContent = `از ${pdfDoc.numPages}`;
       pageNumberInput.max = pdfDoc.numPages;
