@@ -25,10 +25,10 @@
  */
 
 // Item جدید هر بار که فایل‌های اصلی سایت (index.htm، search-widget.js،
-// in-page-search.js، pdf-viewer.html) تغییر مهمی می‌کنند، این عدد را
+// in-page-search.js) تغییر مهمی می‌کنند، این عدد را
 // بالا ببرید تا کاربرها نسخهٔ کش‌شدهٔ قدیمی را دور بیندازند و نسخهٔ
 // جدید را بگیرند.
-const CACHE_VERSION = "milani-cache-v8";
+const CACHE_VERSION = "milani-cache-v9";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -38,7 +38,6 @@ const SHELL_FILES = [
   "index.htm",
   "search-widget.js",
   "in-page-search.js",
-  "pdf-viewer.html",
 ];
 
 self.addEventListener("install", event => {

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>آمار سایت - آرشیو استاد میلانی</title>
+<!--
+  Item ۸ (آمار سایت): این صفحه فقط داده‌های آماده‌شده توسط Worker را
+  (از endpoint GET /stats) نمایش می‌دهد؛ هیچ منطق شمارشی این‌جا نیست.
+
+  نکته‌ی امنیتی مهم: این صفحه فعلاً هیچ رمز/محدودیتی ندارد - هرکسی
+  آدرسش را بداند می‌تواند آمار را ببیند (نه چیز خطرناکی مثل کلید API،
+  ولی شاید نخواهید عمومی باشد). اگر خواستید محدودش کنید، ساده‌ترین راه
+  این است که در همین فایل یک رمز عبور ساده (که فقط خودتان می‌دانید)
+  اضافه شود - در صورت نیاز بگویید تا اضافه کنم.
+-->
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: Tahoma, Arial, sans-serif;
+    background: #f1f5f9;
+    color: #1f2937;
+    padding: 24px 16px 60px;
+  }
+
+  h1 {
+    color: #173b63;
+    font-size: 1.3rem;
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    max-width: 720px;
+    margin: 0 auto 32px;
+  }
+
+  .stat-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  }
+
+  .stat-card .value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #0f766e;
+  }
+
+  .stat-card .label {
+    color: #64748b;
+    font-size: 0.85rem;
+    margin-top: 4px;
+  }
+
+  .tables-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+    justify-content: center;
+  }
+
+  .table-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+    flex: 1 1 380px;
+    max-width: 420px;
+  }
+
+  .table-card h2 {
+    font-size: 1rem;
+    color: #173b63;
+    margin: 0 0 10px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+
+  th, td {
+    text-align: right;
+    padding: 6px 8px;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  th {
+    color: #64748b;
+    font-weight: normal;
+  }
+
+  td.count {
+    text-align: left;
+    color: #0f766e;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  .status-note {
+    text-align: center;
+    color: #64748b;
+    max-width: 500px;
+    margin: 0 auto 20px;
+  }
+
+  .status-note.error {
+    color: #b91c1c;
+  }
+</style>
+</head>
+<body>
+
+<h1>📊 آمار سایت — آرشیو استاد میلانی</h1>
+
+<p class="status-note" id="statusNote">در حال بارگذاری آمار…</p>
+
+<div class="stats-grid" id="statsGrid" style="display:none;">
+  <div class="stat-card">
+    <div class="value" id="statPageviews">۰</div>
+    <div class="label">بازدید صفحه</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="statSearches">۰</div>
+    <div class="label">جست‌وجو</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="statDownloads">۰</div>
+    <div class="label">دانلود</div>
+  </div>
+</div>
+
+<div class="tables-wrap" id="tablesWrap" style="display:none;">
+  <div class="table-card">
+    <h2>پرتکرارترین عبارت‌های جست‌وجوشده</h2>
+    <table>
+      <thead><tr><th>عبارت</th><th>تعداد</th></tr></thead>
+      <tbody id="searchTermsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <h2>پرتکرارترین فایل‌های دانلودشده</h2>
+    <table>
+      <thead><tr><th>فایل</th><th>تعداد</th></tr></thead>
+      <tbody id="downloadFilesBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
+
+  function toPersianDigits(num) {
+    return String(num).replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+  }
+
+  function escapeHtml(text) {
+    return String(text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function fillTable(bodyEl, entries, labelKey) {
+    if (!entries || entries.length === 0) {
+      bodyEl.innerHTML = `<tr><td colspan="2" style="color:#94a3b8;">هنوز داده‌ای ثبت نشده</td></tr>`;
+      return;
+    }
+    bodyEl.innerHTML = entries
+      .map(item => `
+        <tr>
+          <td>${escapeHtml(item[labelKey])}</td>
+          <td class="count">${toPersianDigits(item.count)}</td>
+        </tr>
+      `)
+      .join("");
+  }
+
+  async function loadStats() {
+    const statusNote = document.getElementById("statusNote");
+    try {
+      const res = await fetch(`${WORKER_URL}/stats`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `خطای سرور (${res.status})`);
+      }
+      const data = await res.json();
+
+      document.getElementById("statPageviews").textContent = toPersianDigits(data.pageviews || 0);
+      document.getElementById("statSearches").textContent = toPersianDigits(data.searches || 0);
+      document.getElementById("statDownloads").textContent = toPersianDigits(data.downloads || 0);
+
+      fillTable(document.getElementById("searchTermsBody"), data.topSearchTerms, "value");
+      fillTable(document.getElementById("downloadFilesBody"), data.topDownloadFiles, "value");
+
+      statusNote.style.display = "none";
+      document.getElementById("statsGrid").style.display = "grid";
+      document.getElementById("tablesWrap").style.display = "flex";
+    } catch (err) {
+      statusNote.className = "status-note error";
+      statusNote.textContent = "دریافت آمار ناموفق بود: " + err.message;
+    }
+  }
+
+  loadStats();
+})();
+</script>
+
+</body>
+</html>

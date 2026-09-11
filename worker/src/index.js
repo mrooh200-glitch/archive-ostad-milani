@@ -9,6 +9,9 @@
  *  - GEMINI_API_KEY
  *  - AI (binding خودکار Workers AI، نیازی به کلید نداره)
  *  - EMBEDDING_CACHE (یک KV namespace — اختیاری؛ اگه بایند نشده باشه، کد بدون کش کار می‌کنه)
+ *  - STATS_KV (یک KV namespace دیگه، جدا از EMBEDDING_CACHE — اختیاری؛ برای مورد ۸
+ *    «آمار سایت». اگه بایند نشه، endpointهای /track و /stats بی‌خطا کار می‌کنن ولی
+ *    چیزی ثبت/برنمی‌گردونن.)
  *
  * تغییر جدید: کش مشترک بین همه‌ی کاربران برای عبارت‌های جست‌وجوی تکراری.
  * اگه کاربر A عبارتی رو جست‌وجو کنه، بردارش برای مدتی (یک ساعت) در KV ذخیره می‌شه؛
@@ -18,7 +21,7 @@
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*", // اگه خواستی امن‌تر بشه، به‌جای * آدرس دقیق سایتت رو بذار
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
@@ -56,6 +59,16 @@ export default {
 
       if (url.pathname === "/chat" && request.method === "POST") {
         return await handleChat(request, env);
+      }
+
+      // Item ۸ (آمار سایت): دو endpoint جدید - یکی برای ثبت یک رویداد
+      // (بازدید صفحه، جست‌وجو، دانلود)، یکی برای خواندن جمع آن‌ها.
+      if (url.pathname === "/track" && request.method === "POST") {
+        return await handleTrack(request, env);
+      }
+
+      if (url.pathname === "/stats" && request.method === "GET") {
+        return await handleStats(request, env);
       }
 
       return jsonResponse({ error: "مسیر یا متد نامعتبر" }, 404);
@@ -259,4 +272,91 @@ ${contextText}`;
   }
 
   return jsonResponse({ answer, usedReferences });
+}
+
+// ---------- /track و /stats : آمار سایت (مورد ۸) ----------
+// چون KV افزایش اتمی نداره (فقط get/put ساده)، این شمارنده‌ها زیر بار
+// هم‌زمانِ خیلی بالا ممکنه گاهی یک شمارش رو از دست بدن (دو درخواست
+// هم‌زمان، هر دو همون عدد قدیمی رو می‌خونن و هر دو با +۱ می‌نویسن) -
+// برای یک سایت آرشیوی با ترافیک معمولی، این خطای کوچیک قابل چشم‌پوشیه؛
+// اگه دقتِ صددرصدی لازم شد، باید از Durable Objects استفاده کرد که
+// پیچیدگی بیشتری داره.
+async function handleTrack(request, env) {
+  if (!env.STATS_KV) {
+    // نبودِ KV آمار نباید تجربهٔ کاربر رو خراب کنه - بی‌سروصدا موفق
+    // برمی‌گردونیم، انگار ثبت شد (فقط tracked:false رو نشون می‌ده).
+    return jsonResponse({ ok: true, tracked: false });
+  }
+
+  const body = await request.json();
+  const type = body.type;
+  const validTypes = ["pageview", "search", "download"];
+
+  if (!validTypes.includes(type)) {
+    return jsonResponse({ error: "پارامتر type باید یکی از pageview/search/download باشه" }, 400);
+  }
+
+  const counterKey = `stats:count:${type}`;
+  const current = parseInt((await env.STATS_KV.get(counterKey)) || "0", 10);
+  await env.STATS_KV.put(counterKey, String(current + 1));
+
+  const detail = typeof body.detail === "string" ? body.detail.trim() : "";
+
+  if (type === "search" && detail) {
+    await incrementTermCount(env, "stats:searchTerms", detail.slice(0, 200).toLowerCase());
+  }
+
+  if (type === "download" && detail) {
+    await incrementTermCount(env, "stats:downloadFiles", detail.slice(0, 300));
+  }
+
+  return jsonResponse({ ok: true, tracked: true });
+}
+
+// کمک‌تابع مشترک برای «فهرست پرتکرارترین‌ها» (هم برای عبارت‌های
+// جست‌وجوشده، هم اسم فایل‌های دانلودشده) - یک آبجکت JSON از
+// {مقدار: تعداد} در KV نگه می‌داره. اگه تعداد مقدارهای یکتا خیلی زیاد
+// بشه (حافظهٔ هر کلید KV نامحدود نیست)، کم‌تکرارترین‌ها کنار گذاشته
+// می‌شن تا فقط پرتکرارترین‌ها بمونن.
+const MAX_UNIQUE_TRACKED_VALUES = 1000;
+
+async function incrementTermCount(env, kvKey, value) {
+  const raw = await env.STATS_KV.get(kvKey);
+  const counts = raw ? JSON.parse(raw) : {};
+  counts[value] = (counts[value] || 0) + 1;
+
+  const entries = Object.entries(counts);
+  const trimmed = entries.length > MAX_UNIQUE_TRACKED_VALUES
+    ? Object.fromEntries(entries.sort((a, b) => b[1] - a[1]).slice(0, MAX_UNIQUE_TRACKED_VALUES))
+    : counts;
+
+  await env.STATS_KV.put(kvKey, JSON.stringify(trimmed));
+}
+
+async function handleStats(request, env) {
+  if (!env.STATS_KV) {
+    return jsonResponse({ error: "آمار روی این سرور فعال نیست (KV به اسم STATS_KV بایند نشده)" }, 404);
+  }
+
+  const [pageviews, searches, downloads, searchTermsRaw, downloadFilesRaw] = await Promise.all([
+    env.STATS_KV.get("stats:count:pageview"),
+    env.STATS_KV.get("stats:count:search"),
+    env.STATS_KV.get("stats:count:download"),
+    env.STATS_KV.get("stats:searchTerms"),
+    env.STATS_KV.get("stats:downloadFiles"),
+  ]);
+
+  const topEntries = (raw) =>
+    Object.entries(raw ? JSON.parse(raw) : {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 30)
+      .map(([value, count]) => ({ value, count }));
+
+  return jsonResponse({
+    pageviews: parseInt(pageviews || "0", 10),
+    searches: parseInt(searches || "0", 10),
+    downloads: parseInt(downloads || "0", 10),
+    topSearchTerms: topEntries(searchTermsRaw),
+    topDownloadFiles: topEntries(downloadFilesRaw),
+  });
 }
