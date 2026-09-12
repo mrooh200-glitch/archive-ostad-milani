@@ -742,8 +742,34 @@
     return result;
   }
 
+  // Item جدید (رفع باگ ۲: «توحیده» و مشابه‌هایش اصلاً در جست‌وجوی
+  // ریشه‌ای پیدا نمی‌شدند): یک ضمیر متصل تک‌حرفی (ه یا ی) که به یک
+  // کلمهٔ از قبل کامل می‌چسبد (مثلاً توحید + ه = توحیده)، همیشه
+  // بیرونی‌ترین لایهٔ کلمه است - صرف‌نظر از این‌که ریشه‌اش با کدام
+  // الگوی صرفی پیدا می‌شود. اگر این حرف را همان اول جدا نکنیم،
+  // deaugmentToRoot روی شکل بلندترِ نادرست (با ضمیر هنوز چسبیده)
+  // امتحان می‌شود، شکل غلطی برمی‌گرداند، و پسوندزدای عمومی روی همان
+  // نتیجهٔ غلط - به‌جای پسوند واقعی - حرف ریشه را هم می‌برد.
+  // عمداً فقط برای کلمات ۶ حرفی یا بیشتر اعمال می‌شود: کلمات کوتاه‌تر
+  // (مثل «کریم») از قبل با ترتیب فعلی (الگو قبل از پسوند) درست کار
+  // می‌کنند و جداکردن زودهنگام «ی»/«ه» از آن‌ها می‌تواند حرف ریشه را
+  // به‌اشتباه ببرد.
+  function stripAttachedPronounSuffix(word) {
+    if (word.length < 6) {
+      return word;
+    }
+
+    const last = word[word.length - 1];
+
+    if (last === "ه" || last === "ی") {
+      return word.slice(0, -1);
+    }
+
+    return word;
+  }
+
   function stemWord(word) {
-    let w = stripOnePrefix(cleanWord(word));
+    let w = stripAttachedPronounSuffix(stripOnePrefix(cleanWord(word)));
 
     if (w.length > 3) {
       const patternResult = deaugmentToRoot(w);
@@ -1087,13 +1113,26 @@
     const selectionTagPopover = document.createElement("form");
     selectionTagPopover.id = "inPageSelectionTagPopover";
     selectionTagPopover.className = "in-page-selection-tag-popover";
+    // Item جدید (رفع باگ ۴: قفل‌شدن روی دو عنوان ثابت "محمد"/"حسین"):
+    // autocomplete="on" روی این فیلد باعث می‌شد مرورگر (نه خودِ سایت)
+    // پیشنهادهای تکمیل خودکارِ خودش را نشان بدهد - مقادیری که قبلاً
+    // در همین فیلد (با همین name) در هر سایتی تایپ شده بودند، کاملاً
+    // مستقل از برچسب‌های واقعیِ ذخیره‌شدهٔ این سایت، و چون preventDefault
+    // روی submit واقعی فرم جلوی ثبت این پیشنهادها را هم می‌گرفت، هیچ
+    // مقدار جدیدی هم به آن اضافه نمی‌شد - فقط همان دو مقدار قدیمی
+    // (از قبل از این تغییر) باقی مانده بودند. الان autocomplete="off"
+    // است و پیشنهاد برچسب‌های قبلی به‌جایش از خودِ داده‌های نشانه‌ها
+    // (getAllBookmarkTags) در یک <datalist> ساخته می‌شود - رجوع کنید
+    // به showTagPopoverAt.
     selectionTagPopover.innerHTML = `
       <input
         type="text"
         id="inPageSelectionTagInput"
         name="bookmarkTagInput"
-        autocomplete="on"
+        autocomplete="off"
+        list="inPageBookmarkTagSuggestions"
         placeholder="برچسب (اختیاری، با ویرگول جدا کنید)">
+      <datalist id="inPageBookmarkTagSuggestions"></datalist>
       <div class="in-page-selection-tag-popover-actions">
         <button type="submit" id="inPageSelectionTagSave">ذخیره</button>
         <button type="button" id="inPageSelectionTagCancel">انصراف</button>
@@ -3911,7 +3950,7 @@
     return `${base}?${params.toString()}`;
   }
 
-  function addBookmark({ text, url, tags, occurrenceIndex, links, page }) {
+  function addBookmark({ text, matchText, url, tags, occurrenceIndex, links, page, skipRender }) {
     const trimmedText = (text || "").trim();
 
     if (!trimmedText) {
@@ -3924,6 +3963,17 @@
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title: getPageTitle(),
       text: trimmedText,
+      // Item جدید (رفع باگ ۱/۵: نشانه در متن علامت‌گذاری نمی‌شد و «باز
+      // کردن» کل صفحه را رفرش می‌کرد): text بالا برای نمایش/کپی/خروجی
+      // است و ممکن است با **...** (کلمهٔ پررنگ‌شده) و … (علامت بریدگی
+      // پاراگراف بلند) تزئین شده باشد - رجوع کنید به buildParagraphPlainText.
+      // این تزئین‌ها هیچ‌وقت عیناً در متن واقعی صفحه وجود ندارند، پس
+      // جست‌وجوی findRangeForBookmarkText با همین text عملاً همیشه
+      // شکست می‌خورد. matchText نسخهٔ خام و بدون‌تزئین همان متن است -
+      // دقیقاً همان‌طور که در DOM واقعی صفحه ظاهر می‌شود - و برای
+      // پیداکردن دوبارهٔ نشانه (علامت‌گذاری در متن، «باز کردن» بدون
+      // رفرش کامل) به‌کار می‌رود.
+      matchText: (matchText || trimmedText).trim(),
       url: url || (location.origin + location.pathname),
       tags: Array.isArray(tags) ? tags : [],
       // Item جدید (آدرس‌های داخل متن/پاورقی): آدرس‌های واقعی‌ای که خودِ
@@ -3942,9 +3992,12 @@
     });
 
     saveBookmarks(bookmarks);
-    renderBookmarksPanel();
-    markBookmarksOnCurrentPage();
-    renderSettingsMenu();
+
+    if (!skipRender) {
+      renderBookmarksPanel();
+      markBookmarksOnCurrentPage();
+      renderSettingsMenu();
+    }
   }
 
   function removeBookmark(id) {
@@ -4057,14 +4110,30 @@
   // longer be found (page content changed since the bookmark was
   // saved). Falls back to the first occurrence if the requested one no
   // longer exists, rather than failing outright.
-  function findRangeForBookmarkText(rawText, occurrenceIndex) {
+  // Item جدید (رفع باگ ۱/۵ برای نشانه‌های قدیمی): نشانه‌هایی که پیش از
+  // این تغییر ذخیره شده‌اند matchText ندارند - برای آن‌ها، همان تزئین
+  // **...**/… که در addBookmark توضیح داده شد از روی text حذف می‌شود
+  // تا این نشانه‌های قدیمی هم بدون نیاز به دوباره‌نشانه‌گذاری کارکرد.
+  function getBookmarkMatchText(item) {
+    if (item && item.matchText) {
+      return item.matchText;
+    }
+
+    return ((item && item.text) || "")
+      .replace(/\*\*/g, "")
+      .replace(/^…/, "")
+      .replace(/…$/, "")
+      .trim();
+  }
+
+  function findRangeForBookmarkText(rawText, occurrenceIndex, precomputedMap) {
     const target = normalize(rawText);
 
     if (!target) {
       return null;
     }
 
-    const { normalized, positions } = buildBodyNormalizedTextMap();
+    const { normalized, positions } = precomputedMap || buildBodyNormalizedTextMap();
     const wanted = occurrenceIndex > 0 ? occurrenceIndex : 1;
 
     let fromIndex = 0;
@@ -4208,15 +4277,33 @@
   function markBookmarksOnCurrentPage() {
     const currentTitle = getPageTitle();
 
-    loadBookmarks()
-      .filter(item => (item.title || "") === currentTitle)
-      .forEach(item => {
-        const range = findRangeForBookmarkText(item.text, item.occurrenceIndex || 1);
+    const alreadyMarkedIds = new Set(
+      Array.from(document.querySelectorAll(".in-page-bookmark-marker"))
+        .map(marker => marker.dataset.bookmarkId)
+    );
 
-        if (range) {
-          insertBookmarkMarker(range, item.id);
-        }
-      });
+    const pending = loadBookmarks().filter(item =>
+      (item.title || "") === currentTitle && !alreadyMarkedIds.has(item.id)
+    );
+
+    if (pending.length === 0) {
+      return;
+    }
+
+    // Item جدید (رفع باگ ۶: کندی هنگام اضافه‌کردن چند نشانه هم‌زمان):
+    // قبلاً findRangeForBookmarkText برای هر نشانه، از صفر کل متن
+    // صفحه را (گره به گره، حرف به حرف) دوباره می‌ساخت - یعنی برای N
+    // نشانه، N بار این کار سنگین تکرار می‌شد. الان یک‌بار برای کل
+    // فراخوانی ساخته و بین همهٔ نشانه‌ها مشترک استفاده می‌شود.
+    const textMap = buildBodyNormalizedTextMap();
+
+    pending.forEach(item => {
+      const range = findRangeForBookmarkText(getBookmarkMatchText(item), item.occurrenceIndex || 1, textMap);
+
+      if (range) {
+        insertBookmarkMarker(range, item.id);
+      }
+    });
   }
 
   // Item ۳: scrolls to a same-page bookmark and briefly flashes it, as
@@ -4926,7 +5013,7 @@
           return;
         }
 
-        const range = findRangeForBookmarkText(item.text, item.occurrenceIndex || 1);
+        const range = findRangeForBookmarkText(getBookmarkMatchText(item), item.occurrenceIndex || 1);
 
         event.preventDefault();
         closeBookmarksPanel();
@@ -5093,6 +5180,17 @@
       input.value = "";
     }
 
+    // Item جدید (رفع باگ ۴): فهرست برچسب‌های پیشنهادی را هر بار که
+    // کادر باز می‌شود از تازه‌ترین داده‌های واقعیِ نشانه‌ها می‌سازیم -
+    // نه یک‌بار در بارگذاری صفحه - تا برچسبی که همین الان اضافه شده
+    // هم بلافاصله در پیشنهادهای دفعهٔ بعد باشد.
+    const datalist = selectionTagPopoverElement.querySelector("#inPageBookmarkTagSuggestions");
+    if (datalist) {
+      datalist.innerHTML = getAllBookmarkTags(loadBookmarks())
+        .map(tag => `<option value="${escapeHtml(tag)}"></option>`)
+        .join("");
+    }
+
     selectionTagPopoverElement.classList.add("is-open");
 
     if (rect) {
@@ -5162,11 +5260,13 @@
     if (pendingBookmarkMode === "selection") {
       addBookmark({
         text: pendingSelectionParagraphText || pendingSelectionText,
+        matchText: pendingSelectionText,
         url: buildSelectionBookmarkUrl(pendingSelectionText, pendingSelectionOccurrenceIndex, pendingSelectionPage),
         tags,
         occurrenceIndex: pendingSelectionOccurrenceIndex,
         links: pendingSelectionLinks,
-        page: pendingSelectionPage
+        page: pendingSelectionPage,
+        skipRender: true
       });
     } else if (pendingBookmarkMode === "matches") {
       // Item جدید (رفع اشکال): قبلاً فقط snippet کوتاه ذخیره می‌شد؛ حالا
@@ -5184,14 +5284,26 @@
 
         addBookmark({
           text: buildParagraphPlainText(excerpt),
+          matchText: group.marks[0].textContent.replace(/\s+/g, " ").trim(),
           url: buildMatchUrl(group.marks[0]),
           tags,
           occurrenceIndex: computeMatchOccurrenceIndex(group.marks[0]),
           links: excerpt.links,
-          page: getPageNumberFromNode(group.marks[0])
+          page: getPageNumberFromNode(group.marks[0]),
+          skipRender: true
         });
       });
     }
+
+    // Item جدید (رفع باگ ۶: کندی هنگام اضافه‌کردن چند نتیجه هم‌زمان):
+    // قبلاً addBookmark به‌ازای هر نشانه، پنل نشانه‌ها را کامل رندر
+    // می‌کرد، کل صفحه را برای علامت‌گذاری اسکن می‌کرد، و منوی تنظیمات
+    // را هم رندر می‌کرد - یعنی برای N نشانهٔ انتخاب‌شده، N بار این سه
+    // کار سنگین تکرار می‌شد. الان addBookmark با skipRender این سه کار
+    // را انجام نمی‌دهد و اینجا، فقط یک‌بار برای کل دسته، انجام می‌شود.
+    renderBookmarksPanel();
+    markBookmarksOnCurrentPage();
+    renderSettingsMenu();
 
     hideTagPopover(true);
   }
@@ -6131,7 +6243,18 @@
   }
 
   function getMatchVisualKey(mark) {
-    return getVisualWordKey(mark.textContent);
+    // Item جدید (رفع باگ ۲: التوحید/فالتوحید/والتوحید/بالتوحید مشتق‌های
+    // جدا نشان داده می‌شدند): این کلید قبلاً فقط نگارش سطحیِ کلمه را
+    // (بعد از یکسان‌سازی ي/ى/ك و حذف اعراب) در نظر می‌گرفت - نه ریشهٔ
+    // واقعی‌اش. یعنی هرچند تب «مشتقات» فقط وقتی «جست‌وجوی ریشه‌ای» روشن
+    // باشد نمایش داده می‌شود، گروه‌بندی خودش اصلاً بر پایهٔ ریشه نبود؛
+    // برای همین صورت‌های مختلفِ یک کلمه که فقط یک حرف ربط/اضافه (و/ف/ب)
+    // یا «ال» جلوی‌شان دارند، هرکدام مشتق جداگانه‌ای حساب می‌شدند. الان
+    // همان stemWord که خودِ جست‌وجوی ریشه‌ای برای تطبیق مچ‌ها به‌کار
+    // می‌برد این‌جا هم به‌عنوان کلید گروه‌بندی استفاده می‌شود - یعنی هر
+    // دو کلمه‌ای که جست‌وجوی ریشه‌ای آن‌ها را «همان کلمه» می‌داند، در تب
+    // مشتقات هم دقیقاً یک ردیف می‌شوند.
+    return stemWord(mark.textContent) || getVisualWordKey(mark.textContent);
   }
 
   function isMatchVisible(index) {
