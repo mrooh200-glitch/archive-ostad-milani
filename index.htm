@@ -4108,6 +4108,13 @@
           title: result.title,
           text: buildParagraphPlainText(buildParagraphExcerpt(result)),
           url: result.url,
+          // Item جدید (رفع باگ ۱): قبلاً اینجا شمارهٔ صفحه اصلاً کپی
+          // نمی‌شد - در حالی که خودِ نتیجهٔ جستجوی متنی آن را در
+          // result.pdfPageNumber دارد (رجوع کنید به بلوک نمایش نتایج
+          // که با همین فیلد شماره صفحه را نشان می‌دهد). سایر بخش‌های
+          // کد (رندر پنل نشانه‌ها، خروجی‌های سه‌گانه) همه دنبال فیلدی
+          // به اسم item.page می‌گردند، نه pdfPageNumber.
+          page: result.pdfPageNumber || null,
           tags: Array.isArray(tags) ? tags : [],
           links: [],
           occurrenceIndex: 1,
@@ -5693,23 +5700,12 @@
       return buildFragmentText(cleanParagraph, match.index, match[0].length);
     }
 
-    function getStemFragmentText(paragraph, queryStems) {
-      const cleanParagraph = paragraph.replace(/\s+/g, " ").trim();
-      const words = findWordsInText(cleanParagraph);
-      const matchedWord = words.find(
-        word => word.stem && queryStems.includes(word.stem)
-      );
-
-      if (!matchedWord) {
-        return "";
-      }
-
-      return buildFragmentText(
-        cleanParagraph,
-        matchedWord.start,
-        matchedWord.end - matchedWord.start
-      );
-    }
+    // Item جدید (رفع باگ ۲): این تابع دیگر استفاده نمی‌شود - منطقش
+    // (فقط اولین کلمهٔ هم‌ریشه را در نظر می‌گرفت و هیچ شمارش رخداد
+    // نداشت) در شاخهٔ rootMode بالا مستقیماً جایگزین شده، چون شمارش
+    // رخداد اکنون باید روی *همهٔ* کلمات هم‌ریشهٔ پاراگراف انجام شود، نه
+    // فقط یکی. اینجا فقط برای مرجع نگه داشته شده است.
+    // function getStemFragmentText(paragraph, queryStems) { ... }
 
     function makeTextFragmentUrl(url, extraParams) {
       // Item 3 fix: document.url is stored as a relative path (e.g.
@@ -7233,7 +7229,7 @@
       );
     }
 
-    function buildResultUrl(document, paragraphIndex, query, rootMode, fragmentText, occurrenceIndex) {
+    function buildResultUrl(document, paragraphIndex, query, rootMode, fragmentText, occurrenceIndex, derivKey) {
       // Item جدید: قبلاً اینجا یک شاخهٔ جدا برای document.type === "pdf"
       // بود که مستقیماً به فایل PDF با #page=N لینک می‌داد. چون PDFها
       // دیگر وارد جست‌وجوی متنی نمی‌شوند (رجوع کنید به حذف pdfJobs)،
@@ -7254,7 +7250,15 @@
         q: query.trim(),
         root: rootMode ? "1" : undefined,
         frag: needsSeparateFrag ? fragmentText : undefined,
-        occ: occurrenceIndex
+        occ: occurrenceIndex,
+        // Item جدید (رفع باگ ۲): برخلاف قبل که derivKey فقط زمانی
+        // اضافه می‌شد که کاربر یک مشتق خاص را از چیپ‌ها فیلتر کرده بود
+        // (رجوع کنید به resultHrefWithDerivFilter)، حالا برای *هر*
+        // نتیجهٔ جستجوی ریشه‌ای همیشه فرستاده می‌شود - چون شمارش occ
+        // در این حالت بر مبنای همین کلید انجام شده (نه بر مبنای متن
+        // خام فرگمنت) و صفحهٔ مقصد باید دقیقاً با همین کلید رخداد را
+        // پیدا کند، نه با تطبیق متنی که ممکن است در پاراگراف تکرار شود.
+        derivKey: derivKey || undefined
       });
     }
 
@@ -7409,6 +7413,20 @@
           return occurrenceIndex;
         }
 
+        // Item جدید (رفع باگ ۲ - لینک اشتقاق نادرست): برخلاف
+        // fragmentOccurrenceCounts بالا (که فقط یک‌بار در هر پاراگراف -
+        // برای اولین کلمهٔ هم‌ریشه - افزایش می‌یابد)، این شمارنده روی
+        // *تمام* کلمات هم‌ریشهٔ هر پاراگراف (نه فقط اولی) و بر اساس
+        // کلید بصری مشتق (derivKey - هم‌ارز getMatchVisualKey در
+        // in-page-search.js) کار می‌کند. چرا لازم است: صفحهٔ مقصد با
+        // highlightStemMatches همهٔ رخدادهای واقعی هر شکل را در کل فایل
+        // هایلایت می‌کند - نه فقط یکی به‌ازای هر پاراگراف - پس اگر
+        // شمارش اینجا هم رخدادهای بعدی/تکراری در همان پاراگراف را در
+        // نظر نگیرد، عدد occ برای پاراگراف‌های بعدی به‌تدریج کم‌شمرده
+        // می‌شود و لینک کلیک‌شده به رخداد اشتباه (معمولاً اولین رخداد
+        // آن مشتق) می‌رود.
+        const derivKeyOccurrenceCounts = new Map();
+
         document.paragraphs.forEach((paragraph, paragraphIndex) => {
           // Item ح: دامنهٔ جست‌وجو در متن اصلی/پاورقی - این پاراگراف را
           // کلاً رد کن اگر دامنهٔ مربوط به آن خاموش است.
@@ -7475,7 +7493,16 @@
               });
             }
           } else if (rootMode) {
-            const wordsInParagraph = findWordsInText(paragraph);
+            // Item جدید (رفع باگ ۲ - تصحیح جانبی): findWordsInText قبلاً
+            // روی خودِ paragraph خام (با فاصله‌ها/خط‌های اصلی) صدا زده
+            // می‌شد، در حالی که موقعیت‌های start/end این کلمات قرار است
+            // برای برش از cleanParagraphForStems (نسخهٔ فاصله‌یکدست‌شده)
+            // استفاده شوند - اگر تعداد/محل فاصله‌ها فرق کند، این دو
+            // مجموعه اندیس هم‌راستا نمی‌مانند. حالا همان‌طور که تابع
+            // قدیمیِ getStemFragmentText هم انجام می‌داد، کلمات را از
+            // خودِ متنِ یکدست‌شده استخراج می‌کنیم.
+            const cleanParagraphForStems = paragraph.replace(/\s+/g, " ").trim();
+            const wordsInParagraph = findWordsInText(cleanParagraphForStems);
 
             const paragraphStems = new Set(
               wordsInParagraph.map(word => word.stem).filter(Boolean)
@@ -7486,14 +7513,40 @@
             );
 
             if (matchesAll) {
-              const fragmentText =
-                getStemFragmentText(paragraph, queryStems) || query.trim();
-              const occurrenceIndex = nextOccurrenceIndex(fragmentText);
+              // Item جدید (رفع باگ ۲): همهٔ کلمات هم‌ریشهٔ این پاراگراف را
+              // به ترتیب واقعی‌شان می‌بینیم (نه فقط اولی) تا شمارندهٔ
+              // derivKeyOccurrenceCounts دقیقاً همان چیزی را بشمارد که
+              // in-page-search.js با highlightStemMatches در فایل مقصد
+              // می‌بیند. اولین کلمه همچنان به‌عنوان نمایندهٔ این نتیجه
+              // (برای قطعهٔ لینک/چکیده) انتخاب می‌شود - فقط شیوهٔ شمارش
+              // رخدادش عوض شده.
+              const stemMatchingWordsInOrder = wordsInParagraph.filter(
+                word => word.stem && queryStems.includes(word.stem)
+              );
+
+              const representativeWord = stemMatchingWordsInOrder[0];
+
+              let occurrenceIndex = 1;
+              let representativeDerivKey = "";
+
+              stemMatchingWordsInOrder.forEach(word => {
+                const key = getVisualWordKey(word.text);
+                const next = (derivKeyOccurrenceCounts.get(key) || 0) + 1;
+                derivKeyOccurrenceCounts.set(key, next);
+
+                if (word === representativeWord) {
+                  occurrenceIndex = next;
+                  representativeDerivKey = key;
+                }
+              });
+
+              const fragmentText = (representativeWord ? buildFragmentText(
+                cleanParagraphForStems, representativeWord.start,
+                representativeWord.end - representativeWord.start
+              ) : "") || query.trim();
 
               const matchedWords = [...new Set(
-                wordsInParagraph
-                  .filter(word => word.stem && queryStems.includes(word.stem))
-                  .map(word => word.text)
+                stemMatchingWordsInOrder.map(word => word.text)
               )];
 
               const matchedWordKeys = [...new Set(
@@ -7510,7 +7563,7 @@
                 pdfPageNumber: pdfPageNumber,
                 url: buildResultUrl(
                   document, paragraphIndex, query, rootMode,
-                  fragmentText, occurrenceIndex
+                  fragmentText, occurrenceIndex, representativeDerivKey
                 )
               });
             }
@@ -8002,7 +8055,19 @@
     searchInput.addEventListener("focus", openSearchHistoryDropdown);
     searchInput.addEventListener("mouseenter", openSearchHistoryDropdown);
     searchInput.addEventListener("mouseleave", scheduleSearchHistoryHoverClose);
-    searchInput.addEventListener("blur", closeSearchHistoryDropdown);
+    // Item جدید (رفع باگ ۳): نتایج جستجوی متنی همان لحظهٔ تایپ (رویداد
+    // "input" بالا) نمایش داده می‌شوند - کاربر لازم نیست Enter بزند تا
+    // نتیجه را ببیند، پس اغلب هرگز Enter نمی‌زند و عبارت جست‌وجو در
+    // تاریخچه ثبت نمی‌شد (چون pushSearchHistory قبلاً فقط زیر رویداد
+    // keydown/Enter بود). هم‌ارز in-page-search.js: با ترک کادر
+    // (blur) هم عبارت تایپ‌شده در تاریخچه ذخیره می‌شود.
+    searchInput.addEventListener("blur", () => {
+      closeSearchHistoryDropdown();
+
+      if (searchInput.value.trim()) {
+        pushSearchHistory(searchInput.value);
+      }
+    });
 
     const siteSearchHistoryDropdownEl = document.getElementById("siteSearchHistory");
 

@@ -7099,29 +7099,31 @@
     // (خالی) می‌ماند تا اگر کاربر بعداً خودش چیزی جست‌وجو کرد، تحت
     // تأثیر این ورود خودکار قرار نگیرد.
     const allMatchesForTarget = highlightMatches(incomingQuery);
-    let targetIndex = findMatchIndexForFragment(
-      getTextFragmentFromHash(),
-      getOccurrenceFromUrl()
-    );
 
-    // Item جدید (رفع بخشی از باگ ۲): اگر لینک برای یک مشتق مشخص
-    // (derivKey) ساخته شده، ولی frag/occ (که مستقل از فیلتر مشتق
-    // محاسبه شده بودند) رخدادی از یک مشتق دیگر را پیدا کرده - رخداد
-    // درست را دوباره، این‌بار فقط در میان همان مشتق، پیدا می‌کنیم.
+    // Item جدید (رفع کامل باگ ۲): index.htm حالا برای *هر* نتیجهٔ
+    // جستجوی ریشه‌ای/اشتقاقی، occ را بر مبنای کلید بصری مشتق (derivKey)
+    // می‌شمارد - نه بر مبنای متن خام frag - چون فقط این شمارش دقیقاً
+    // با چیزی که highlightStemMatches اینجا هایلایت می‌کند (همهٔ
+    // رخدادهای واقعی هر شکل در کل فایل) یکی است. پس وقتی derivKey در
+    // آدرس هست، این باید مسیر اصلی و قطعی پیدا کردن رخداد باشد - نه
+    // یک تصحیح ثانویه روی نتیجهٔ frag/occ (که با شمارش دیگری به
+    // دست آمده و می‌تواند رخداد کاملاً غلطی برگرداند).
     const derivKeyParam = params.get("derivKey");
-    if (
-      derivKeyParam &&
-      (targetIndex === -1 || getMatchVisualKey(allMatchesForTarget[targetIndex]) !== derivKeyParam)
-    ) {
-      const derivIndex = findMatchIndexForDerivative(
+    let targetIndex = -1;
+
+    if (derivKeyParam) {
+      targetIndex = findMatchIndexForDerivative(
         derivKeyParam,
         getOccurrenceFromUrl(),
         allMatchesForTarget
       );
+    }
 
-      if (derivIndex !== -1) {
-        targetIndex = derivIndex;
-      }
+    if (targetIndex === -1) {
+      targetIndex = findMatchIndexForFragment(
+        getTextFragmentFromHash(),
+        getOccurrenceFromUrl()
+      );
     }
 
     if (targetIndex === -1) {
