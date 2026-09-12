@@ -2777,8 +2777,10 @@
       type="text"
       id="siteTagInput"
       name="bookmarkTagInput"
-      autocomplete="on"
+      autocomplete="off"
+      list="siteTagSuggestions"
       placeholder="برچسب (اختیاری، با ویرگول جدا کنید)">
+    <datalist id="siteTagSuggestions"></datalist>
     <div class="site-tag-popover-actions">
       <button type="submit" id="siteTagSave">ذخیره</button>
       <button type="button" id="siteTagCancel">انصراف</button>
@@ -4754,6 +4756,18 @@
 
       if (input) {
         input.value = "";
+      }
+
+      // Item جدید (رفع باگ ۴: قفل‌شدن روی دو عنوان ثابت "محمد"/"حسین" -
+      // هم‌ارز اصلاح in-page-search.js): پیشنهاد برچسب دیگر به تکمیل
+      // خودکار خودِ مرورگر (autocomplete) واگذار نمی‌شود - از خودِ
+      // برچسب‌های واقعاً ذخیره‌شدهٔ سایت ساخته می‌شود، و هر بار که کادر
+      // باز می‌شود دوباره تازه‌سازی می‌شود.
+      const datalist = document.getElementById("siteTagSuggestions");
+      if (datalist) {
+        datalist.innerHTML = getAllBookmarkTags(loadBookmarks())
+          .map(tag => `<option value="${escapeHtml(tag)}"></option>`)
+          .join("");
       }
 
       popover.classList.add("is-open");
