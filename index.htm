@@ -4154,13 +4154,20 @@
     // جداگانه با برچسب «کتاب (صفحهٔ N)» می‌سازه - هم‌ارز
     // formatSourcesInfoHtmlAi در search-widget.js، اما به شکل دکمه‌های
     // مجزا در ردیف عملیات (به‌جای یک لینک متنی داخل عنوان).
-    function bookmarkSourceLinksHtml(item) {
+    // Item جدید (رفع باگ: خروجی‌ها فقط یک «لینک منبع» نشون می‌دادن، نه
+    // به تعداد لینک‌های واقعیِ بلوک نشانه‌ها): این تابع، منطق مشترکِ
+    // «کدوم لینک(ها) و با چه برچسبی» رو یک‌بار به شکل داده (نه HTML)
+    // برمی‌گردونه - bookmarkSourceLinksHtml (برای پنل روی صفحه) و هر
+    // سه خروجی (Text/Word/PDF) همه از همین یک منبع می‌خونن، تا اگه
+    // بعداً منطقش عوض شد، لازم نباشه در ۴ جای مختلف هم‌زمان تغییر کنه.
+    function bookmarkSourceLinksData(item) {
       const sourcesInfo = Array.isArray(item.sourcesInfo) ? item.sourcesInfo : null;
 
       if (!sourcesInfo || sourcesInfo.length === 0) {
-        return item.hasRealSource === false
-          ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
-          : `<a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">بازکردن</a>`;
+        if (item.hasRealSource === false) {
+          return [];
+        }
+        return [{ label: "لینک منبع", url: item.url || "" }];
       }
 
       const links = [];
@@ -4171,11 +4178,25 @@
           const label = entries.length > 1
             ? `${source.book} (${entry.page ? `ص ${entry.page}` : `بخش ${i + 1}`})`
             : source.book;
-          links.push(`<a href="${escapeHtml(entry.url)}" target="_blank" rel="noopener">${escapeHtml(label)}</a>`);
+          links.push({ label, url: entry.url });
         });
       });
 
-      return links.length > 0 ? links.join("") : `<span class="archive-item-nolink">بازکردن</span>`;
+      return links;
+    }
+
+    function bookmarkSourceLinksHtml(item) {
+      const links = bookmarkSourceLinksData(item);
+
+      if (links.length === 0) {
+        return item.hasRealSource === false
+          ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
+          : `<a href="${escapeHtml(item.url || "#")}" target="_blank" rel="noopener">بازکردن</a>`;
+      }
+
+      return links
+        .map(link => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener">${escapeHtml(link.label)}</a>`)
+        .join("");
     }
 
     function compareFa(a, b) {
@@ -4242,10 +4263,17 @@
     function buildBookmarkExportPlainText(items) {
       return buildBookmarkExportGroups(items).map(group => {
         const tagsBody = group.tagGroups.map(tagGroup => {
-          const itemsBody = tagGroup.items.map((item, index) => (
-            `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}\n` +
-            `      🔗 ${formatShareLink("لینک منبع", item.url)}`
-          )).join("\n\n");
+          const itemsBody = tagGroup.items.map((item, index) => {
+            const links = bookmarkSourceLinksData(item);
+            const linksBody = links.length > 0
+              ? links.map(link => `      🔗 ${formatShareLink(link.label, link.url)}`).join("\n")
+              : "";
+
+            return (
+              `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}\n` +
+              linksBody
+            );
+          }).join("\n\n");
 
           return `${tagGroup.subNumber} - 🏷️ ${tagGroup.tagLabel}\n${itemsBody}`;
         }).join("\n\n");
@@ -4265,18 +4293,27 @@
     function buildBookmarkExportRichHtml(items) {
       return buildBookmarkExportGroups(items).map(group => {
         const tagsHtml = group.tagGroups.map(tagGroup => {
-          const entriesHtml = tagGroup.items.map((item, index) => (
-            `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
-            `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
-            `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>` +
-            (item.page ?
-              `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
-              `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
-              "") +
-            `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
-            `font-size:12px;text-align:right;">🔗 ` +
-            `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
-          )).join("");
+          const entriesHtml = tagGroup.items.map((item, index) => {
+            const links = bookmarkSourceLinksData(item);
+            const linksHtml = links
+              .map(link => (
+                `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+                `font-size:12px;text-align:right;">🔗 ` +
+                `<a href="${escapeHtml(link.url)}" style="color:#1d4ed8;text-decoration:none;">${escapeHtml(link.label)}</a></p>`
+              ))
+              .join("");
+
+            return (
+              `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
+              `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
+              `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>` +
+              (item.page ?
+                `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+                `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
+                "") +
+              `<div style="margin:0 0 14px;">${linksHtml}</div>`
+            );
+          }).join("");
 
           return (
             `<p dir="rtl" style="margin:10px 0 6px;font-family:Tahoma,Arial,sans-serif;` +
@@ -4339,13 +4376,20 @@
 
       const itemsHtml = buildBookmarkExportGroups(items).map(group => {
         const tagsHtml = group.tagGroups.map(tagGroup => {
-          const entriesHtml = tagGroup.items.map((item, index) => `
+          const entriesHtml = tagGroup.items.map((item, index) => {
+            const links = bookmarkSourceLinksData(item);
+            const linksHtml = links
+              .map(link => `<p class="export-link">🔗 <a href="${escapeHtml(link.url)}">${escapeHtml(link.label)}</a></p>`)
+              .join("");
+
+            return `
             <div class="export-item">
               <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>
               ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
-              <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
+              ${linksHtml}
             </div>
-          `).join("");
+          `;
+          }).join("");
 
           return `
             <div class="export-group-tag">${tagGroup.subNumber} - 🏷️ ${escapeHtml(tagGroup.tagLabel)}</div>

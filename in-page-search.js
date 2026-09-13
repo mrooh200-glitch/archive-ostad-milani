@@ -4371,6 +4371,57 @@
   // نشانه‌های همان زیرگروه - با همان buildBookmarkGroups/
   // sortedBookmarkTagKeys که کادر نشانه از آن‌ها استفاده می‌کند، تا دو
   // چینش همیشه دقیقا یکی باشند.
+  // Item جدید (رفع باگ: چند آدرسِ استنادشده در گفتگو، در پنل/خروجیِ
+  // نشانه‌های همین صفحهٔ کتاب فقط یک لینک نشون می‌داد - هم‌ارز اصلاحی
+  // که برای index.htm انجام شد، چون این پنل هم از همون کلید مشترکِ
+  // localStorage می‌خونه و ممکنه نشانه‌های ساخته‌شده از تبِ گفتگو
+  // این‌جا هم دیده/صادر بشن.
+  function bookmarkSourceLinksData(item) {
+    const sourcesInfo = Array.isArray(item.sourcesInfo) ? item.sourcesInfo : null;
+
+    if (!sourcesInfo || sourcesInfo.length === 0) {
+      if (item.hasRealSource === false) {
+        return [];
+      }
+      return [{ label: "لینک منبع", url: item.url || "" }];
+    }
+
+    const links = [];
+    sourcesInfo.forEach(source => {
+      const entries = source.entries && source.entries.length ? source.entries : [{ page: null, url: source.url }];
+      entries.forEach((entry, i) => {
+        if (!entry.url) return;
+        const label = entries.length > 1
+          ? `${source.book} (${entry.page ? `ص ${entry.page}` : `بخش ${i + 1}`})`
+          : source.book;
+        links.push({ label, url: entry.url });
+      });
+    });
+
+    return links;
+  }
+
+  function bookmarkSourceLinksHtml(item) {
+    const links = bookmarkSourceLinksData(item);
+
+    if (links.length === 0) {
+      return item.hasRealSource === false
+        ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
+        : `<a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}" target="_blank" rel="noopener">بازکردن</a>`;
+    }
+
+    // نکته: data-bookmark-open (پرش زنده به همین صفحه، بدون رفرش، وقتی
+    // آدرسِ نشانه دقیقاً همین فایل باشه) فقط برای همون یک لینکِ
+    // fallback بالا معنی داره - چون اون منطق دنبال item.text (متنِ
+    // انتخاب‌شده) تو DOM همین صفحه می‌گرده، و item.text برای نشانه‌های
+    // چندمنبعیِ گفتگو، خودِ سؤال‌وجواب است، نه متنی از کتاب. برای این
+    // لینک‌ها، بازشدن سادهٔ هرکدوم در تب جدید (بدون این پرشِ ویژه) کافی
+    // و صحیح است.
+    return links
+      .map(link => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener">${escapeHtml(link.label)}</a>`)
+      .join("");
+  }
+
   function buildBookmarkExportGroups(items) {
     const groups = buildBookmarkGroups(items, bookmarkFilterTags);
     const bookTitles = Array.from(groups.keys()).sort(compareFa);
@@ -4393,11 +4444,18 @@
   function buildBookmarkExportPlainText(items) {
     const body = buildBookmarkExportGroups(items).map(group => {
       const tagsBody = group.tagGroups.map(tagGroup => {
-        const itemsBody = tagGroup.items.map((item, index) => (
-          `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}\n` +
-          `      🔗 لینک: ${item.url}` +
-          buildLinksPlainTextSuffix(item.links, "      ")
-        )).join("\n\n");
+        const itemsBody = tagGroup.items.map((item, index) => {
+          const links = bookmarkSourceLinksData(item);
+          const linksBody = links
+            .map(link => `      🔗 ${formatShareLink(link.label, link.url)}`)
+            .join("\n");
+
+          return (
+            `   ${index + 1}. «${item.text}»${item.page ? ` — صفحهٔ ${item.page}` : ""}\n` +
+            linksBody +
+            buildLinksPlainTextSuffix(item.links, "      ")
+          );
+        }).join("\n\n");
 
         return `${tagGroup.subNumber} - 🏷️ ${tagGroup.tagLabel}\n${itemsBody}`;
       }).join("\n\n");
@@ -4417,14 +4475,20 @@
             `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
             "";
 
+          const linksHtml = bookmarkSourceLinksData(item)
+            .map(link => (
+              `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
+              `font-size:12px;text-align:right;">🔗 ` +
+              `<a href="${escapeHtml(link.url)}" style="color:#1d4ed8;text-decoration:none;">${escapeHtml(link.label)}</a></p>`
+            ))
+            .join("");
+
           return (
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
             `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>` +
             itemPageHtml +
-            `<p dir="rtl" style="margin:0 0 14px;font-family:Tahoma,Arial,sans-serif;` +
-            `font-size:12px;text-align:right;">🔗 ` +
-            `<a href="${escapeHtml(item.url)}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>` +
+            `<div style="margin:0 0 14px;">${linksHtml}</div>` +
             buildLinksHtmlSuffix(item.links)
           );
         }).join("");
@@ -4499,14 +4563,20 @@
 
     const itemsHtml = buildBookmarkExportGroups(items).map(group => {
       const tagsHtml = group.tagGroups.map(tagGroup => {
-        const entriesHtml = tagGroup.items.map((item, index) => `
+        const entriesHtml = tagGroup.items.map((item, index) => {
+          const linksHtml = bookmarkSourceLinksData(item)
+            .map(link => `<p class="export-link">🔗 <a href="${escapeHtml(link.url)}">${escapeHtml(link.label)}</a></p>`)
+            .join("");
+
+          return `
           <div class="export-item">
             <p class="export-snippet"><strong>${index + 1}.</strong>&nbsp;«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>
             ${item.page ? `<p class="export-page">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` : ""}
-            <p class="export-link">🔗 <a href="${escapeHtml(item.url)}">لینک منبع</a></p>
+            ${linksHtml}
             ${buildLinksPdfSuffix(item.links)}
           </div>
-        `).join("");
+        `;
+        }).join("");
 
         return `
           <div class="export-group-tag">${tagGroup.subNumber} - 🏷️ ${escapeHtml(tagGroup.tagLabel)}</div>
@@ -4750,9 +4820,7 @@
                   ${item.page ? `<span class="in-page-result-page" title="شمارهٔ صفحهٔ چاپی">ص ${escapeHtml(item.page)}</span>` : ""}
                   <p class="archive-item-text">"${renderBookmarkTextHtml(item.text || "")}"</p>
                   <div class="archive-item-actions">
-                    ${item.hasRealSource === false
-                      ? `<span class="archive-item-nolink" title="این پاسخ منبع مشخصی نداشت (حالت پاسخ آزاد)">بازکردن</span>`
-                      : `<a href="${escapeHtml(item.url || "#")}" data-bookmark-open="${escapeHtml(item.id)}" target="_blank" rel="noopener">بازکردن</a>`}
+                    ${bookmarkSourceLinksHtml(item)}
                     <button type="button" data-bookmark-id="${escapeHtml(item.id)}">
                       حذف
                     </button>
