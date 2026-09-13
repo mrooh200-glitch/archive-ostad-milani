@@ -24,10 +24,13 @@
  * قرار دارد.
  */
 
-// Item جدید هر بار که فایل‌های اصلی سایت (index.htm، search-widget.js،
-// in-page-search.js) تغییر مهمی می‌کنند، این عدد را
-// بالا ببرید تا کاربرها نسخهٔ کش‌شدهٔ قدیمی را دور بیندازند و نسخهٔ
-// جدید را بگیرند.
+// Item جدید (به‌روزرسانی خودکار): این مقدار دیگر نیازی به تغییر دستی
+// ندارد - یک workflow جداگانه در گیت‌هاب (.github/workflows/
+// update-sw-version.yml) با هر تغییری در index.htm، search-widget.js
+// یا in-page-search.js، این خط را خودش با شناسهٔ کامیت (SHA) همان
+// تغییر جایگزین می‌کند و مستقیماً commit می‌کند - یعنی هیچ‌وقت لازم
+// نیست خودتان یادتان باشد این عدد را بالا ببرید. مقدار زیر فقط یک
+// پیش‌فرضِ اولیه است (تا وقتی اولین اجرای آن workflow آن را عوض کند).
 const CACHE_VERSION = "milani-cache-v11";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;

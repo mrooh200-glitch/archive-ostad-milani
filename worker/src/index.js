@@ -12,6 +12,9 @@
  *  - STATS_KV (یک KV namespace دیگه، جدا از EMBEDDING_CACHE — اختیاری؛ برای مورد ۸
  *    «آمار سایت». اگه بایند نشه، endpointهای /track و /stats بی‌خطا کار می‌کنن ولی
  *    چیزی ثبت/برنمی‌گردونن.)
+ *  - STATS_RESET_KEY (یک رمزِ دلخواه، به‌عنوان Secret تنظیم می‌شه - نه بایند KV؛
+ *    برای endpoint جدید POST /reset-stats که کل آمار رو صفر می‌کنه. اگه تنظیم
+ *    نشه، این endpoint کلاً غیرفعاله.)
  *
  * تغییر جدید: کش مشترک بین همه‌ی کاربران برای عبارت‌های جست‌وجوی تکراری.
  * اگه کاربر A عبارتی رو جست‌وجو کنه، بردارش برای مدتی (یک ساعت) در KV ذخیره می‌شه؛
@@ -69,6 +72,12 @@ export default {
 
       if (url.pathname === "/stats" && request.method === "GET") {
         return await handleStats(request, env);
+      }
+
+      // Item جدید (ریست آمار): یک راه برای صفرکردن کامل آمار، بدون نیاز
+      // به رفتن به داشبورد Cloudflare و حذف دستیِ تک‌تک کلیدهای KV.
+      if (url.pathname === "/reset-stats" && request.method === "POST") {
+        return await handleResetStats(request, env);
       }
 
       return jsonResponse({ error: "مسیر یا متد نامعتبر" }, 404);
@@ -492,4 +501,42 @@ async function handleStats(request, env) {
     topSearchTerms: topEntries(mergeTermMaps(searchTermsRawList)),
     topDownloadFiles: topEntries(mergeTermMaps(downloadFilesRawList)),
   });
+}
+
+// ---------- /reset-stats : صفرکردن کامل آمار ----------
+// یک رمزِ ساده لازم داره تا هرکسی که آدرسِ Worker رو بدونه نتونه آمار
+// رو پاک کنه - این رمز به‌عنوان یک Secret جدا (نه در همین کد) روی
+// Cloudflare تنظیم می‌شه: env.STATS_RESET_KEY. اگه این Secret اصلاً
+// تنظیم نشده باشه، این endpoint به‌طور کامل غیرفعاله (نه این‌که با یک
+// رمزِ پیش‌فرض/خالی کار کنه) - تا از پاک‌شدنِ ناخواسته جلوگیری بشه.
+async function handleResetStats(request, env) {
+  if (!env.STATS_KV) {
+    return jsonResponse({ error: "آمار روی این سرور فعال نیست (KV به اسم STATS_KV بایند نشده)" }, 404);
+  }
+
+  if (!env.STATS_RESET_KEY) {
+    return jsonResponse({ error: "ریست آمار روی این سرور تنظیم نشده (Secret به اسم STATS_RESET_KEY لازمه)" }, 404);
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const providedKey = typeof body.key === "string" ? body.key : "";
+
+  if (providedKey !== env.STATS_RESET_KEY) {
+    return jsonResponse({ error: "رمز درست نیست" }, 401);
+  }
+
+  // KV هیچ عملیاتِ «حذفِ همهٔ کلیدهایی که با فلان پیشوند شروع می‌شن»
+  // نداره - باید اول همه‌شون رو با list (که صفحه‌به‌صفحه، هر بار حداکثر
+  // ۱۰۰۰ تا برمی‌گردونه) فهرست کنیم، بعد یکی‌یکی حذف کنیم.
+  let cursor;
+  let deletedCount = 0;
+
+  do {
+    const page = await env.STATS_KV.list({ prefix: "stats:", cursor });
+    await Promise.all(page.keys.map((k) => env.STATS_KV.delete(k.name)));
+    deletedCount += page.keys.length;
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+
+  return jsonResponse({ ok: true, deletedCount });
 }

@@ -326,6 +326,28 @@
     cursor: pointer;
     text-decoration: underline;
   }
+
+  /* Item جدید (ریست آمار): عمداً کوچیک و کم‌رنگ و ته صفحه - چون یک
+     عملِ برگشت‌ناپذیره و نباید تصادفی به چشم بیاد یا کلیک بشه. */
+  .reset-stats-wrap {
+    text-align: center;
+    margin: 32px 0 0;
+  }
+
+  #resetStatsBtn {
+    background: none;
+    border: 1px solid #e2b8b8;
+    color: #b91c1c;
+    font-family: inherit;
+    font-size: 0.78rem;
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  #resetStatsBtn:hover {
+    background: #fef2f2;
+  }
 </style>
 </head>
 <body>
@@ -384,6 +406,10 @@
       <tbody id="downloadFilesBody"></tbody>
     </table>
   </div>
+</div>
+
+<div class="reset-stats-wrap">
+  <button type="button" id="resetStatsBtn">ریست کامل آمار</button>
 </div>
 
 <script>
@@ -851,6 +877,39 @@
 
   setupJalaliDatePicker(document.getElementById("fromDateInput"), document.getElementById("fromDatePicker"));
   setupJalaliDatePicker(document.getElementById("toDateInput"), document.getElementById("toDatePicker"));
+
+  // Item جدید (ریست آمار): با تأییدِ دوباره (چون برگشت‌ناپذیره) و
+  // گرفتنِ رمز، درخواست POST /reset-stats می‌فرسته. رمز روی همین
+  // مرورگر ذخیره نمی‌شه - هر بار باید دوباره وارد بشه، عمداً، تا فقط
+  // با تصمیمِ آگاهانه انجام بشه.
+  document.getElementById("resetStatsBtn").addEventListener("click", async () => {
+    const sure = confirm(
+      "این کار همهٔ آمار (بازدید، جست‌وجو، دانلود، و پرتکرارترین‌ها) را برای همیشه پاک می‌کند و قابل بازگشت نیست. مطمئن هستید؟"
+    );
+    if (!sure) return;
+
+    const key = prompt("رمز ریست آمار را وارد کنید:");
+    if (key === null) return;
+
+    try {
+      const res = await fetch(`${WORKER_URL}/reset-stats`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key }),
+      });
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        alert(body.error || `خطای سرور (${res.status})`);
+        return;
+      }
+
+      alert("آمار با موفقیت صفر شد.");
+      applyPreset("all");
+    } catch (err) {
+      alert("ارتباط با سرور برقرار نشد: " + err.message);
+    }
+  });
 
   updateFilterCurrentLabel();
   setActivePresetButton("all");
