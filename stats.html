@@ -145,6 +145,7 @@
     gap: 4px;
     font-size: 0.8rem;
     color: #64748b;
+    position: relative;
   }
 
   .filter-row input[type="text"].jalali-date-input {
@@ -208,6 +209,123 @@
     font-size: 0.8rem;
     margin: 12px 0 0;
   }
+
+  /* Item جدید (تقویمِ شمسیِ کلیک‌پذیر): چون input[type=date] از تقویم
+     میلادی خودِ مرورگر استفاده می‌کنه (که قابل تبدیل به شمسی نیست)،
+     به‌جاش یک تقویم کوچکِ شمسی خودمون ساختیم که با فوکوس/کلیک روی
+     ورودی باز می‌شه - تایپ دستی هم هنوز جواب می‌ده، این فقط یک راه
+     راحت‌تر و «قابل‌کلیک» اضافه است.  */
+  .jalali-picker-popup {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 30;
+    background: #ffffff;
+    border: 1px solid #d7dee7;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+    padding: 10px;
+    width: 220px;
+    direction: rtl;
+  }
+
+  .jalali-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .jalali-picker-header select {
+    font-family: inherit;
+    font-size: 0.82rem;
+    padding: 3px 4px;
+    border: 1px solid #d7dee7;
+    border-radius: 6px;
+    color: #1f2937;
+    background: #fff;
+  }
+
+  .jalali-picker-nav {
+    background: #eef2f7;
+    border: none;
+    border-radius: 6px;
+    width: 24px;
+    height: 24px;
+    line-height: 24px;
+    text-align: center;
+    cursor: pointer;
+    color: #173b63;
+    font-size: 0.9rem;
+    flex: 0 0 auto;
+  }
+
+  .jalali-picker-nav:hover {
+    background: #dde5ee;
+  }
+
+  .jalali-picker-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+
+  .jalali-picker-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+  }
+
+  .jalali-picker-day {
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    padding: 5px 0;
+    font-size: 0.78rem;
+    cursor: pointer;
+    color: #1f2937;
+    font-family: inherit;
+  }
+
+  .jalali-picker-day:hover {
+    background: #eef2f7;
+  }
+
+  .jalali-picker-day.today {
+    box-shadow: inset 0 0 0 1px #0f766e;
+  }
+
+  .jalali-picker-day.selected {
+    background: #0f766e;
+    color: #ffffff;
+  }
+
+  .jalali-picker-day.empty {
+    cursor: default;
+  }
+
+  .jalali-picker-day.empty:hover {
+    background: transparent;
+  }
+
+  .jalali-picker-footer {
+    text-align: center;
+    margin-top: 6px;
+  }
+
+  .jalali-picker-today-btn {
+    background: none;
+    border: none;
+    color: #0f766e;
+    font-family: inherit;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: underline;
+  }
 </style>
 </head>
 <body>
@@ -216,8 +334,12 @@
 
 <div class="filter-bar" id="filterBar">
   <div class="filter-row">
-    <label>از تاریخ (شمسی)<input type="text" class="jalali-date-input" id="fromDateInput" placeholder="۱۴۰۵/۰۶/۰۱" inputmode="numeric"></label>
-    <label>تا تاریخ (شمسی)<input type="text" class="jalali-date-input" id="toDateInput" placeholder="۱۴۰۵/۰۶/۲۲" inputmode="numeric"></label>
+    <label>از تاریخ (شمسی)<input type="text" class="jalali-date-input" id="fromDateInput" placeholder="۱۴۰۵/۰۶/۰۱" inputmode="numeric" autocomplete="off">
+      <div class="jalali-picker-popup" id="fromDatePicker" style="display:none;"></div>
+    </label>
+    <label>تا تاریخ (شمسی)<input type="text" class="jalali-date-input" id="toDateInput" placeholder="۱۴۰۵/۰۶/۲۲" inputmode="numeric" autocomplete="off">
+      <div class="jalali-picker-popup" id="toDatePicker" style="display:none;"></div>
+    </label>
     <button type="button" id="applyFilterBtn">نمایش</button>
   </div>
   <div class="filter-presets">
@@ -420,6 +542,149 @@
     }
   }
 
+  // Item جدید (تقویمِ کلیک‌پذیر شمسی): یک تقویمِ کوچکِ بازشونده که با
+  // فوکوس‌کردنِ ورودی ظاهر می‌شه - هنوز می‌شه تاریخ رو دستی هم تایپ
+  // کرد؛ این فقط راهِ کلیک‌پذیرِ اضافه است (چون input[type=date]
+  // استانداردِ مرورگر از تقویم شمسی پشتیبانی نمی‌کنه).
+  const JALALI_MONTH_NAMES = [
+    "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+    "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+  ];
+  const JALALI_WEEKDAY_LABELS = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
+
+  function jalaliMonthLength(jy, jm) {
+    if (jm <= 6) return 31;
+    if (jm <= 11) return 30;
+    // نکته: jalCal(jy).leap یک شمارندهٔ درونیِ چرخهٔ ۴ساله است، نه یک
+    // بولین؛ طبق آزمایش رفت‌وبرگشتیِ واقعی (نه فرضی)، سال jy وقتی و
+    // فقط وقتی کبیسه است (اسفندش ۳۰ روزه) که این شمارنده صفر باشد.
+    return jalCal(jy).leap === 0 ? 30 : 29;
+  }
+
+  function todayJalali() {
+    const now = new Date();
+    return gregorianToJalali(now.getFullYear(), now.getMonth() + 1, now.getDate());
+  }
+
+  // روزِ هفتهٔ ۱ فلان ماهِ شمسی را بر اساس هفتهٔ ایرانی (شنبه=۰ ... جمعه=۶)
+  // برمی‌گردونه - برای این‌که جدول روزها از ستونِ درست شروع بشه.
+  function jalaliFirstWeekday(jy, jm) {
+    const [gy, gm, gd] = jalaliToGregorian(jy, jm, 1);
+    const jsWeekday = new Date(gy, gm - 1, gd).getDay(); // یکشنبه=۰ ... شنبه=۶
+    return (jsWeekday + 1) % 7; // شنبه=۰ ... جمعه=۶
+  }
+
+  function setupJalaliDatePicker(inputEl, popupEl) {
+    let viewYear;
+    let viewMonth;
+
+    function currentSelection() {
+      const iso = jalaliInputToIsoGregorian(inputEl.value);
+      if (!iso) return null;
+      const [gy, gm, gd] = iso.split("-").map(n => parseInt(n, 10));
+      return gregorianToJalali(gy, gm, gd);
+    }
+
+    function render() {
+      const selected = currentSelection();
+      const [ty, tm, td] = todayJalali();
+      const monthLength = jalaliMonthLength(viewYear, viewMonth);
+      const firstWeekday = jalaliFirstWeekday(viewYear, viewMonth);
+
+      const yearOptions = [];
+      for (let y = ty - 10; y <= ty + 1; y += 1) {
+        yearOptions.push(
+          `<option value="${y}" ${y === viewYear ? "selected" : ""}>${toPersianDigits(y)}</option>`
+        );
+      }
+
+      const monthOptions = JALALI_MONTH_NAMES
+        .map((name, i) => `<option value="${i + 1}" ${i + 1 === viewMonth ? "selected" : ""}>${name}</option>`)
+        .join("");
+
+      let dayCells = "";
+      for (let i = 0; i < firstWeekday; i += 1) {
+        dayCells += `<span class="jalali-picker-day empty"></span>`;
+      }
+      for (let day = 1; day <= monthLength; day += 1) {
+        const isToday = viewYear === ty && viewMonth === tm && day === td;
+        const isSelected = selected && selected[0] === viewYear && selected[1] === viewMonth && selected[2] === day;
+        dayCells += `<button type="button" class="jalali-picker-day${isToday ? " today" : ""}${isSelected ? " selected" : ""}" data-day="${day}">${toPersianDigits(day)}</button>`;
+      }
+
+      popupEl.innerHTML = `
+        <div class="jalali-picker-header">
+          <button type="button" class="jalali-picker-nav" data-nav="prev" title="ماه قبل">›</button>
+          <select class="jalali-picker-month-select">${monthOptions}</select>
+          <select class="jalali-picker-year-select">${yearOptions.join("")}</select>
+          <button type="button" class="jalali-picker-nav" data-nav="next" title="ماه بعد">‹</button>
+        </div>
+        <div class="jalali-picker-weekdays">
+          ${JALALI_WEEKDAY_LABELS.map(l => `<span>${l}</span>`).join("")}
+        </div>
+        <div class="jalali-picker-days">${dayCells}</div>
+        <div class="jalali-picker-footer">
+          <button type="button" class="jalali-picker-today-btn">امروز</button>
+        </div>
+      `;
+
+      popupEl.querySelector('[data-nav="prev"]').addEventListener("click", () => {
+        viewMonth -= 1;
+        if (viewMonth < 1) { viewMonth = 12; viewYear -= 1; }
+        render();
+      });
+      popupEl.querySelector('[data-nav="next"]').addEventListener("click", () => {
+        viewMonth += 1;
+        if (viewMonth > 12) { viewMonth = 1; viewYear += 1; }
+        render();
+      });
+      popupEl.querySelector(".jalali-picker-month-select").addEventListener("change", (e) => {
+        viewMonth = parseInt(e.target.value, 10);
+        render();
+      });
+      popupEl.querySelector(".jalali-picker-year-select").addEventListener("change", (e) => {
+        viewYear = parseInt(e.target.value, 10);
+        render();
+      });
+      popupEl.querySelector(".jalali-picker-today-btn").addEventListener("click", () => {
+        viewYear = ty; viewMonth = tm;
+        selectDay(td);
+      });
+      popupEl.querySelectorAll(".jalali-picker-day:not(.empty)").forEach(btn => {
+        btn.addEventListener("click", () => selectDay(parseInt(btn.dataset.day, 10)));
+      });
+    }
+
+    function selectDay(day) {
+      inputEl.value = toPersianDigits(`${viewYear}/${String(viewMonth).padStart(2, "0")}/${String(day).padStart(2, "0")}`);
+      popupEl.style.display = "none";
+      // انتخاب از تقویم هم دقیقاً مثل تایپِ دستی است - کاربر هنوز باید
+      // دکمهٔ «نمایش» را بزند تا هر دو تاریخِ از/تا با هم اعمال شوند.
+    }
+
+    function openPicker() {
+      const selected = currentSelection();
+      const [ty, tm] = todayJalali();
+      viewYear = selected ? selected[0] : ty;
+      viewMonth = selected ? selected[1] : tm;
+      render();
+      popupEl.style.display = "block";
+    }
+
+    inputEl.addEventListener("focus", openPicker);
+    inputEl.addEventListener("click", openPicker);
+
+    document.addEventListener("click", (e) => {
+      if (!popupEl.contains(e.target) && e.target !== inputEl) {
+        popupEl.style.display = "none";
+      }
+    });
+
+    inputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") popupEl.style.display = "none";
+    });
+  }
+
   // Item جدید (فیلتر تاریخ): وضعیت فعلیِ بازهٔ انتخابی (همیشه به شکل
   // میلادیِ YYYY-MM-DD - همون چیزی که Worker می‌فهمه). مقدار null یعنی
   // «کل بازه» (بدون فیلتر - همون رفتار قبلی، سازگار با نسخهٔ قدیمی
@@ -583,6 +848,9 @@
     updateFilterCurrentLabel();
     loadStats();
   });
+
+  setupJalaliDatePicker(document.getElementById("fromDateInput"), document.getElementById("fromDatePicker"));
+  setupJalaliDatePicker(document.getElementById("toDateInput"), document.getElementById("toDatePicker"));
 
   updateFilterCurrentLabel();
   setActivePresetButton("all");
