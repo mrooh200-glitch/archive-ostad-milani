@@ -6,7 +6,37 @@
   // لود نشده باشه) نداره - برای همین آدرس رو این‌جا هم جدا نگه می‌داریم.
   const STATS_WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
 
+  // Item جدید (خروج خودِ صاحبِ سایت از آمار): همون پرچمِ localStorage
+  // که در index.htm تنظیم می‌شه (با ?notrack=1 یک‌بار در آدرسِ سایت) -
+  // چون کلید یکسانه و localStorage به ازای دامنه مشترکه، همینجا هم
+  // (صفحهٔ هر کتاب) به همون اندازه معتبره؛ این‌جا هم پارامترِ آدرس رو
+  // می‌خونیم تا اگه کاربر مستقیم یک صفحهٔ کتاب رو (نه صفحهٔ اصلی) با
+  // ?notrack=1 باز کرد، همون‌جا هم فعال بشه.
+  const NO_TRACK_STORAGE_KEY = "milaniNoTrackMe";
+
+  (function syncNoTrackFlagFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const flag = params.get("notrack");
+    if (flag === "1") {
+      try { localStorage.setItem(NO_TRACK_STORAGE_KEY, "1"); } catch {}
+    } else if (flag === "0") {
+      try { localStorage.removeItem(NO_TRACK_STORAGE_KEY); } catch {}
+    }
+  })();
+
+  function isTrackingExcluded() {
+    try {
+      return localStorage.getItem(NO_TRACK_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  }
+
   function trackEvent(type, detail) {
+    if (isTrackingExcluded()) {
+      return;
+    }
+
     try {
       fetch(`${STATS_WORKER_URL}/track`, {
         method: "POST",
