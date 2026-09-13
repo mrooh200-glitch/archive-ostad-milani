@@ -564,6 +564,16 @@ function addItemsToBookmarksAi(items, tags) {
       links: [],
       occurrenceIndex: 1,
       page: item.page || null,
+      // Item جدید (رفع باگ ۱: چند آدرسِ استنادشده در گفتگو، به‌صورت
+      // لینک‌های جدا در بلوک نشانه‌ها دیده نمی‌شدن): این تابع تا این‌جا
+      // sourcesInfo رو از item کپی نمی‌کرد - با این‌که خودِ item
+      // (ساخته‌شده تو chatToolbar) این فیلد رو داشت. نبودِ این فیلد
+      // تو نشانهٔ ذخیره‌شده باعث می‌شد bookmarkSourceLinksHtml (در
+      // index.htm) هیچ‌وقت نتونه لینک‌های جداگانه بسازه - چون آدرس‌های
+      // واقعی هیچ‌وقت واقعاً ذخیره نمی‌شدن، فقط اولین‌شون (تو url) و
+      // یک برچسبِ متنیِ ساده (تو title، برای عنوانِ گروه‌بندی) باقی
+      // می‌موند.
+      sourcesInfo: Array.isArray(item.sourcesInfo) ? item.sourcesInfo : null,
       hasRealSource: item.hasRealSource !== false,
       savedAt: new Date().toISOString(),
     });

@@ -7016,6 +7016,58 @@
     return -1;
   }
 
+  // Item جدید (رفع باگ ۲ در تب گفتگو: لینک منبع هوش به صفحهٔ درست
+  // نمی‌رسید - مثلاً به‌جای صفحهٔ ۳۰۰، چیزی نزدیک ۲۹۷ باز می‌شد):
+  // search-widget.js شمارهٔ صفحهٔ چاپیِ هر منبع را از قبل در پارامتر
+  // page می‌فرستد (چون تکه‌های متنِ جست‌وجوی معنایی معمولاً با هم
+  // هم‌پوشانی دارند - یعنی همان چند کلمهٔ اول یک تکه، ممکن است عیناً
+  // در تکهٔ قبلی/مجاور هم دیده شود)، اما تا این‌جا هیچ‌جای این فایل
+  // این پارامتر را نمی‌خواند - پیداکردنِ محل، فقط بر مبنای frag/occِ
+  // متنی بود که به‌خاطر همان هم‌پوشانی می‌توانست رخداد نزدیک‌تر ولی
+  // نادرست (چند صفحه زودتر) را پیدا کند. حالا وقتی page در آدرس باشد
+  // و فایل جاری صفحه‌بندی‌شده باشد (section.page[data-display]),
+  // جست‌وجوی رخداد ابتدا فقط در میان مارک‌های همان صفحهٔ چاپی انجام
+  // می‌شود - چون در محدودهٔ یک صفحهٔ چاپی، تکرار همان عبارتِ ۶کلمه‌ای
+  // عملاً غیرممکن است، پس دیگر نیازی به شمارشِ occ در کل فایل نیست.
+  function getPageSectionElement(pageNumber) {
+    if (!pageNumber) {
+      return null;
+    }
+
+    const safe = String(pageNumber).replace(/"/g, "");
+    return document.querySelector(`section.page[data-display="${safe}"]`);
+  }
+
+  function findMatchIndexOnPage(allMatches, pageNumber, fragmentText) {
+    const section = getPageSectionElement(pageNumber);
+    if (!section) {
+      return { index: -1, section: null };
+    }
+
+    const normalizedFragment = fragmentText ? normalize(fragmentText) : null;
+    const indexesOnPage = [];
+
+    allMatches.forEach((mark, index) => {
+      if (section.contains(mark)) {
+        indexesOnPage.push(index);
+      }
+    });
+
+    if (normalizedFragment) {
+      const exact = indexesOnPage.find(
+        index => getMatchFragmentText(allMatches[index]) === normalizedFragment
+      );
+      if (exact !== undefined) {
+        return { index: exact, section };
+      }
+    }
+
+    // متن دقیقاً پیدا نشد (مثلاً یک نشانِ 🔖 یا فاصلهٔ اضافه وسط جمله
+    // آمده)، ولی دست‌کم یک مارک روی همین صفحه هست - همان را به‌عنوان
+    // نزدیک‌ترین نتیجهٔ معتبر روی صفحهٔ درست برمی‌گردانیم.
+    return { index: indexesOnPage.length > 0 ? indexesOnPage[0] : -1, section };
+  }
+
   function applyIncomingQueryFromUrl() {
     const params = new URLSearchParams(location.search);
     const incomingQuery = params.get("q");
@@ -7071,9 +7123,25 @@
     // یک تصحیح ثانویه روی نتیجهٔ frag/occ (که با شمارش دیگری به
     // دست آمده و می‌تواند رخداد کاملاً غلطی برگرداند).
     const derivKeyParam = params.get("derivKey");
+    const pageParam = params.get("page");
     let targetIndex = -1;
+    let targetSection = null;
 
-    if (derivKeyParam) {
+    // اولویت با صفحهٔ چاپی است (اگه فرستاده شده و فایل صفحه‌بندی‌شده
+    // باشه) - چون فقط همین، ضدِ مشکلِ هم‌پوشانیِ تکه‌های جست‌وجوی
+    // معنایی است؛ frag/occ متنی (که زیرش می‌آید) هنوز برای لینک‌های
+    // قدیمی‌تر یا فایل‌های صفحه‌بندی‌نشده لازم است.
+    if (pageParam) {
+      const pageResult = findMatchIndexOnPage(
+        allMatchesForTarget,
+        pageParam,
+        getTextFragmentFromHash()
+      );
+      targetIndex = pageResult.index;
+      targetSection = pageResult.section;
+    }
+
+    if (targetIndex === -1 && derivKeyParam) {
       targetIndex = findMatchIndexForDerivative(
         derivKeyParam,
         getOccurrenceFromUrl(),
@@ -7089,6 +7157,17 @@
     }
 
     if (targetIndex === -1) {
+      // اگه صفحهٔ چاپیِ موردنظر پیدا شد ولی هیچ مارکی داخلش نبود (نه
+      // حتی نزدیک‌ترین)، دست‌کم خودِ همان صفحه را نشان بده - به‌جای
+      // برگشتن به جست‌وجوی کامل که ممکن است به صفحه‌ای کاملاً نامرتبط
+      // برود.
+      if (targetSection) {
+        removeHighlights();
+        input.value = "";
+        targetSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
       // نتونستیم رخداد دقیق رو پیدا کنیم - رفتار قدیمی (پرکردن کادر
       // و جست‌وجوی کامل) به‌عنوان جایگزین امن، تا کاربر دست‌کم به یک
       // نتیجه برسد.
