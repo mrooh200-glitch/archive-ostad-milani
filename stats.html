@@ -147,13 +147,16 @@
     color: #64748b;
   }
 
-  .filter-row input[type="date"] {
+  .filter-row input[type="text"].jalali-date-input {
     font-family: inherit;
     font-size: 0.9rem;
     padding: 6px 8px;
     border: 1px solid #d7dee7;
     border-radius: 8px;
     color: #1f2937;
+    width: 110px;
+    text-align: center;
+    direction: ltr;
   }
 
   #applyFilterBtn {
@@ -213,8 +216,8 @@
 
 <div class="filter-bar" id="filterBar">
   <div class="filter-row">
-    <label>از تاریخ<input type="date" id="fromDateInput"></label>
-    <label>تا تاریخ<input type="date" id="toDateInput"></label>
+    <label>از تاریخ (شمسی)<input type="text" class="jalali-date-input" id="fromDateInput" placeholder="۱۴۰۵/۰۶/۰۱" inputmode="numeric"></label>
+    <label>تا تاریخ (شمسی)<input type="text" class="jalali-date-input" id="toDateInput" placeholder="۱۴۰۵/۰۶/۲۲" inputmode="numeric"></label>
     <button type="button" id="applyFilterBtn">نمایش</button>
   </div>
   <div class="filter-presets">
@@ -267,7 +270,158 @@
 
   const WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
 
-  // Item جدید (فیلتر تاریخ): وضعیت فعلیِ بازهٔ انتخابی. مقدار null یعنی
+  // Item جدید (تقویم هجری شمسی): تبدیل تاریخ بین میلادی و شمسی، چون
+  // ورودی‌های فیلتر حالا به شمسی گرفته می‌شن ولی خودِ Worker (و کلیدهای
+  // ذخیره‌شده در KV) بر مبنای تاریخ میلادیِ روزِ تقویمیِ تهران کار
+  // می‌کنن. الگوریتم استاندارد تبدیل (بر پایهٔ شمارهٔ روزِ ژولینی) -
+  // بدون وابستگی به کتابخانهٔ خارجی.
+  function div(a, b) { return Math.trunc(a / b); }
+  function mod(a, b) { return a - Math.trunc(a / b) * b; }
+
+  function jalCal(jy) {
+    const breaks = [-61, 9, 38, 199, 426, 686, 756, 818, 1111, 1181, 1210, 1635, 2060, 2097, 2192, 2262, 2324, 2394, 2456, 3178];
+    const bl = breaks.length;
+    const gy = jy + 621;
+    let leapJ = -14;
+    let jp = breaks[0];
+
+    if (jy < jp || jy >= breaks[bl - 1]) {
+      throw new Error("سال شمسی نامعتبر: " + jy);
+    }
+
+    let jump = 0;
+    let jm;
+    for (let i = 1; i < bl; i += 1) {
+      jm = breaks[i];
+      jump = jm - jp;
+      if (jy < jm) break;
+      leapJ += div(jump, 33) * 8 + div(mod(jump, 33), 4);
+      jp = jm;
+    }
+
+    let n = jy - jp;
+    leapJ += div(n, 33) * 8 + div(mod(n, 33) + 3, 4);
+    if (mod(jump, 33) === 4 && jump - n === 4) leapJ += 1;
+
+    const leapG = div(gy, 4) - div((div(gy, 100) + 1) * 3, 4) - 150;
+    const march = 20 + leapJ - leapG;
+
+    if (jump - n < 6) n = n - jump + div(jump, 33) * 33;
+
+    let leap = mod(mod(n + 1, 33) - 1, 4);
+    if (leap === -1) leap = 4;
+
+    return { leap, gy, march };
+  }
+
+  function g2d(gy, gm, gd) {
+    let d = div((gy + div(gm - 8, 6) + 100100) * 1461, 4)
+      + div(153 * mod(gm + 9, 12) + 2, 5)
+      + gd - 34840408;
+    d = d - div(div(gy + div(gm - 8, 6) + 100100, 100) * 3, 4) + 752;
+    return d;
+  }
+
+  function d2g(jdn) {
+    let j = 4 * jdn + 139361631;
+    j = j + div(div(4 * jdn + 183187720, 146097) * 3, 4) * 4 - 3908;
+    const i = div(mod(j, 1461), 4) * 5 + 308;
+    const gd = div(mod(i, 153), 5) + 1;
+    const gm = mod(div(i, 153), 12) + 1;
+    const gy = div(j, 1461) - 100100 + div(8 - gm, 6);
+    return [gy, gm, gd];
+  }
+
+  function j2d(jy, jm, jd) {
+    const r = jalCal(jy);
+    return g2d(r.gy, 3, r.march) + (jm - 1) * 31 - div(jm, 7) * (jm - 7) + jd - 1;
+  }
+
+  function d2j(jdn) {
+    const gy = d2g(jdn)[0];
+    let jy = gy - 621;
+    const r = jalCal(jy);
+    const jdn1f = g2d(gy, 3, r.march);
+    let k = jdn - jdn1f;
+    let jm, jd;
+
+    if (k >= 0) {
+      if (k <= 185) {
+        jm = 1 + div(k, 31);
+        jd = mod(k, 31) + 1;
+        return [jy, jm, jd];
+      }
+      k -= 186;
+    } else {
+      jy -= 1;
+      k += 179;
+      if (r.leap === 1) k += 1;
+    }
+
+    jm = 7 + div(k, 30);
+    jd = mod(k, 30) + 1;
+    return [jy, jm, jd];
+  }
+
+  function gregorianToJalali(gy, gm, gd) { return d2j(g2d(gy, gm, gd)); }
+  function jalaliToGregorian(jy, jm, jd) { return d2g(j2d(jy, jm, jd)); }
+
+  function toPersianDigits(num) {
+    return String(num).replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+  }
+
+  function toAsciiDigits(text) {
+    const persian = "۰۱۲۳۴۵۶۷۸۹";
+    const arabic = "٠١٢٣٤٥٦٧٨٩";
+    return String(text).replace(/[۰-۹٠-٩]/g, ch => {
+      const pIndex = persian.indexOf(ch);
+      if (pIndex !== -1) return String(pIndex);
+      const aIndex = arabic.indexOf(ch);
+      return aIndex !== -1 ? String(aIndex) : ch;
+    });
+  }
+
+  // یک رشتهٔ تاریخِ میلادیِ YYYY-MM-DD رو به رشتهٔ نمایشیِ شمسی (با
+  // ارقام فارسی، برای گذاشتن داخل ورودی‌های فیلتر) تبدیل می‌کنه.
+  function isoGregorianToJalaliDisplay(isoStr) {
+    const [gy, gm, gd] = isoStr.split("-").map(n => parseInt(n, 10));
+    const [jy, jm, jd] = gregorianToJalali(gy, gm, gd);
+    return toPersianDigits(`${jy}/${String(jm).padStart(2, "0")}/${String(jd).padStart(2, "0")}`);
+  }
+
+  // متن تایپ‌شده توسط کاربر (شمسی، با ارقام فارسی یا انگلیسی، با جداکنندهٔ
+  // / یا - یا فاصله) رو می‌گیره و رشتهٔ میلادیِ YYYY-MM-DD برمی‌گردونه؛
+  // اگه نامعتبر بود null برمی‌گردونه (نه این‌که خطا پرتاب کنه).
+  function jalaliInputToIsoGregorian(text) {
+    const clean = toAsciiDigits(String(text).trim()).replace(/[\s.]+/g, "/").replace(/-/g, "/");
+    const match = clean.match(/^(\d{3,4})\/(\d{1,2})\/(\d{1,2})$/);
+    if (!match) return null;
+
+    const jy = parseInt(match[1], 10);
+    const jm = parseInt(match[2], 10);
+    const jd = parseInt(match[3], 10);
+
+    if (jm < 1 || jm > 12 || jd < 1 || jd > 31) return null;
+
+    try {
+      const [gy, gm, gd] = jalaliToGregorian(jy, jm, jd);
+      // اعتبارسنجی رفت‌وبرگشتی: اگه jd روزی بود که در این ماه/سال وجود
+      // نداره (مثلاً ۳۰ اسفند در سال غیرکبیسه)، تبدیل رفت‌وبرگشت به
+      // ورودیِ اصلی نمی‌رسه - این‌جا رد می‌کنیم.
+      const [jy2, jm2, jd2] = gregorianToJalali(gy, gm, gd);
+      if (jy2 !== jy || jm2 !== jm || jd2 !== jd) return null;
+
+      const year = String(gy).padStart(4, "0");
+      const month = String(gm).padStart(2, "0");
+      const day = String(gd).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    } catch {
+      return null;
+    }
+  }
+
+  // Item جدید (فیلتر تاریخ): وضعیت فعلیِ بازهٔ انتخابی (همیشه به شکل
+  // میلادیِ YYYY-MM-DD - همون چیزی که Worker می‌فهمه). مقدار null یعنی
   // «کل بازه» (بدون فیلتر - همون رفتار قبلی، سازگار با نسخهٔ قدیمی
   // Worker هم هست، چون وقتی from/to فرستاده نشه، Worker مجموع کل رو
   // برمی‌گردونه).
@@ -287,10 +441,6 @@
     const d = new Date();
     d.setDate(d.getDate() - n);
     return toIsoDateString(d);
-  }
-
-  function toPersianDigits(num) {
-    return String(num).replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   }
 
   function escapeHtml(text) {
@@ -367,7 +517,7 @@
   function updateFilterCurrentLabel() {
     const label = document.getElementById("filterCurrentLabel");
     label.textContent = currentFrom && currentTo
-      ? `بازهٔ نمایش‌داده‌شده: ${currentFrom} تا ${currentTo}`
+      ? `بازهٔ نمایش‌داده‌شده: ${isoGregorianToJalaliDisplay(currentFrom)} تا ${isoGregorianToJalaliDisplay(currentTo)}`
       : "بازهٔ نمایش‌داده‌شده: از ابتدا تا الان (بدون فیلتر)";
   }
 
@@ -384,14 +534,14 @@
       const today = toIsoDateString(new Date());
       currentFrom = today;
       currentTo = today;
-      fromInput.value = today;
-      toInput.value = today;
+      fromInput.value = isoGregorianToJalaliDisplay(today);
+      toInput.value = isoGregorianToJalaliDisplay(today);
     } else {
       const n = parseInt(presetKey, 10);
       currentFrom = daysAgoDateString(n - 1);
       currentTo = toIsoDateString(new Date());
-      fromInput.value = currentFrom;
-      toInput.value = currentTo;
+      fromInput.value = isoGregorianToJalaliDisplay(currentFrom);
+      toInput.value = isoGregorianToJalaliDisplay(currentTo);
     }
 
     setActivePresetButton(presetKey);
@@ -404,13 +554,21 @@
   });
 
   document.getElementById("applyFilterBtn").addEventListener("click", () => {
-    const fromValue = document.getElementById("fromDateInput").value;
-    const toValue = document.getElementById("toDateInput").value;
+    const fromText = document.getElementById("fromDateInput").value.trim();
+    const toText = document.getElementById("toDateInput").value.trim();
 
-    if (!fromValue || !toValue) {
+    if (!fromText || !toText) {
       // اگه کاربر هر دو تاریخ رو پاک کرده باشه، یعنی می‌خواد فیلتر
       // برداشته بشه - مثل زدن دکمهٔ «کل بازه».
       applyPreset("all");
+      return;
+    }
+
+    const fromValue = jalaliInputToIsoGregorian(fromText);
+    const toValue = jalaliInputToIsoGregorian(toText);
+
+    if (!fromValue || !toValue) {
+      alert("تاریخ را به‌صورت شمسی و به شکل سال/ماه/روز وارد کنید - مثلاً ۱۴۰۵/۰۶/۰۱");
       return;
     }
 
