@@ -274,13 +274,33 @@ ${contextText}`;
   return jsonResponse({ answer, usedReferences });
 }
 
-// ---------- /track و /stats : آمار سایت (مورد ۸) ----------
+// ---------- /track و /stats : آمار سایت (مورد ۸، + فیلتر روزانه) ----------
 // چون KV افزایش اتمی نداره (فقط get/put ساده)، این شمارنده‌ها زیر بار
 // هم‌زمانِ خیلی بالا ممکنه گاهی یک شمارش رو از دست بدن (دو درخواست
 // هم‌زمان، هر دو همون عدد قدیمی رو می‌خونن و هر دو با +۱ می‌نویسن) -
 // برای یک سایت آرشیوی با ترافیک معمولی، این خطای کوچیک قابل چشم‌پوشیه؛
 // اگه دقتِ صددرصدی لازم شد، باید از Durable Objects استفاده کرد که
 // پیچیدگی بیشتری داره.
+
+// Item جدید (فیلتر روزانهٔ آمار): تاریخ هر رویداد بر اساس روزِ تقویمیِ
+// تهران (نه UTC) محاسبه می‌شه - چون سرورِ Worker به وقتِ UTC کار می‌کنه
+// و اگه به‌جاش از تاریخِ خامِ UTC استفاده می‌کردیم، بازدیدهای ساعت‌های
+// اول شب (تا حدود ۳ ساعت و نیم بعد از نیمه‌شبِ تهران) اشتباهاً به روزِ
+// قبل نسبت داده می‌شدن.
+function tehranDateString(date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tehran",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+// حداکثر تعداد روزهایی که یک درخواستِ /stats با from/to مجاز است
+// پیمایش کند - جلوگیری از یک درخواستِ سنگین با بازهٔ خیلی بزرگ (که
+// می‌تونه صدها خواندنِ KV در یک درخواست بسازه).
+const MAX_STATS_RANGE_DAYS = 366;
+
 async function handleTrack(request, env) {
   if (!env.STATS_KV) {
     // نبودِ KV آمار نباید تجربهٔ کاربر رو خراب کنه - بی‌سروصدا موفق
@@ -296,18 +316,37 @@ async function handleTrack(request, env) {
     return jsonResponse({ error: "پارامتر type باید یکی از pageview/search/download باشه" }, 400);
   }
 
+  const today = tehranDateString(new Date());
+
   const counterKey = `stats:count:${type}`;
-  const current = parseInt((await env.STATS_KV.get(counterKey)) || "0", 10);
-  await env.STATS_KV.put(counterKey, String(current + 1));
+  const dayCounterKey = `stats:day:${today}:count:${type}`;
+
+  const [current, currentForDay] = await Promise.all([
+    env.STATS_KV.get(counterKey),
+    env.STATS_KV.get(dayCounterKey),
+  ]);
+
+  await Promise.all([
+    env.STATS_KV.put(counterKey, String(parseInt(current || "0", 10) + 1)),
+    env.STATS_KV.put(dayCounterKey, String(parseInt(currentForDay || "0", 10) + 1)),
+  ]);
 
   const detail = typeof body.detail === "string" ? body.detail.trim() : "";
 
   if (type === "search" && detail) {
-    await incrementTermCount(env, "stats:searchTerms", detail.slice(0, 200).toLowerCase());
+    const term = detail.slice(0, 200).toLowerCase();
+    await Promise.all([
+      incrementTermCount(env, "stats:searchTerms", term),
+      incrementTermCount(env, `stats:day:${today}:searchTerms`, term),
+    ]);
   }
 
   if (type === "download" && detail) {
-    await incrementTermCount(env, "stats:downloadFiles", detail.slice(0, 300));
+    const fileName = detail.slice(0, 300);
+    await Promise.all([
+      incrementTermCount(env, "stats:downloadFiles", fileName),
+      incrementTermCount(env, `stats:day:${today}:downloadFiles`, fileName),
+    ]);
   }
 
   return jsonResponse({ ok: true, tracked: true });
@@ -333,30 +372,124 @@ async function incrementTermCount(env, kvKey, value) {
   await env.STATS_KV.put(kvKey, JSON.stringify(trimmed));
 }
 
+// یک لیست از رشته‌های تاریخِ «YYYY-MM-DD» بین from و to (هر دو شامل)
+// می‌سازه. تاریخ‌ها فقط برچسبِ روزِ تقویمی‌ان (نه یک لحظهٔ دقیق)، پس
+// برای جلوگیری از دردسرهای منطقهٔ زمانی هنگام جمع‌زدنِ روزها، هرکدوم
+// را روی ساعتِ ۱۲:۰۰ UTC همون روز می‌سازیم.
+function dateRangeList(fromStr, toStr) {
+  const dates = [];
+  let cursor = new Date(`${fromStr}T12:00:00Z`);
+  const end = new Date(`${toStr}T12:00:00Z`);
+
+  while (cursor <= end && dates.length <= MAX_STATS_RANGE_DAYS) {
+    dates.push(cursor.toISOString().slice(0, 10));
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  return dates;
+}
+
+function mergeTermMaps(rawList) {
+  const merged = {};
+  for (const raw of rawList) {
+    if (!raw) continue;
+    const counts = JSON.parse(raw);
+    for (const [value, count] of Object.entries(counts)) {
+      merged[value] = (merged[value] || 0) + count;
+    }
+  }
+  return merged;
+}
+
+const DATE_STRING_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 async function handleStats(request, env) {
   if (!env.STATS_KV) {
     return jsonResponse({ error: "آمار روی این سرور فعال نیست (KV به اسم STATS_KV بایند نشده)" }, 404);
   }
 
-  const [pageviews, searches, downloads, searchTermsRaw, downloadFilesRaw] = await Promise.all([
-    env.STATS_KV.get("stats:count:pageview"),
-    env.STATS_KV.get("stats:count:search"),
-    env.STATS_KV.get("stats:count:download"),
-    env.STATS_KV.get("stats:searchTerms"),
-    env.STATS_KV.get("stats:downloadFiles"),
-  ]);
+  const url = new URL(request.url);
+  const fromParam = url.searchParams.get("from");
+  const toParam = url.searchParams.get("to");
 
-  const topEntries = (raw) =>
-    Object.entries(raw ? JSON.parse(raw) : {})
+  const topEntries = (obj) =>
+    Object.entries(obj)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 30)
       .map(([value, count]) => ({ value, count }));
 
+  // بدون from/to: همان رفتار قبلی - مجموع کل از ابتدا تا الان (سازگار
+  // با نسخهٔ قبلیِ stats.html که هنوز فیلتر تاریخ نمی‌فرسته).
+  if (!fromParam && !toParam) {
+    const [pageviews, searches, downloads, searchTermsRaw, downloadFilesRaw] = await Promise.all([
+      env.STATS_KV.get("stats:count:pageview"),
+      env.STATS_KV.get("stats:count:search"),
+      env.STATS_KV.get("stats:count:download"),
+      env.STATS_KV.get("stats:searchTerms"),
+      env.STATS_KV.get("stats:downloadFiles"),
+    ]);
+
+    return jsonResponse({
+      range: null,
+      pageviews: parseInt(pageviews || "0", 10),
+      searches: parseInt(searches || "0", 10),
+      downloads: parseInt(downloads || "0", 10),
+      topSearchTerms: topEntries(searchTermsRaw ? JSON.parse(searchTermsRaw) : {}),
+      topDownloadFiles: topEntries(downloadFilesRaw ? JSON.parse(downloadFilesRaw) : {}),
+    });
+  }
+
+  // اگه یکی از from/to داده شده، هر دو لازمن.
+  if (!fromParam || !toParam || !DATE_STRING_PATTERN.test(fromParam) || !DATE_STRING_PATTERN.test(toParam)) {
+    return jsonResponse({ error: "پارامترهای from و to باید هر دو به شکل YYYY-MM-DD داده بشن" }, 400);
+  }
+
+  if (fromParam > toParam) {
+    return jsonResponse({ error: "تاریخ from نباید بعد از to باشه" }, 400);
+  }
+
+  const days = dateRangeList(fromParam, toParam);
+
+  if (days.length > MAX_STATS_RANGE_DAYS) {
+    return jsonResponse({ error: `بازهٔ تاریخ نباید بیشتر از ${MAX_STATS_RANGE_DAYS} روز باشه` }, 400);
+  }
+
+  // برای هر روزِ بازه، شش کلید (سه شمارنده + دو نقشهٔ پرتکرارها) از KV
+  // خونده می‌شه. تعداد خواندن‌های KV در پلن رایگان بسیار سخاوتمندانه‌تر
+  // از نوشتن‌هاست، پس این حتی برای بازه‌های چندماهه هم مشکلی ایجاد
+  // نمی‌کنه.
+  const perDayResults = await Promise.all(
+    days.map((day) =>
+      Promise.all([
+        env.STATS_KV.get(`stats:day:${day}:count:pageview`),
+        env.STATS_KV.get(`stats:day:${day}:count:search`),
+        env.STATS_KV.get(`stats:day:${day}:count:download`),
+        env.STATS_KV.get(`stats:day:${day}:searchTerms`),
+        env.STATS_KV.get(`stats:day:${day}:downloadFiles`),
+      ])
+    )
+  );
+
+  let pageviews = 0;
+  let searches = 0;
+  let downloads = 0;
+  const searchTermsRawList = [];
+  const downloadFilesRawList = [];
+
+  for (const [pv, se, dl, terms, files] of perDayResults) {
+    pageviews += parseInt(pv || "0", 10);
+    searches += parseInt(se || "0", 10);
+    downloads += parseInt(dl || "0", 10);
+    searchTermsRawList.push(terms);
+    downloadFilesRawList.push(files);
+  }
+
   return jsonResponse({
-    pageviews: parseInt(pageviews || "0", 10),
-    searches: parseInt(searches || "0", 10),
-    downloads: parseInt(downloads || "0", 10),
-    topSearchTerms: topEntries(searchTermsRaw),
-    topDownloadFiles: topEntries(downloadFilesRaw),
+    range: { from: fromParam, to: toParam },
+    pageviews,
+    searches,
+    downloads,
+    topSearchTerms: topEntries(mergeTermMaps(searchTermsRawList)),
+    topDownloadFiles: topEntries(mergeTermMaps(downloadFilesRawList)),
   });
 }
