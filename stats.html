@@ -118,11 +118,113 @@
   .status-note.error {
     color: #b91c1c;
   }
+
+  /* Item جدید (فیلتر تاریخ): نوار فیلتر بازهٔ تاریخ - روی سه بخش:
+     ردیف ورودی‌های تاریخ + دکمهٔ نمایش، ردیف دکمه‌های آماده (پرش
+     سریع)، و یک خط وضعیت که بازهٔ فعال را نشان می‌دهد. */
+  .filter-bar {
+    max-width: 720px;
+    margin: 0 auto 20px;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 14px 16px;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  }
+
+  .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: end;
+    justify-content: center;
+  }
+
+  .filter-row label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+
+  .filter-row input[type="date"] {
+    font-family: inherit;
+    font-size: 0.9rem;
+    padding: 6px 8px;
+    border: 1px solid #d7dee7;
+    border-radius: 8px;
+    color: #1f2937;
+  }
+
+  #applyFilterBtn {
+    background: #0f766e;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-family: inherit;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  #applyFilterBtn:hover {
+    background: #0d5f58;
+  }
+
+  .filter-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+  }
+
+  .preset-btn {
+    background: #eef2f7;
+    color: #173b63;
+    border: none;
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .preset-btn:hover {
+    background: #dde5ee;
+  }
+
+  .preset-btn.active {
+    background: #0f766e;
+    color: #ffffff;
+  }
+
+  .filter-current {
+    text-align: center;
+    color: #64748b;
+    font-size: 0.8rem;
+    margin: 12px 0 0;
+  }
 </style>
 </head>
 <body>
 
 <h1>📊 آمار سایت — آرشیو استاد میلانی</h1>
+
+<div class="filter-bar" id="filterBar">
+  <div class="filter-row">
+    <label>از تاریخ<input type="date" id="fromDateInput"></label>
+    <label>تا تاریخ<input type="date" id="toDateInput"></label>
+    <button type="button" id="applyFilterBtn">نمایش</button>
+  </div>
+  <div class="filter-presets">
+    <button type="button" class="preset-btn" data-preset="today">امروز</button>
+    <button type="button" class="preset-btn" data-preset="7">۷ روز اخیر</button>
+    <button type="button" class="preset-btn" data-preset="30">۳۰ روز اخیر</button>
+    <button type="button" class="preset-btn" data-preset="all">کل بازه (پیش‌فرض)</button>
+  </div>
+  <p class="filter-current" id="filterCurrentLabel"></p>
+</div>
 
 <p class="status-note" id="statusNote">در حال بارگذاری آمار…</p>
 
@@ -165,6 +267,28 @@
 
   const WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
 
+  // Item جدید (فیلتر تاریخ): وضعیت فعلیِ بازهٔ انتخابی. مقدار null یعنی
+  // «کل بازه» (بدون فیلتر - همون رفتار قبلی، سازگار با نسخهٔ قدیمی
+  // Worker هم هست، چون وقتی from/to فرستاده نشه، Worker مجموع کل رو
+  // برمی‌گردونه).
+  let currentFrom = null;
+  let currentTo = null;
+
+  function toIsoDateString(date) {
+    // تاریخِ محلیِ مرورگر کاربر رو به شکل YYYY-MM-DD تبدیل می‌کنه (نه
+    // toISOString که به UTC تبدیل می‌کنه و ممکنه یک روز عقب/جلو بشه).
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function daysAgoDateString(n) {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return toIsoDateString(d);
+  }
+
   function toPersianDigits(num) {
     return String(num).replace(/[0-9]/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
   }
@@ -193,8 +317,21 @@
 
   async function loadStats() {
     const statusNote = document.getElementById("statusNote");
+    statusNote.className = "status-note";
+    statusNote.textContent = "در حال بارگذاری آمار…";
+    statusNote.style.display = "block";
+    document.getElementById("statsGrid").style.display = "none";
+    document.getElementById("tablesWrap").style.display = "none";
+
     try {
-      const res = await fetch(`${WORKER_URL}/stats`);
+      // Item جدید (فیلتر تاریخ): وقتی currentFrom/currentTo پر باشن،
+      // به‌عنوان پارامتر به Worker فرستاده می‌شن؛ Worker خودش تشخیص
+      // می‌ده و فقط مجموع همون بازه رو برمی‌گردونه.
+      const query = currentFrom && currentTo
+        ? `?from=${encodeURIComponent(currentFrom)}&to=${encodeURIComponent(currentTo)}`
+        : "";
+
+      const res = await fetch(`${WORKER_URL}/stats${query}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `خطای سرور (${res.status})`);
@@ -217,6 +354,80 @@
     }
   }
 
+  // Item جدید (فیلتر تاریخ): وقتی یک دکمهٔ آماده (امروز/۷ روز/۳۰ روز/کل
+  // بازه) زده می‌شه، هم ورودی‌های تاریخ رو پر می‌کنه و هم بلافاصله
+  // آمار رو دوباره می‌خونه؛ دکمهٔ «نمایش» هم برای وقتی هست که کاربر
+  // خودش دستی یک بازهٔ دلخواه در ورودی‌ها انتخاب کرده.
+  function setActivePresetButton(presetKey) {
+    document.querySelectorAll(".preset-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.preset === presetKey);
+    });
+  }
+
+  function updateFilterCurrentLabel() {
+    const label = document.getElementById("filterCurrentLabel");
+    label.textContent = currentFrom && currentTo
+      ? `بازهٔ نمایش‌داده‌شده: ${currentFrom} تا ${currentTo}`
+      : "بازهٔ نمایش‌داده‌شده: از ابتدا تا الان (بدون فیلتر)";
+  }
+
+  function applyPreset(presetKey) {
+    const fromInput = document.getElementById("fromDateInput");
+    const toInput = document.getElementById("toDateInput");
+
+    if (presetKey === "all") {
+      currentFrom = null;
+      currentTo = null;
+      fromInput.value = "";
+      toInput.value = "";
+    } else if (presetKey === "today") {
+      const today = toIsoDateString(new Date());
+      currentFrom = today;
+      currentTo = today;
+      fromInput.value = today;
+      toInput.value = today;
+    } else {
+      const n = parseInt(presetKey, 10);
+      currentFrom = daysAgoDateString(n - 1);
+      currentTo = toIsoDateString(new Date());
+      fromInput.value = currentFrom;
+      toInput.value = currentTo;
+    }
+
+    setActivePresetButton(presetKey);
+    updateFilterCurrentLabel();
+    loadStats();
+  }
+
+  document.querySelectorAll(".preset-btn").forEach(btn => {
+    btn.addEventListener("click", () => applyPreset(btn.dataset.preset));
+  });
+
+  document.getElementById("applyFilterBtn").addEventListener("click", () => {
+    const fromValue = document.getElementById("fromDateInput").value;
+    const toValue = document.getElementById("toDateInput").value;
+
+    if (!fromValue || !toValue) {
+      // اگه کاربر هر دو تاریخ رو پاک کرده باشه، یعنی می‌خواد فیلتر
+      // برداشته بشه - مثل زدن دکمهٔ «کل بازه».
+      applyPreset("all");
+      return;
+    }
+
+    if (fromValue > toValue) {
+      alert("تاریخ «از» نباید بعد از تاریخ «تا» باشد.");
+      return;
+    }
+
+    currentFrom = fromValue;
+    currentTo = toValue;
+    setActivePresetButton(null);
+    updateFilterCurrentLabel();
+    loadStats();
+  });
+
+  updateFilterCurrentLabel();
+  setActivePresetButton("all");
   loadStats();
 })();
 </script>
