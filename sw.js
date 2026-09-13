@@ -92,7 +92,16 @@ function isNetworkFirstUrl(url) {
 
 async function networkFirst(request) {
   try {
-    const response = await fetch(request);
+    // Item جدید (رفع باگ: نسخهٔ قدیمی گاهی برمی‌گشت، گاهی نه): سرورِ
+    // GitHub Pages برای این فایل‌ها هدر Cache-Control: max-age=3600
+    // می‌فرسته - یعنی مرورگر اجازه داره تا یک ساعت، حتی برای همین
+    // fetch داخلیِ Service Worker، بدون رفتن به شبکه، نسخهٔ کش‌شده‌ی
+    // HTTP معمولیِ خودش رو برگردونه. این کاملاً جدا از Cache Storage
+    // (که خودمون کنترلش می‌کنیم) و جدا از کشِ Cloudflare/GitHubه - و
+    // همینه که باعث می‌شد نتیجه گاهی تازه، گاهی کهنه باشه. با
+    // {cache: "no-store"} صریحاً می‌گیم این fetch همیشه واقعاً از
+    // شبکه بره، بدون مشورت با هیچ کشِ HTTP.
+    const response = await fetch(request, { cache: "no-store" });
     if (response && response.ok) {
       const cache = await caches.open(RUNTIME_CACHE);
       cache.put(request, response.clone());
