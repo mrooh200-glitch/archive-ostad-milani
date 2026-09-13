@@ -76,7 +76,18 @@ function isNetworkFirstUrl(url) {
   return url.pathname.endsWith("/index.htm") ||
     url.pathname === "/" ||
     url.pathname.endsWith("/embeddings.json") ||
-    url.pathname.endsWith("/embeddings-version.json");
+    url.pathname.endsWith("/embeddings-version.json") ||
+    // Item جدید (رفع باگ: فیلتر تاریخ/دکمهٔ ریست تو مرورگرِ عادی دیده
+    // نمی‌شد ولی تو ناشناس دیده می‌شد): stats.html این‌جا نبود، پس با
+    // اولین بازدید یک‌بار cache-first می‌شد و از اون به بعد، حتی بعد
+    // از هر آپدیتی روی خودِ فایل، همون نسخهٔ قدیمیِ کش‌شده برمی‌گشت -
+    // چون تغییرات stats.html باعثِ بالارفتنِ CACHE_VERSION نمی‌شه (اون
+    // فقط با تغییرِ index.htm/search-widget.js/in-page-search.js عوض
+    // می‌شه، نه stats.html) تا کشِ قدیمی باطل بشه. حالت ناشناس چون از
+    // اول کشی نداشت، این مشکل رو نشون نمی‌داد. صفحهٔ آمار یک پنلِ
+    // مدیریتیه که همیشه باید نسخهٔ تازه‌اش لود بشه، پس بهتره اصلاً
+    // هیچ‌وقت cache-first نشه.
+    url.pathname.endsWith("/stats.html");
 }
 
 async function networkFirst(request) {
