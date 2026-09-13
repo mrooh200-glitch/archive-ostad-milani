@@ -327,26 +327,41 @@
     text-decoration: underline;
   }
 
-  /* Item جدید (ریست آمار): عمداً کوچیک و کم‌رنگ و ته صفحه - چون یک
-     عملِ برگشت‌ناپذیره و نباید تصادفی به چشم بیاد یا کلیک بشه. */
+  /* Item جدید (ریست آمار): طبق بازخورد کاربر، طراحیِ اولیه (فقط یک
+     خط نازک و متن کم‌رنگ) اونقدر بی‌سروصدا بود که عملاً پیدا نمی‌شد -
+     الان یک کادرِ مشخص با پس‌زمینه داره تا موقع اسکرول‌کردن، بدون شک
+     دیده بشه؛ ولی رنگش (قرمزِ ملایم) و جداافتادنش از بقیهٔ صفحه هنوز
+     نشون می‌ده این یک عملِ متفاوت (و حساس) از بقیهٔ صفحه‌ست.  */
   .reset-stats-wrap {
+    max-width: 720px;
+    margin: 32px auto 0;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    padding: 16px;
     text-align: center;
-    margin: 32px 0 0;
+  }
+
+  .reset-stats-wrap p {
+    margin: 0 0 10px;
+    color: #7f1d1d;
+    font-size: 0.85rem;
   }
 
   #resetStatsBtn {
-    background: none;
-    border: 1px solid #e2b8b8;
-    color: #b91c1c;
+    background: #b91c1c;
+    border: none;
+    color: #ffffff;
     font-family: inherit;
-    font-size: 0.78rem;
-    padding: 6px 14px;
-    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    padding: 10px 24px;
+    border-radius: 8px;
     cursor: pointer;
   }
 
   #resetStatsBtn:hover {
-    background: #fef2f2;
+    background: #991b1b;
   }
 </style>
 </head>
@@ -409,6 +424,7 @@
 </div>
 
 <div class="reset-stats-wrap">
+  <p>⚠️ منطقهٔ حساس — این کار همهٔ آمار را برای همیشه پاک می‌کند.</p>
   <button type="button" id="resetStatsBtn">ریست کامل آمار</button>
 </div>
 
