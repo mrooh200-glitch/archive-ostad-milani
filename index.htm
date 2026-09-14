@@ -8,7 +8,7 @@
 
   <!-- Item ۲۵ (حالت آفلاین): manifest برای نصب/PWA + رنگ نوار مرورگر -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#173b63">
+  <meta name="theme-color" content="#0b4f3c">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
 
@@ -16,7 +16,7 @@
        فونت سیستمیِ Tahoma که قبلاً استفاده می‌شد) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
     * {
@@ -92,11 +92,17 @@
       filter: invert(1) hue-rotate(180deg);
     }
 
+    /* این دو دکمه دیگه فیکس/شناور روی گوشهٔ صفحه نیستن - داخل یک نوار
+       کوچیک بالای هیرو قرار می‌گیرن (به درخواست کاربر، تا با عکس
+       بزرگ‌شدهٔ هیرو تداخل نداشته باشن). */
+    .top-utility-bar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
     .dark-mode-toggle {
-      position: fixed;
-      top: 14px;
-      left: 14px;
-      z-index: 900;
       width: 38px;
       height: 38px;
       padding: 0;
@@ -114,10 +120,9 @@
       background: var(--c-cream-deep);
     }
 
-    /* فرم «ارتباط با ما»: دکمهٔ دومی هم‌شکل با دکمهٔ حالت شب، کنارش. */
-    .contact-toggle {
-      left: 60px;
-    }
+    /* فرم «ارتباط با ما»: دکمهٔ دومی، هم‌شکل با دکمهٔ حالت شب، توی همون
+       نوار کوچیک کنارش می‌شینه (چیدمانِ .top-utility-bar بالا خودش
+       فاصله‌شون رو مدیریت می‌کنه). */
 
     header.site-hero {
       position: relative;
@@ -144,22 +149,23 @@
     .site-hero-inner {
       position: relative;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 26px;
-      padding: 32px 30px;
+      gap: 18px;
+      padding: 40px 30px 34px;
       text-align: center;
     }
 
+    /* عکس بزرگ‌تر شد (طبق درخواست) و حالا بالای اسم سایت می‌شینه، نه
+       کنارش - تا خودش کانون توجهِ هیرو باشه. */
     .hero-portrait {
       flex: 0 0 auto;
-      width: 104px;
-      height: 104px;
+      width: clamp(150px, 20vw, 230px);
+      height: clamp(150px, 20vw, 230px);
       border-radius: 50%;
       overflow: hidden;
-      border: 3px solid var(--c-gold);
-      box-shadow: 0 0 0 5px rgba(227, 200, 118, 0.2);
+      border: 4px solid var(--c-gold);
+      box-shadow: 0 0 0 7px rgba(227, 200, 118, 0.2);
     }
 
     .hero-portrait img {
@@ -169,27 +175,36 @@
       display: block;
     }
 
-    .hero-text {
-      max-width: 620px;
-    }
-
-    h1 {
+    /* اسم سایت - دقیقاً همون فونت/رنگی که در فایل مرجع (نسخهٔ نهایی)
+       برای «پایگاه علمی‌پژوهشی استاد میلانی» استفاده شده بود (فونت
+       عارف رقعه، طلایی)، فقط با سایز خیلی بزرگ‌تر چون قبلاً برای یک
+       کپشنِ کوچیکِ روی عکس طراحی شده بود، نه برای عنوان اصلی صفحه. */
+    .site-name {
       margin: 0;
-      color: var(--c-cream);
-      font-size: clamp(1.5rem, 3.6vw, 2.2rem);
-      font-weight: 800;
     }
 
-    .subtitle {
-      margin: 10px 0 0;
+    .site-name .line1 {
+      margin: 0 0 6px;
+      font-family: "Aref Ruqaa", serif;
+      font-weight: 700;
       color: var(--c-gold-light);
-      font-size: 0.98rem;
+      font-size: clamp(1.1rem, 2.8vw, 1.55rem);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 2px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .site-name .line2 {
+      margin: 0;
+      font-family: "Aref Ruqaa", serif;
+      font-weight: 700;
+      color: var(--c-cream);
+      font-size: clamp(2rem, 5.4vw, 3.2rem);
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), 0 3px 14px rgba(0, 0, 0, 0.3);
     }
 
     @media (max-width: 560px) {
       .hero-portrait {
-        width: 84px;
-        height: 84px;
+        width: clamp(120px, 32vw, 160px);
+        height: clamp(120px, 32vw, 160px);
       }
     }
 
@@ -241,8 +256,8 @@
     }
 
     .search-box:focus {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      border-color: #0b4f3c;
+      box-shadow: 0 0 0 3px rgba(184, 145, 42, 0.18);
     }
 
     /* آیتم ۴: عبارت پس‌زمینه (placeholder) کادرهای جستجو باید محسوسا
@@ -299,7 +314,7 @@
       border: 1px solid #cbd5e1;
       border-radius: 999px;
       background: #f8fafc;
-      color: #173b63;
+      color: #0b4f3c;
       font: inherit;
       font-size: 0.7rem;
       white-space: nowrap;
@@ -307,8 +322,8 @@
     }
 
     .search-history-item:hover {
-      background: #eff6ff;
-      border-color: #93c5fd;
+      background: #f1e6c9;
+      border-color: #d9c58f;
     }
 
     .search-layout {
@@ -379,10 +394,10 @@
 
     .copy-selected-button {
       padding: 7px 12px;
-      border: 1px solid #93c5fd;
+      border: 1px solid #d9c58f;
       border-radius: 8px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       cursor: pointer;
       font: inherit;
       font-size: 0.84rem;
@@ -390,7 +405,7 @@
     }
 
     .copy-selected-button:hover:not(:disabled) {
-      background: #dbeafe;
+      background: #f1e6c9;
     }
 
     .copy-selected-button:disabled {
@@ -477,10 +492,10 @@
 
     .voice-input-button {
       padding: 8px 12px;
-      border: 1px solid #93c5fd;
+      border: 1px solid #d9c58f;
       border-radius: 8px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       cursor: pointer;
       font: inherit;
       font-size: 0.84rem;
@@ -489,7 +504,7 @@
     }
 
     .voice-input-button:hover:not(:disabled) {
-      background: #dbeafe;
+      background: #f1e6c9;
     }
 
     .voice-input-button:disabled {
@@ -689,7 +704,7 @@
       padding: 12px 16px 12px 44px;
       border-bottom: 1px solid #e2e8f0;
       background: #f8fafc;
-      color: #173b63;
+      color: #0b4f3c;
       font-weight: bold;
       z-index: 4;
     }
@@ -719,7 +734,7 @@
       padding: 12px 16px 12px 44px;
       border-bottom: 1px solid #e2e8f0;
       background: #f8fafc;
-      color: #173b63;
+      color: #0b4f3c;
       font-weight: bold;
     }
 
@@ -777,10 +792,10 @@
     #archivePanel .archive-header-actions button,
     #bookmarksPanel .archive-header-actions button,
     #aiChatArchivePanel .archive-header-actions button {
-      border: 1px solid #93c5fd;
+      border: 1px solid #d9c58f;
       border-radius: 6px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       font: inherit;
       font-size: 0.74rem;
       padding: 4px 8px;
@@ -793,7 +808,7 @@
     #archivePanel .archive-header-actions button:hover,
     #bookmarksPanel .archive-header-actions button:hover,
     #aiChatArchivePanel .archive-header-actions button:hover {
-      background: #dbeafe;
+      background: #f1e6c9;
     }
 
     .archive-item-nolink {
@@ -832,7 +847,7 @@
       padding: 16px 16px 14px 44px;
       background: #f8fafc;
       border-bottom: 1px solid #e2e8f0;
-      color: #173b63;
+      color: #0b4f3c;
       font-weight: bold;
       font-size: 1.05rem;
     }
@@ -891,7 +906,7 @@
       padding: 11px;
       border: none;
       border-radius: 8px;
-      background: #173b63;
+      background: #0b4f3c;
       color: #ffffff;
       font: inherit;
       font-size: 0.95rem;
@@ -944,10 +959,10 @@
     }
 
     .bookmark-export-row button {
-      border: 1px solid #93c5fd;
+      border: 1px solid #d9c58f;
       border-radius: 6px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       font: inherit;
       font-size: 0.76rem;
       padding: 5px 10px;
@@ -955,7 +970,7 @@
     }
 
     .bookmark-export-row button:hover {
-      background: #dbeafe;
+      background: #f1e6c9;
     }
 
     .bookmark-tag-chip {
@@ -970,7 +985,7 @@
     }
 
     .bookmark-tag-chip:hover {
-      background: #eff6ff;
+      background: #f1e6c9;
     }
 
     .bookmark-tag-chip.is-active {
@@ -1034,8 +1049,8 @@
       margin: 0 0 4px;
       padding: 1px 6px;
       border-radius: 9999px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       font-size: 0.68rem;
       font-weight: bold;
     }
@@ -1050,8 +1065,8 @@
     .archive-item-tag {
       padding: 2px 8px;
       border-radius: 999px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       font-size: 0.7rem;
     }
 
@@ -1096,17 +1111,17 @@
 
     .site-tag-popover-actions button {
       padding: 6px 12px;
-      border: 1px solid #93c5fd;
+      border: 1px solid #d9c58f;
       border-radius: 6px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       cursor: pointer;
       font: inherit;
       font-size: 0.8rem;
     }
 
     .site-tag-popover-actions button:hover {
-      background: #dbeafe;
+      background: #f1e6c9;
     }
 
     #siteTagCancel {
@@ -1134,16 +1149,16 @@
 
     .settings-gear {
       padding: 8px 12px;
-      border: 1px solid #93c5fd;
+      border: 1px solid #d9c58f;
       border-radius: 8px;
-      background: #eff6ff;
+      background: #f1e6c9;
       cursor: pointer;
       font-size: 1rem;
       line-height: 1;
     }
 
     .settings-gear:hover {
-      background: #dbeafe;
+      background: #f1e6c9;
     }
 
     .settings-menu {
@@ -1193,7 +1208,7 @@
     }
 
     .settings-menu button.settings-item:hover:not(:disabled) {
-      background: #eff6ff;
+      background: #f1e6c9;
     }
 
     .settings-menu button.settings-item:disabled {
@@ -1239,8 +1254,8 @@
     }
 
     .operations-menu-btn:hover:not(:disabled) {
-      background: #eff6ff;
-      border-color: #93c5fd;
+      background: #f1e6c9;
+      border-color: #d9c58f;
     }
 
     .operations-menu-btn:disabled {
@@ -1319,8 +1334,8 @@
 
     .settings-exclude-input:focus {
       outline: none;
-      border-color: #2563eb;
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      border-color: #0b4f3c;
+      box-shadow: 0 0 0 3px rgba(184, 145, 42, 0.18);
     }
 
     .tabs {
@@ -1415,7 +1430,7 @@
 
     .ai-section-title {
       margin: 0 0 6px;
-      color: #173b63;
+      color: #0b4f3c;
       font-size: 1.15rem;
     }
 
@@ -1552,7 +1567,7 @@
       border-bottom: 1px solid #e2e8f0;
       background: #f8fafc;
       font-weight: bold;
-      color: #173b63;
+      color: #0b4f3c;
     }
 
     .ai-scope-panel-header div {
@@ -1627,10 +1642,10 @@
     }
 
     .ai-search-selection-bar button {
-      border: 1px solid #93c5fd;
+      border: 1px solid #d9c58f;
       border-radius: 6px;
-      background: #eff6ff;
-      color: #1d4ed8;
+      background: #f1e6c9;
+      color: #0b4f3c;
       font: inherit;
       font-size: 0.78rem;
       padding: 4px 10px;
@@ -1638,7 +1653,7 @@
     }
 
     .ai-search-selection-bar button:hover {
-      background: #dbeafe;
+      background: #f1e6c9;
     }
 
     .ai-search-results {
@@ -1659,13 +1674,13 @@
     }
 
     .ai-search-result:hover {
-      border-color: #1d4ed8;
-      background: #eff6ff;
+      border-color: #0b4f3c;
+      background: #f1e6c9;
     }
 
     .ai-search-result strong {
       display: block;
-      color: #1d4ed8;
+      color: #0b4f3c;
       font-size: 0.92rem;
       margin-bottom: 4px;
     }
@@ -1711,7 +1726,7 @@
       height: 30px;
       border: none;
       border-radius: 50%;
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      background: linear-gradient(135deg, #0b4f3c, #0b4f3c);
       color: #fff;
       font-size: 1rem;
       line-height: 1;
@@ -1719,12 +1734,12 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25);
+      box-shadow: 0 2px 6px rgba(11, 79, 60, 0.28);
       transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
     }
 
     .ai-chat-send-icon:hover {
-      background: linear-gradient(135deg, #1d4ed8, #1e3a8a);
+      background: linear-gradient(135deg, #0b4f3c, #082f24);
       transform: translateY(-50%) scale(1.05);
     }
 
@@ -1875,7 +1890,7 @@
 
     .ai-chat-bubble-user {
       align-self: flex-start;
-      background: #2563eb;
+      background: #0b4f3c;
       color: #ffffff;
       border-bottom-right-radius: 4px;
     }
@@ -1895,7 +1910,7 @@
     }
 
     .ai-chat-sources a {
-      color: #1d4ed8;
+      color: #0b4f3c;
       text-decoration: none;
     }
 
@@ -1968,7 +1983,7 @@
       border: 1px solid #cbd5e1;
       border-radius: 999px;
       background: #ffffff;
-      color: #1d4ed8;
+      color: #0b4f3c;
       font-size: 0.78rem;
       text-decoration: none;
       white-space: nowrap;
@@ -1978,8 +1993,8 @@
     }
 
     .reading-history-chip:hover {
-      background: #eff6ff;
-      border-color: #93c5fd;
+      background: #f1e6c9;
+      border-color: #d9c58f;
     }
 
     .title-search-tree {
@@ -2010,7 +2025,7 @@
       cursor: pointer;
       list-style: none;
       font-weight: bold;
-      color: #173b63;
+      color: #0b4f3c;
       user-select: none;
     }
 
@@ -2022,7 +2037,7 @@
       content: "＋";
       display: inline-block;
       width: 28px;
-      color: #2563eb;
+      color: #0b4f3c;
       font-size: 1.25rem;
       vertical-align: middle;
     }
@@ -2053,13 +2068,13 @@
       flex: 1;
       min-width: 0;
       padding: 11px 10px;
-      color: #1d4ed8;
+      color: #0b4f3c;
       text-decoration: none;
       border-radius: 7px;
     }
 
     .book-list a:hover {
-      background: #eff6ff;
+      background: #f1e6c9;
       text-decoration: underline;
     }
 
@@ -2084,7 +2099,7 @@
       gap: 10px;
       padding: 10px 16px;
       border-radius: 999px;
-      background: #173b63;
+      background: #0b4f3c;
       color: #ffffff;
       box-shadow: 0 8px 22px rgba(15, 23, 42, 0.3);
       font-size: 0.86rem;
@@ -2098,7 +2113,7 @@
       padding: 6px 12px;
       border: none;
       border-radius: 999px;
-      background: #2563eb;
+      background: #0b4f3c;
       color: #ffffff;
       cursor: pointer;
       font: inherit;
@@ -2107,7 +2122,7 @@
     }
 
     .compare-read-bar button:hover {
-      background: #1d4ed8;
+      background: #0b4f3c;
     }
 
     .compare-read-bar .compare-read-cancel {
@@ -2222,7 +2237,7 @@
       margin: 0;
       padding: 17px 20px 12px;
       border-bottom: 2px solid #dbe3ee;
-      color: #173b63;
+      color: #0b4f3c;
       font-size: 1.05rem;
       font-weight: bold;
     }
@@ -2269,7 +2284,7 @@
 
     .result-title {
       display: block;
-      color: #1d4ed8;
+      color: #0b4f3c;
       font-weight: bold;
       text-decoration: none;
     }
@@ -2335,7 +2350,7 @@
     }
 
     .compare-column-title {
-      color: #173b63;
+      color: #0b4f3c;
       font-weight: bold;
       font-size: 0.86rem;
     }
@@ -2363,7 +2378,7 @@
     }
 
     .compare-result-link:hover {
-      background: #eff6ff;
+      background: #f1e6c9;
       color: #1f2937;
     }
 
@@ -2397,20 +2412,20 @@
       border: 1px solid #cbd5e1;
       border-radius: 8px;
       background: #fff;
-      color: #1d4ed8;
+      color: #0b4f3c;
       cursor: pointer;
       font: inherit;
       font-size: 0.9rem;
     }
 
     .page-button:hover:not(:disabled) {
-      border-color: #2563eb;
-      background: #eff6ff;
+      border-color: #0b4f3c;
+      background: #f1e6c9;
     }
 
     .page-button.current-page {
-      border-color: #1d4ed8;
-      background: #1d4ed8;
+      border-color: #0b4f3c;
+      background: #0b4f3c;
       color: #fff;
       cursor: default;
     }
@@ -2478,35 +2493,37 @@
 </head>
 
 <body>
-  <button
-    id="darkModeToggle"
-    type="button"
-    class="dark-mode-toggle"
-    title="حالت شب"
-    aria-label="حالت شب">
-    🌙
-  </button>
-
-  <button
-    id="contactToggle"
-    type="button"
-    class="dark-mode-toggle contact-toggle"
-    title="ارتباط با ما"
-    aria-label="ارتباط با ما">
-    ✉️
-  </button>
-
   <div class="page-frame" aria-hidden="true"></div>
 
   <main class="container">
+    <div class="top-utility-bar">
+      <button
+        id="darkModeToggle"
+        type="button"
+        class="dark-mode-toggle"
+        title="حالت شب"
+        aria-label="حالت شب">
+        🌙
+      </button>
+
+      <button
+        id="contactToggle"
+        type="button"
+        class="dark-mode-toggle"
+        title="ارتباط با ما"
+        aria-label="ارتباط با ما">
+        ✉️
+      </button>
+    </div>
+
     <header class="site-hero">
       <div class="site-hero-inner">
         <div class="hero-portrait">
           <img src="ostad-milani-hero.jpg" alt="استاد میلانی" loading="lazy">
         </div>
-        <div class="hero-text">
-          <h1>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</h1>
-          <p class="subtitle">دسترسی و جست‌وجو در عنوان‌ها و متن دروس آرشیو</p>
+        <div class="site-name">
+          <p class="line1">پایگاه علمی‌پژوهشی</p>
+          <h1 class="line2">استاد میلانی</h1>
         </div>
       </div>
     </header>
@@ -4107,14 +4124,14 @@
           return (
             `<div dir="ltr" style="margin:0 0 16px;text-align:right;">` +
               `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;` +
-              `margin:0 0 8px;"><tr><td style="padding:9px 14px;background:#eff6ff;` +
-              `border-right:4px solid #2563eb;font-family:Tahoma,Arial,sans-serif;` +
-              `font-size:14px;font-weight:bold;color:#173b63;text-align:right;">` +
+              `margin:0 0 8px;"><tr><td style="padding:9px 14px;background:#f1e6c9;` +
+              `border-right:4px solid #0b4f3c;font-family:Tahoma,Arial,sans-serif;` +
+              `font-size:14px;font-weight:bold;color:#0b4f3c;text-align:right;">` +
               `📘\u00a0${title}</td></tr></table>` +
               `<p dir="ltr" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
               `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">«${snippetHtml}»</p>` +
               `<p dir="ltr" style="margin:0;font-family:Tahoma,Arial,sans-serif;font-size:12px;text-align:right;">` +
-              `🔗 <a href="${url}" style="color:#1d4ed8;text-decoration:none;">` +
+              `🔗 <a href="${url}" style="color:#0b4f3c;text-decoration:none;">` +
               `لینک منبع</a></p>` +
             `</div>`
           );
@@ -4199,14 +4216,14 @@
           return (
             `<table dir="ltr" role="presentation" style="width:100%;border-collapse:collapse;` +
             `margin:${index === 0 ? "0" : "18px"} 0 8px;"><tr><td style="padding:9px 14px;` +
-            `background:#eff6ff;border-right:4px solid #2563eb;font-family:Tahoma,Arial,sans-serif;` +
-            `font-size:14px;font-weight:bold;color:#173b63;text-align:right;">📘\u00a0${title}</td></tr></table>` +
+            `background:#f1e6c9;border-right:4px solid #0b4f3c;font-family:Tahoma,Arial,sans-serif;` +
+            `font-size:14px;font-weight:bold;color:#0b4f3c;text-align:right;">📘\u00a0${title}</td></tr></table>` +
             `<p dir="rtl" style="margin:0 0 3px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:14px;line-height:1.9;color:#1f2937;text-align:right;">` +
             `<strong>${index + 1}.</strong>\u00a0«${snippetHtml}»</p>` +
             `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
             `font-size:12px;text-align:right;">🔗 ` +
-            `<a href="${url}" style="color:#1d4ed8;text-decoration:none;">لینک منبع</a></p>`
+            `<a href="${url}" style="color:#0b4f3c;text-decoration:none;">لینک منبع</a></p>`
           );
         })
         .join("");
@@ -4276,12 +4293,12 @@
             .export-book-title {
               margin: 0 0 6px;
               padding: 8px 12px;
-              background: #eff6ff;
-              border-right: 4px solid #2563eb;
+              background: #f1e6c9;
+              border-right: 4px solid #0b4f3c;
               border-radius: 6px;
               font-size: 14px;
               font-weight: bold;
-              color: #173b63;
+              color: #0b4f3c;
             }
             .export-snippet {
               margin: 0 0 4px;
@@ -4293,7 +4310,7 @@
               font-size: 12px;
             }
             .export-link a {
-              color: #1d4ed8;
+              color: #0b4f3c;
               text-decoration: none;
             }
             @media print {
@@ -4723,7 +4740,7 @@
               .map(link => (
                 `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
                 `font-size:12px;text-align:right;">🔗 ` +
-                `<a href="${escapeHtml(link.url)}" style="color:#1d4ed8;text-decoration:none;">${escapeHtml(link.label)}</a></p>`
+                `<a href="${escapeHtml(link.url)}" style="color:#0b4f3c;text-decoration:none;">${escapeHtml(link.label)}</a></p>`
               ))
               .join("");
 
@@ -4733,7 +4750,7 @@
               `<strong>${index + 1}.</strong>\u00a0«${renderBookmarkTextHtml(item.text, { colored: false })}»</p>` +
               (item.page ?
                 `<p dir="rtl" style="margin:0 0 4px;font-family:Tahoma,Arial,sans-serif;` +
-                `font-size:12px;color:#1d4ed8;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
+                `font-size:12px;color:#0b4f3c;text-align:right;">📄 صفحهٔ ${escapeHtml(String(item.page))}</p>` :
                 "") +
               `<div style="margin:0 0 14px;">${linksHtml}</div>`
             );
@@ -4749,7 +4766,7 @@
 
         return (
           `<p dir="rtl" style="margin:16px 0 4px;font-family:Tahoma,Arial,sans-serif;` +
-          `font-size:15px;font-weight:bold;color:#173b63;border-bottom:2px solid #173b63;` +
+          `font-size:15px;font-weight:bold;color:#0b4f3c;border-bottom:2px solid #0b4f3c;` +
           `padding-bottom:4px;text-align:right;">${group.mainNumber} - ${escapeHtml(group.bookTitle)}</p>` +
           tagsHtml
         );
@@ -4847,10 +4864,10 @@
             .export-group-book {
               margin: 18px 0 6px;
               padding-bottom: 4px;
-              border-bottom: 2px solid #173b63;
+              border-bottom: 2px solid #0b4f3c;
               font-size: 16px;
               font-weight: bold;
-              color: #173b63;
+              color: #0b4f3c;
             }
             .export-group-tag {
               margin: 10px 0 6px;
@@ -4861,7 +4878,7 @@
             .export-page {
               margin: 0 0 4px;
               font-size: 12px;
-              color: #1d4ed8;
+              color: #0b4f3c;
             }
             .export-item {
               padding: 10px 0;
@@ -4877,7 +4894,7 @@
               font-size: 12px;
             }
             .export-link a {
-              color: #1d4ed8;
+              color: #0b4f3c;
               text-decoration: none;
             }
             @media print {
