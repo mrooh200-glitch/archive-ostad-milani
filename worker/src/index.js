@@ -16,6 +16,14 @@
  *    برای endpoint جدید POST /reset-stats که کل آمار رو صفر می‌کنه. اگه تنظیم
  *    نشه، این endpoint کلاً غیرفعاله.)
  *
+ * فرم «ارتباط با ما» (POST /contact): پیام رو بسته به موضوع (site/books) به
+ * تلگرام و/یا ایتا می‌فرسته. متغیرهای لازم (همه Secret، در Cloudflare):
+ *  - TG_BOT_TOKEN, TG_SITE_CHAT_ID, TG_BOOKS_CHAT_ID
+ *  - EITAA_BOT_TOKEN, EITAA_SITE_CHAT_ID
+ * (پیام‌های «کتب» فقط به تلگرام می‌رن، چون برای ایتا مقصدی برای کتب نساختیم.
+ * اگه هرکدوم از این‌ها تنظیم نشده باشن، همون یک مقصد به‌سادگی نادیده گرفته
+ * می‌شه - نه این‌که کل endpoint خطا بده.)
+ *
  * تغییر جدید: کش مشترک بین همه‌ی کاربران برای عبارت‌های جست‌وجوی تکراری.
  * اگه کاربر A عبارتی رو جست‌وجو کنه، بردارش برای مدتی (یک ساعت) در KV ذخیره می‌شه؛
  * اگه کاربر B دقیقاً همون عبارت رو جست‌وجو کنه، به‌جای زدن دوباره به مدل bge-m3
@@ -78,6 +86,11 @@ export default {
       // به رفتن به داشبورد Cloudflare و حذف دستیِ تک‌تک کلیدهای KV.
       if (url.pathname === "/reset-stats" && request.method === "POST") {
         return await handleResetStats(request, env);
+      }
+
+      // فرم «ارتباط با ما»: پیام رو به تلگرام/ایتا (بسته به موضوع) می‌فرسته.
+      if (url.pathname === "/contact" && request.method === "POST") {
+        return await handleContact(request, env);
       }
 
       return jsonResponse({ error: "مسیر یا متد نامعتبر" }, 404);
@@ -501,6 +514,95 @@ async function handleStats(request, env) {
     topSearchTerms: topEntries(mergeTermMaps(searchTermsRawList)),
     topDownloadFiles: topEntries(mergeTermMaps(downloadFilesRawList)),
   });
+}
+
+// ---------- /contact : فرم «ارتباط با ما» ----------
+// ورودی مورد انتظار (JSON):
+//   { topic: "site" | "books", name: string, contact?: string, message: string }
+// «contact» اختیاریه (ایمیل یا شماره‌ای که کاربر می‌ذاره تا بشه جوابش رو داد).
+const CONTACT_MAX_LENGTHS = { name: 200, contact: 200, message: 4000 };
+
+async function handleContact(request, env) {
+  const body = await request.json().catch(() => ({}));
+
+  const topic = body.topic === "books" ? "books" : "site";
+  const name = typeof body.name === "string" ? body.name.trim().slice(0, CONTACT_MAX_LENGTHS.name) : "";
+  const contact = typeof body.contact === "string" ? body.contact.trim().slice(0, CONTACT_MAX_LENGTHS.contact) : "";
+  const message = typeof body.message === "string" ? body.message.trim().slice(0, CONTACT_MAX_LENGTHS.message) : "";
+
+  if (!name || !message) {
+    return jsonResponse({ error: "نام و متن پیام هر دو لازمن" }, 400);
+  }
+
+  const topicLabel = topic === "books" ? "📚 پیام دربارهٔ کتب استاد" : "📌 پیام دربارهٔ سایت";
+  const textLines = [topicLabel, "", `نام: ${name}`];
+  if (contact) textLines.push(`تماس: ${contact}`);
+  textLines.push("", "متن پیام:", message);
+  const text = textLines.join("\n");
+
+  // هر مقصد (تلگرام سایت/کتب، ایتا سایت) فقط وقتی به لیست تسک‌ها اضافه
+  // می‌شه که هم توکنِ بات و هم chat_id مربوطه واقعاً تنظیم شده باشن -
+  // این‌جوری کمبودِ یکی از متغیرها باعث خطای کل درخواست نمی‌شه، فقط همون
+  // یک مقصد رد می‌شه.
+  const destinations = [];
+
+  const tgChatId = topic === "books" ? env.TG_BOOKS_CHAT_ID : env.TG_SITE_CHAT_ID;
+  if (env.TG_BOT_TOKEN && tgChatId) {
+    destinations.push({ kind: "telegram", send: () => sendTelegramMessage(env.TG_BOT_TOKEN, tgChatId, text) });
+  }
+
+  if (topic === "site" && env.EITAA_BOT_TOKEN && env.EITAA_SITE_CHAT_ID) {
+    destinations.push({ kind: "eitaa", send: () => sendEitaaMessage(env.EITAA_BOT_TOKEN, env.EITAA_SITE_CHAT_ID, text) });
+  }
+
+  if (destinations.length === 0) {
+    return jsonResponse({ error: "هیچ مقصدی برای این موضوع تنظیم نشده (متغیرهای Cloudflare رو چک کن)" }, 500);
+  }
+
+  const results = await Promise.allSettled(destinations.map((d) => d.send()));
+  const failures = results
+    .map((r, i) => ({ kind: destinations[i].kind, r }))
+    .filter(({ r }) => r.status === "rejected" || !r.value?.ok);
+
+  if (failures.length > 0) {
+    console.error("contact send failures:", failures.map((f) => f.kind));
+  }
+
+  // حتی اگه یکی از دو مقصد (مثلاً ایتا) شکست بخوره، تا وقتی حداقل یکی
+  // موفق بوده به کاربر «ok» برمی‌گردونیم - چون پیامش واقعاً به دست یکی
+  // از شما دو نفر رسیده؛ جزئیات موفقیت/شکست هر مقصد رو هم برمی‌گردونیم
+  // تا در صورت نیاز از کنسول مرورگر قابل بررسی باشه.
+  const anySucceeded = results.some((r) => r.status === "fulfilled" && r.value?.ok);
+  return jsonResponse(
+    {
+      ok: anySucceeded,
+      sent: results.filter((r) => r.status === "fulfilled" && r.value?.ok).length,
+      failed: failures.length,
+    },
+    anySucceeded ? 200 : 502
+  );
+}
+
+async function sendTelegramMessage(token, chatId, text) {
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text }),
+  });
+  return { ok: res.ok, status: res.status };
+}
+
+async function sendEitaaMessage(token, chatId, text) {
+  // توجه: فرمتِ آدرسِ API ایتایار بین منابع مختلف کمی متفاوت دیده شده
+  // (بعضی جاها با «/api/» وسطش، بعضی جاها بدون آن). اگه این آدرس با
+  // خطا مواجه شد، اولین چیزی که باید امتحان کرد همینه:
+  // https://eitaayar.ir/api/${token}/sendMessage
+  const res = await fetch(`https://eitaayar.ir/bot${token}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chat_id: chatId, text }),
+  });
+  return { ok: res.ok, status: res.status };
 }
 
 // ---------- /reset-stats : صفرکردن کامل آمار ----------
