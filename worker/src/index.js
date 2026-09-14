@@ -17,12 +17,10 @@
  *    نشه، این endpoint کلاً غیرفعاله.)
  *
  * فرم «ارتباط با ما» (POST /contact): پیام رو بسته به موضوع (site/books) به
- * تلگرام و/یا ایتا می‌فرسته. متغیرهای لازم (همه Secret، در Cloudflare):
+ * تلگرام می‌فرسته. متغیرهای لازم (همه Secret، در Cloudflare):
  *  - TG_BOT_TOKEN, TG_SITE_CHAT_ID, TG_BOOKS_CHAT_ID
- *  - EITAA_BOT_TOKEN, EITAA_SITE_CHAT_ID
- * (پیام‌های «کتب» فقط به تلگرام می‌رن، چون برای ایتا مقصدی برای کتب نساختیم.
- * اگه هرکدوم از این‌ها تنظیم نشده باشن، همون یک مقصد به‌سادگی نادیده گرفته
- * می‌شه - نه این‌که کل endpoint خطا بده.)
+ * (تلاش برای اتصال به ایتا هم کنار گذاشته شد - بعد از رفع‌اشکال طولانی،
+ * تصمیم گرفته شد فعلاً فقط تلگرام کافیه.)
  *
  * تغییر جدید: کش مشترک بین همه‌ی کاربران برای عبارت‌های جست‌وجوی تکراری.
  * اگه کاربر A عبارتی رو جست‌وجو کنه، بردارش برای مدتی (یک ساعت) در KV ذخیره می‌شه؛
@@ -540,19 +538,14 @@ async function handleContact(request, env) {
   textLines.push("", "متن پیام:", message);
   const text = textLines.join("\n");
 
-  // هر مقصد (تلگرام سایت/کتب، ایتا سایت) فقط وقتی به لیست تسک‌ها اضافه
-  // می‌شه که هم توکنِ بات و هم chat_id مربوطه واقعاً تنظیم شده باشن -
-  // این‌جوری کمبودِ یکی از متغیرها باعث خطای کل درخواست نمی‌شه، فقط همون
-  // یک مقصد رد می‌شه.
+  // هر مقصد فقط وقتی به لیست تسک‌ها اضافه می‌شه که هم توکنِ بات و هم
+  // chat_id مربوطه واقعاً تنظیم شده باشن - این‌جوری کمبودِ یکی از
+  // متغیرها باعث خطای کل درخواست نمی‌شه.
   const destinations = [];
 
   const tgChatId = topic === "books" ? env.TG_BOOKS_CHAT_ID : env.TG_SITE_CHAT_ID;
   if (env.TG_BOT_TOKEN && tgChatId) {
     destinations.push({ kind: "telegram", send: () => sendTelegramMessage(env.TG_BOT_TOKEN, tgChatId, text) });
-  }
-
-  if (topic === "site" && env.EITAA_BOT_TOKEN && env.EITAA_SITE_CHAT_ID) {
-    destinations.push({ kind: "eitaa", send: () => sendEitaaMessage(env.EITAA_BOT_TOKEN, env.EITAA_SITE_CHAT_ID, text) });
   }
 
   if (destinations.length === 0) {
@@ -585,19 +578,6 @@ async function handleContact(request, env) {
 
 async function sendTelegramMessage(token, chatId, text) {
   const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  });
-  return { ok: res.ok, status: res.status };
-}
-
-async function sendEitaaMessage(token, chatId, text) {
-  // توجه: فرمتِ آدرسِ API ایتایار بین منابع مختلف کمی متفاوت دیده شده
-  // (بعضی جاها با «/api/» وسطش، بعضی جاها بدون آن). اگه این آدرس با
-  // خطا مواجه شد، اولین چیزی که باید امتحان کرد همینه:
-  // https://eitaayar.ir/api/${token}/sendMessage
-  const res = await fetch(`https://eitaayar.ir/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chat_id: chatId, text }),
