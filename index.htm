@@ -69,6 +69,11 @@
       background: #f4f7fb;
     }
 
+    /* فرم «ارتباط با ما»: دکمهٔ دومی هم‌شکل با دکمهٔ حالت شب، کنارش. */
+    .contact-toggle {
+      left: 60px;
+    }
+
     header {
       text-align: center;
       margin-bottom: 14px;
@@ -705,6 +710,111 @@
       color: #64748b;
       text-align: center;
       font-size: 0.86rem;
+    }
+
+    /* فرم «ارتباط با ما» - از همون الگوی overlay/panel بالا (archive-overlay)
+       استفاده می‌کنه، فقط با محتوای خودش. */
+    #contactPanel {
+      width: min(480px, 100%);
+      max-height: 85vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #contactPanel .contact-header {
+      padding: 16px 44px 14px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      color: #173b63;
+      font-weight: bold;
+      font-size: 1.05rem;
+    }
+
+    #contactPanel .contact-body {
+      padding: 18px 20px;
+      overflow-y: auto;
+    }
+
+    .contact-field {
+      margin-bottom: 14px;
+    }
+
+    .contact-field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.86rem;
+      color: #334155;
+      font-weight: bold;
+    }
+
+    .contact-field input[type="text"],
+    .contact-field textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.9rem;
+      color: #1f2937;
+      resize: vertical;
+    }
+
+    .contact-field textarea {
+      min-height: 110px;
+    }
+
+    .contact-topic-options {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .contact-topic-options label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: normal;
+      font-size: 0.86rem;
+      color: #334155;
+      cursor: pointer;
+    }
+
+    .contact-submit-btn {
+      width: 100%;
+      padding: 11px;
+      border: none;
+      border-radius: 8px;
+      background: #173b63;
+      color: #ffffff;
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .contact-submit-btn:hover {
+      background: #0f2c4a;
+    }
+
+    .contact-submit-btn:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .contact-status {
+      margin-top: 12px;
+      font-size: 0.86rem;
+      text-align: center;
+      min-height: 1.2em;
+    }
+
+    .contact-status.is-success {
+      color: #15803d;
+    }
+
+    .contact-status.is-error {
+      color: #b91c1c;
     }
 
     /* Item جدید: پنل «نشانه‌ها» - هم‌ساختار با #archivePanel بالا، به‌علاوهٔ
@@ -2258,6 +2368,15 @@
     🌙
   </button>
 
+  <button
+    id="contactToggle"
+    type="button"
+    class="dark-mode-toggle contact-toggle"
+    title="ارتباط با ما"
+    aria-label="ارتباط با ما">
+    ✉️
+  </button>
+
   <main class="container">
     <header>
       <h1>آرشیو کتب، مقالات و متن دروس استاد میلانی (حفظه‌الله)</h1>
@@ -2904,6 +3023,44 @@
 
     <div id="bookmarksOverlay" class="archive-overlay">
       <div id="bookmarksPanel" role="dialog" aria-label="نشانه‌ها"></div>
+    </div>
+
+    <!-- فرم «ارتباط با ما» -->
+    <div id="contactOverlay" class="archive-overlay">
+      <div id="contactPanel" role="dialog" aria-label="ارتباط با ما">
+        <button
+          type="button"
+          class="panel-close-x"
+          id="contactCloseBtn"
+          title="بستن"
+          aria-label="بستن">×</button>
+        <div class="contact-header">ارتباط با ما</div>
+        <div class="contact-body">
+          <form id="contactForm">
+            <div class="contact-field">
+              <label>موضوع پیام</label>
+              <div class="contact-topic-options">
+                <label><input type="radio" name="contactTopic" value="site" checked> دربارهٔ سایت</label>
+                <label><input type="radio" name="contactTopic" value="books"> دربارهٔ کتب استاد</label>
+              </div>
+            </div>
+            <div class="contact-field">
+              <label for="contactName">نام شما</label>
+              <input type="text" id="contactName" required maxlength="200">
+            </div>
+            <div class="contact-field">
+              <label for="contactContact">ایمیل یا شماره تماس (اختیاری)</label>
+              <input type="text" id="contactContact" maxlength="200">
+            </div>
+            <div class="contact-field">
+              <label for="contactMessage">متن پیام</label>
+              <textarea id="contactMessage" required maxlength="4000"></textarea>
+            </div>
+            <button type="submit" class="contact-submit-btn" id="contactSubmitBtn">ارسال پیام</button>
+            <div class="contact-status" id="contactStatus"></div>
+          </form>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -8561,6 +8718,85 @@
     }
 
     trackEvent("pageview");
+
+    // فرم «ارتباط با ما»: باز/بسته‌کردن مودال + ارسال به همون Worker
+    // (endpoint جدید /contact) که topic (site/books) رو با خودش می‌بره
+    // تا Worker تصمیم بگیره پیام به کدوم مقصد(ها) بره.
+    (function setupContactForm() {
+      const toggleBtn = document.getElementById("contactToggle");
+      const overlay = document.getElementById("contactOverlay");
+      const closeBtn = document.getElementById("contactCloseBtn");
+      const form = document.getElementById("contactForm");
+      const submitBtn = document.getElementById("contactSubmitBtn");
+      const statusEl = document.getElementById("contactStatus");
+
+      if (!toggleBtn || !overlay || !form) return;
+
+      function openContact() {
+        overlay.classList.add("open");
+        statusEl.textContent = "";
+        statusEl.className = "contact-status";
+      }
+
+      function closeContact() {
+        overlay.classList.remove("open");
+      }
+
+      toggleBtn.addEventListener("click", openContact);
+      closeBtn.addEventListener("click", closeContact);
+      overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeContact();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && overlay.classList.contains("open")) closeContact();
+      });
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const topic =
+          form.querySelector('input[name="contactTopic"]:checked')?.value === "books"
+            ? "books"
+            : "site";
+        const name = document.getElementById("contactName").value.trim();
+        const contact = document.getElementById("contactContact").value.trim();
+        const message = document.getElementById("contactMessage").value.trim();
+
+        if (!name || !message) {
+          statusEl.textContent = "لطفاً نام و متن پیام را وارد کنید.";
+          statusEl.className = "contact-status is-error";
+          return;
+        }
+
+        submitBtn.disabled = true;
+        statusEl.textContent = "در حال ارسال...";
+        statusEl.className = "contact-status";
+
+        try {
+          const res = await fetch(`${STATS_WORKER_URL}/contact`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topic, name, contact, message }),
+          });
+
+          const data = await res.json().catch(() => ({}));
+
+          if (res.ok && data.ok) {
+            statusEl.textContent = "پیام شما با موفقیت ارسال شد. متشکریم!";
+            statusEl.className = "contact-status is-success";
+            form.reset();
+          } else {
+            statusEl.textContent = "متأسفانه ارسال پیام با خطا مواجه شد. لطفاً دوباره تلاش کنید.";
+            statusEl.className = "contact-status is-error";
+          }
+        } catch (err) {
+          statusEl.textContent = "خطا در برقراری ارتباط. اتصال اینترنت خود را بررسی کنید.";
+          statusEl.className = "contact-status is-error";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    })();
   </script>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
