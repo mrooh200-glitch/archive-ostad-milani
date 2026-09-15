@@ -333,6 +333,13 @@ function textFragmentUrl(baseUrl, text, page) {
 // گرفتن سؤال‌های قبلی همین گفتگو ساخته شود - نه این‌که هر پرسش، بی‌خبر
 // از پرسش‌های قبلی، از صفر پاسخ داده شود.
 async function askQuestion(question, history = [], mode = "grounded", image = null, bookFilter = null) {
+  // آمار سایت: این تابع تنها نقطه‌ای‌ست که واقعاً سؤال کاربر رو به
+  // Worker می‌فرسته (یک نقطه‌ی فراخوانی، رجوع کنید به renderChatTurns)،
+  // پس بهترین جا برای ثبتِ «یک پرسشِ تبِ گفتگو»ست.
+  if (typeof trackEvent === "function") {
+    trackEvent("chat", question);
+  }
+
   // Item جدید (پاسخ آزاد): تو این حالت، پاسخ قرار نیست به متون آرشیو
   // محدود باشه - پس نیازی به جست‌وجوی معنایی (که یه تماس شبکه‌ی اضافه‌ست)
   // نیست؛ context خالی می‌مونه و مآخذی هم نشون داده نمی‌شه.
@@ -577,6 +584,13 @@ function addItemsToBookmarksAi(items, tags) {
       hasRealSource: item.hasRealSource !== false,
       savedAt: new Date().toISOString(),
     });
+
+    // آمار سایت: این تابع، مسیرِ مشترکِ افزودنِ نشانه از تب‌های گفتگو و
+    // جست‌وجوی مفهومیه (هر دو مسیر فراخوانی در chatToolbar به همینجا
+    // می‌رسن)، پس تک‌جای درستیه برای ثبتِ «یک نشانه».
+    if (typeof trackEvent === "function") {
+      trackEvent("bookmark", item.title || "");
+    }
   });
   saveBookmarksAi(bookmarks);
 }
@@ -1199,10 +1213,13 @@ function createAiToolbar(getItems, emptyMessage, selectionControls) {
       const ok = await copyRichTextAi(buildPlainTextForItemsAi(items), buildRichHtmlForItemsAi(items));
       setStatus(ok ? "کپی شد!" : "خطا در کپی");
     } else if (action === "text") {
+      if (typeof trackEvent === "function") trackEvent("export", "text");
       downloadTextFileAi("خروجی-دستیار-هوشمند.txt", buildPlainTextForItemsAi(items));
     } else if (action === "word") {
+      if (typeof trackEvent === "function") trackEvent("export", "word");
       downloadTextFileAi("خروجی-دستیار-هوشمند.doc", buildWordDocForItemsAi(items), "application/msword;charset=utf-8");
     } else if (action === "pdf") {
+      if (typeof trackEvent === "function") trackEvent("export", "pdf");
       openPrintableForItemsAi(items);
     } else if (action === "bookmark") {
       // Item جدید (رفع باگ ریشه‌ای - پیدا شد با تست واقعی در مرورگر):
@@ -1459,6 +1476,14 @@ document.addEventListener("DOMContentLoaded", () => {
           // اگه در این فاصله کاربر متن رو پاک کرده یا چیز دیگه‌ای تایپ کرده،
           // این جواب دیگه منسوخ شده و نباید روی وضعیت فعلی بشینه.
           if (myToken !== searchToken) return;
+
+          // آمار سایت: همین‌جا (بعد از دیبانس، وقتی جست‌وجو واقعاً اجرا
+          // و جواب معتبرش دریافت شده - نه به‌ازای هر ضربه‌کلید) بهترین
+          // جای ثبتِ «یک جست‌وجوی مفهومی»ه.
+          if (typeof trackEvent === "function") {
+            trackEvent("semanticSearch", query);
+          }
+
           if (aiSearchStatus) aiSearchStatus.textContent = "";
           latestSearchResults = results;
           searchSelectedIndexes.clear();

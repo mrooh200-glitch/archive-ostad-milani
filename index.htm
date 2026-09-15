@@ -4194,6 +4194,8 @@
         return;
       }
 
+      trackEvent("export", "text");
+
       const divider = "─".repeat(32);
 
       const text = selected
@@ -4218,6 +4220,8 @@
       if (selected.length === 0) {
         return;
       }
+
+      trackEvent("export", "word");
 
       const itemsHtml = selected
         .map((result, index) => {
@@ -4270,6 +4274,8 @@
       if (selected.length === 0) {
         return;
       }
+
+      trackEvent("export", "pdf");
 
       const itemsHtml = selected
         .map((result, index) => `
@@ -4388,6 +4394,12 @@
           page: item.page || null,
           savedAt: new Date().toISOString()
         });
+
+        // Item جدید (آمار سایت): این تابع مشترکه (چه از جست‌وجوی متنی
+        // خودِ این فایل صدا زده بشه، چه از جست‌وجوی مفهومی/گفتگو در
+        // search-widget.js)، پس اینجا بهترین جای ثبتِ «افزودن به
+        // آرشیو»ست - هر سه تب رو یک‌جا پوشش می‌ده.
+        trackEvent("archive", item.title || "");
       });
 
       saveArchive(archive);
@@ -4573,6 +4585,10 @@
           occurrenceIndex: 1,
           savedAt: new Date().toISOString()
         });
+
+        // Item جدید (آمار سایت): هر آیتمی که به نشانه‌ها اضافه می‌شه،
+        // یک رویداد جدا (با عنوان کتاب به‌عنوان detail) ثبت می‌شه.
+        trackEvent("bookmark", result.title || "");
       });
 
       saveBookmarks(bookmarks);
@@ -4740,6 +4756,8 @@
         return;
       }
 
+      trackEvent("export", "text");
+
       downloadTextFile("نشانه‌ها.txt", buildBookmarkExportPlainText(items));
     }
 
@@ -4799,6 +4817,8 @@
         return;
       }
 
+      trackEvent("export", "word");
+
       const itemsHtml = buildBookmarkExportRichHtml(items);
 
       const doc = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
@@ -4826,6 +4846,8 @@
       if (!items || items.length === 0) {
         return;
       }
+
+      trackEvent("export", "pdf");
 
       const itemsHtml = buildBookmarkExportGroups(items).map(group => {
         const tagsHtml = group.tagGroups.map(tagGroup => {

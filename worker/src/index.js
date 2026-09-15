@@ -26,6 +26,13 @@
  * اگه کاربر A عبارتی رو جست‌وجو کنه، بردارش برای مدتی (یک ساعت) در KV ذخیره می‌شه؛
  * اگه کاربر B دقیقاً همون عبارت رو جست‌وجو کنه، به‌جای زدن دوباره به مدل bge-m3
  * (که سهمیه‌ی روزانه مصرف می‌کنه)، همون بردار کش‌شده مستقیم برگردونده می‌شه.
+ *
+ * تغییر جدید (تکمیل فیلدهای آمار): POST /track دیگه فقط pageview/search/
+ * download رو نمی‌شناسه - این انواع هم اضافه شدن: chat (سؤالِ تب گفتگو با
+ * هوش)، semanticSearch (پرس‌وجوی تب جست‌وجوی مفهومی)، bookmark (افزودن به
+ * نشانه‌ها)، archive (افزودن به آرشیو)، export (خروجی‌گرفتنِ سه‌گانه -
+ * detail باید یکی از pdf/word/text باشه). فهرست کامل و نگاشتِ هرکدوم به
+ * فیلدهای خروجیِ /stats در آرایهٔ EVENT_TYPES پایین همین فایله.
  */
 
 const CORS_HEADERS = {
@@ -323,6 +330,25 @@ function tehranDateString(date) {
 // می‌تونه صدها خواندنِ KV در یک درخواست بسازه).
 const MAX_STATS_RANGE_DAYS = 366;
 
+// Item جدید (تکمیل فیلدهای آمار): جدول واحد برای همهٔ انواع رویدادی که
+// ردیابی می‌شن - قبلاً فقط pageview/search/download بودن، الان
+// گفتگو، جستجوی معنایی، نشانه‌ها، آرشیو و خروجی‌گرفتن‌ها هم اضافه شدن.
+// هر نوع یک شمارندهٔ ساده داره (countField) و - اگه kvLabel داشته باشه -
+// یک «فهرست پرتکرارترین‌ها»ی جداگانه هم (topField) بر اساس detail که
+// از سمت صفحه فرستاده می‌شه (مثلاً متن سؤال، یا فرمت خروجی).
+// handleTrack و handleStats هر دو از همین یک جدول تغذیه می‌کنن تا اضافه
+// کردنِ نوع رویداد جدید در آینده فقط به یک خط اینجا نیاز داشته باشه.
+const EVENT_TYPES = [
+  { type: "pageview", countField: "pageviews", topField: null, kvLabel: null },
+  { type: "search", countField: "searches", topField: "topSearchTerms", kvLabel: "searchTerms" },
+  { type: "download", countField: "downloads", topField: "topDownloadFiles", kvLabel: "downloadFiles" },
+  { type: "chat", countField: "chats", topField: "topChatQuestions", kvLabel: "chatQuestions" },
+  { type: "semanticSearch", countField: "semanticSearches", topField: "topSemanticQueries", kvLabel: "semanticQueries" },
+  { type: "bookmark", countField: "bookmarks", topField: "topBookmarkedTitles", kvLabel: "bookmarkedTitles" },
+  { type: "archive", countField: "archives", topField: "topArchivedTitles", kvLabel: "archivedTitles" },
+  { type: "export", countField: "exports", topField: "topExportFormats", kvLabel: "exportFormats" },
+];
+
 async function handleTrack(request, env) {
   if (!env.STATS_KV) {
     // نبودِ KV آمار نباید تجربهٔ کاربر رو خراب کنه - بی‌سروصدا موفق
@@ -332,10 +358,13 @@ async function handleTrack(request, env) {
 
   const body = await request.json();
   const type = body.type;
-  const validTypes = ["pageview", "search", "download"];
+  const eventConfig = EVENT_TYPES.find((e) => e.type === type);
 
-  if (!validTypes.includes(type)) {
-    return jsonResponse({ error: "پارامتر type باید یکی از pageview/search/download باشه" }, 400);
+  if (!eventConfig) {
+    return jsonResponse(
+      { error: `پارامتر type باید یکی از این‌ها باشه: ${EVENT_TYPES.map((e) => e.type).join("/")}` },
+      400
+    );
   }
 
   const today = tehranDateString(new Date());
@@ -355,24 +384,24 @@ async function handleTrack(request, env) {
 
   const detail = typeof body.detail === "string" ? body.detail.trim() : "";
 
-  if (type === "search" && detail) {
-    const term = detail.slice(0, 200).toLowerCase();
-    await Promise.all([
-      incrementTermCount(env, "stats:searchTerms", term),
-      incrementTermCount(env, `stats:day:${today}:searchTerms`, term),
-    ]);
-  }
+  if (eventConfig.kvLabel && detail) {
+    const raw = detail.slice(0, 300);
+    // برای عبارت‌هایی که واقعاً «جست‌وجو» محسوب می‌شن (search، سؤال
+    // گفتگو، پرس‌وجوی معنایی) حروف بزرگ/کوچک لاتین یکسان‌سازی می‌شه تا
+    // یک عبارت با نگارش متفاوت دوبار شمرده نشه؛ برای فرمتِ خروجی یا
+    // عنوان کتاب این یکسان‌سازی لازم نیست.
+    const isQueryLike = type === "search" || type === "chat" || type === "semanticSearch";
+    const value = isQueryLike ? raw.toLowerCase() : raw;
 
-  if (type === "download" && detail) {
-    const fileName = detail.slice(0, 300);
     await Promise.all([
-      incrementTermCount(env, "stats:downloadFiles", fileName),
-      incrementTermCount(env, `stats:day:${today}:downloadFiles`, fileName),
+      incrementTermCount(env, `stats:${eventConfig.kvLabel}`, value),
+      incrementTermCount(env, `stats:day:${today}:${eventConfig.kvLabel}`, value),
     ]);
   }
 
   return jsonResponse({ ok: true, tracked: true });
 }
+
 
 // کمک‌تابع مشترک برای «فهرست پرتکرارترین‌ها» (هم برای عبارت‌های
 // جست‌وجوشده، هم اسم فایل‌های دانلودشده) - یک آبجکت JSON از
@@ -443,22 +472,23 @@ async function handleStats(request, env) {
   // بدون from/to: همان رفتار قبلی - مجموع کل از ابتدا تا الان (سازگار
   // با نسخهٔ قبلیِ stats.html که هنوز فیلتر تاریخ نمی‌فرسته).
   if (!fromParam && !toParam) {
-    const [pageviews, searches, downloads, searchTermsRaw, downloadFilesRaw] = await Promise.all([
-      env.STATS_KV.get("stats:count:pageview"),
-      env.STATS_KV.get("stats:count:search"),
-      env.STATS_KV.get("stats:count:download"),
-      env.STATS_KV.get("stats:searchTerms"),
-      env.STATS_KV.get("stats:downloadFiles"),
-    ]);
+    const reads = await Promise.all(
+      EVENT_TYPES.flatMap((e) => [
+        env.STATS_KV.get(`stats:count:${e.type}`),
+        e.kvLabel ? env.STATS_KV.get(`stats:${e.kvLabel}`) : Promise.resolve(null),
+      ])
+    );
 
-    return jsonResponse({
-      range: null,
-      pageviews: parseInt(pageviews || "0", 10),
-      searches: parseInt(searches || "0", 10),
-      downloads: parseInt(downloads || "0", 10),
-      topSearchTerms: topEntries(searchTermsRaw ? JSON.parse(searchTermsRaw) : {}),
-      topDownloadFiles: topEntries(downloadFilesRaw ? JSON.parse(downloadFilesRaw) : {}),
+    const result = { range: null };
+    EVENT_TYPES.forEach((e, i) => {
+      result[e.countField] = parseInt(reads[i * 2] || "0", 10);
+      if (e.topField) {
+        const topRaw = reads[i * 2 + 1];
+        result[e.topField] = topEntries(topRaw ? JSON.parse(topRaw) : {});
+      }
     });
+
+    return jsonResponse(result);
   }
 
   // اگه یکی از from/to داده شده، هر دو لازمن.
@@ -476,44 +506,40 @@ async function handleStats(request, env) {
     return jsonResponse({ error: `بازهٔ تاریخ نباید بیشتر از ${MAX_STATS_RANGE_DAYS} روز باشه` }, 400);
   }
 
-  // برای هر روزِ بازه، شش کلید (سه شمارنده + دو نقشهٔ پرتکرارها) از KV
-  // خونده می‌شه. تعداد خواندن‌های KV در پلن رایگان بسیار سخاوتمندانه‌تر
-  // از نوشتن‌هاست، پس این حتی برای بازه‌های چندماهه هم مشکلی ایجاد
-  // نمی‌کنه.
+  // برای هر روزِ بازه، به‌ازای هر نوع رویداد یک یا دو کلید (شمارنده +
+  // نقشهٔ پرتکرارها) از KV خونده می‌شه. تعداد خواندن‌های KV در پلن
+  // رایگان بسیار سخاوتمندانه‌تر از نوشتن‌هاست، پس این حتی برای
+  // بازه‌های چندماهه و با این تعداد نوع رویداد هم مشکلی ایجاد نمی‌کنه.
   const perDayResults = await Promise.all(
     days.map((day) =>
-      Promise.all([
-        env.STATS_KV.get(`stats:day:${day}:count:pageview`),
-        env.STATS_KV.get(`stats:day:${day}:count:search`),
-        env.STATS_KV.get(`stats:day:${day}:count:download`),
-        env.STATS_KV.get(`stats:day:${day}:searchTerms`),
-        env.STATS_KV.get(`stats:day:${day}:downloadFiles`),
-      ])
+      Promise.all(
+        EVENT_TYPES.flatMap((e) => [
+          env.STATS_KV.get(`stats:day:${day}:count:${e.type}`),
+          e.kvLabel ? env.STATS_KV.get(`stats:day:${day}:${e.kvLabel}`) : Promise.resolve(null),
+        ])
+      )
     )
   );
 
-  let pageviews = 0;
-  let searches = 0;
-  let downloads = 0;
-  const searchTermsRawList = [];
-  const downloadFilesRawList = [];
+  const counters = EVENT_TYPES.map(() => 0);
+  const topRawLists = EVENT_TYPES.map(() => []);
 
-  for (const [pv, se, dl, terms, files] of perDayResults) {
-    pageviews += parseInt(pv || "0", 10);
-    searches += parseInt(se || "0", 10);
-    downloads += parseInt(dl || "0", 10);
-    searchTermsRawList.push(terms);
-    downloadFilesRawList.push(files);
+  for (const dayRow of perDayResults) {
+    EVENT_TYPES.forEach((e, i) => {
+      counters[i] += parseInt(dayRow[i * 2] || "0", 10);
+      topRawLists[i].push(dayRow[i * 2 + 1]);
+    });
   }
 
-  return jsonResponse({
-    range: { from: fromParam, to: toParam },
-    pageviews,
-    searches,
-    downloads,
-    topSearchTerms: topEntries(mergeTermMaps(searchTermsRawList)),
-    topDownloadFiles: topEntries(mergeTermMaps(downloadFilesRawList)),
+  const result = { range: { from: fromParam, to: toParam } };
+  EVENT_TYPES.forEach((e, i) => {
+    result[e.countField] = counters[i];
+    if (e.topField) {
+      result[e.topField] = topEntries(mergeTermMaps(topRawLists[i]));
+    }
   });
+
+  return jsonResponse(result);
 }
 
 // ---------- /contact : فرم «ارتباط با ما» ----------

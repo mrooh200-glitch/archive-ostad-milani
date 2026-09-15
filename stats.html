@@ -403,6 +403,26 @@
     <div class="value" id="statDownloads">۰</div>
     <div class="label">دانلود</div>
   </div>
+  <div class="stat-card">
+    <div class="value" id="statChats">۰</div>
+    <div class="label">گفتگو با هوش</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="statSemanticSearches">۰</div>
+    <div class="label">جست‌وجوی مفهومی</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="statBookmarks">۰</div>
+    <div class="label">نشانه‌ها</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="statArchives">۰</div>
+    <div class="label">آرشیو</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" id="statExports">۰</div>
+    <div class="label">خروجی گرفتن</div>
+  </div>
 </div>
 
 <div class="tables-wrap" id="tablesWrap" style="display:none;">
@@ -419,6 +439,46 @@
     <table>
       <thead><tr><th>فایل</th><th>تعداد</th></tr></thead>
       <tbody id="downloadFilesBody"></tbody>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <h2>چه چیزهایی در «گفتگو با هوش» پرسیده شده</h2>
+    <table>
+      <thead><tr><th>سؤال</th><th>تعداد</th></tr></thead>
+      <tbody id="chatQuestionsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <h2>چه چیزهایی در «جست‌وجوی مفهومی» جست‌وجو شده</h2>
+    <table>
+      <thead><tr><th>عبارت</th><th>تعداد</th></tr></thead>
+      <tbody id="semanticQueriesBody"></tbody>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <h2>خروجی‌گرفتن‌ها به تفکیک فرمت</h2>
+    <table>
+      <thead><tr><th>فرمت</th><th>تعداد</th></tr></thead>
+      <tbody id="exportFormatsBody"></tbody>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <h2>پرتکرارترین عنوان‌های نشانه‌شده</h2>
+    <table>
+      <thead><tr><th>عنوان</th><th>تعداد</th></tr></thead>
+      <tbody id="bookmarkedTitlesBody"></tbody>
+    </table>
+  </div>
+
+  <div class="table-card">
+    <h2>پرتکرارترین عنوان‌های آرشیوشده</h2>
+    <table>
+      <thead><tr><th>عنوان</th><th>تعداد</th></tr></thead>
+      <tbody id="archivedTitlesBody"></tbody>
     </table>
   </div>
 </div>
@@ -798,9 +858,19 @@
       document.getElementById("statPageviews").textContent = toPersianDigits(data.pageviews || 0);
       document.getElementById("statSearches").textContent = toPersianDigits(data.searches || 0);
       document.getElementById("statDownloads").textContent = toPersianDigits(data.downloads || 0);
+      document.getElementById("statChats").textContent = toPersianDigits(data.chats || 0);
+      document.getElementById("statSemanticSearches").textContent = toPersianDigits(data.semanticSearches || 0);
+      document.getElementById("statBookmarks").textContent = toPersianDigits(data.bookmarks || 0);
+      document.getElementById("statArchives").textContent = toPersianDigits(data.archives || 0);
+      document.getElementById("statExports").textContent = toPersianDigits(data.exports || 0);
 
       fillTable(document.getElementById("searchTermsBody"), data.topSearchTerms, "value");
       fillTable(document.getElementById("downloadFilesBody"), data.topDownloadFiles, "value");
+      fillTable(document.getElementById("chatQuestionsBody"), data.topChatQuestions, "value");
+      fillTable(document.getElementById("semanticQueriesBody"), data.topSemanticQueries, "value");
+      fillTable(document.getElementById("exportFormatsBody"), data.topExportFormats, "value");
+      fillTable(document.getElementById("bookmarkedTitlesBody"), data.topBookmarkedTitles, "value");
+      fillTable(document.getElementById("archivedTitlesBody"), data.topArchivedTitles, "value");
 
       statusNote.style.display = "none";
       document.getElementById("statsGrid").style.display = "grid";
@@ -900,7 +970,7 @@
   // با تصمیمِ آگاهانه انجام بشه.
   document.getElementById("resetStatsBtn").addEventListener("click", async () => {
     const sure = confirm(
-      "این کار همهٔ آمار (بازدید، جست‌وجو، دانلود، و پرتکرارترین‌ها) را برای همیشه پاک می‌کند و قابل بازگشت نیست. مطمئن هستید؟"
+      "این کار همهٔ آمار (بازدید، جست‌وجو، دانلود، گفتگو، جست‌وجوی مفهومی، نشانه‌ها، آرشیو، خروجی‌گرفتن‌ها و پرتکرارترین‌ها) را برای همیشه پاک می‌کند و قابل بازگشت نیست. مطمئن هستید؟"
     );
     if (!sure) return;
 
@@ -926,6 +996,22 @@
       alert("ارتباط با سرور برقرار نشد: " + err.message);
     }
   });
+
+  // Item جدید (رفع اشکال: پلیس‌هولدرهای تاریخ ثابت مونده بودن): قبلاً
+  // این دو placeholder با یک تاریخ نمونهٔ ثابت (هاردکد) نوشته شده بودن -
+  // یعنی هیچ‌وقت خودشون رو با تاریخ واقعیِ امروز به‌روز نمی‌کردن. الان
+  // هر بار که صفحه باز می‌شه، از روی تاریخ واقعیِ سیستم محاسبه می‌شن:
+  // «از» = اول همین ماهِ شمسی، «تا» = امروز.
+  (function setDynamicDatePlaceholders() {
+    const [jy, jm, jd] = todayJalali();
+    const firstOfMonth = toPersianDigits(`${jy}/${String(jm).padStart(2, "0")}/01`);
+    const today = toPersianDigits(`${jy}/${String(jm).padStart(2, "0")}/${String(jd).padStart(2, "0")}`);
+
+    const fromInput = document.getElementById("fromDateInput");
+    const toInput = document.getElementById("toDateInput");
+    if (fromInput) fromInput.placeholder = firstOfMonth;
+    if (toInput) toInput.placeholder = today;
+  })();
 
   updateFilterCurrentLabel();
   setActivePresetButton("all");
