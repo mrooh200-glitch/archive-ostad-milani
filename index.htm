@@ -3567,6 +3567,7 @@
 
       const urls = [...compareReadSelection];
       const isPdfUrl = url => url.toLowerCase().endsWith(".pdf");
+      const hasPdfInSet = urls.some(isPdfUrl);
 
       // Item جدید (رفع اشکال ۱): وقتی یک فایل PDF داخل iframe باز
       // می‌شود، ویوئر داخلی PDF مرورگر به‌صورت پیش‌فرض ستون
@@ -3577,7 +3578,26 @@
       // ستون منصرف می‌کند. توجه: پشتیبانی این پارامتر در نسخه‌های
       // مختلف مرورگر می‌تواند متفاوت باشد - اگر مرورگر آن را نادیده
       // بگیرد، ستون طبق روال قبل باز می‌شود.
-      const withPdfViewerParams = url => isPdfUrl(url) ? `${url}#navpanes=0` : url;
+      //
+      // Item جدید (رفع اشکال ۳): حتی بعد از کلیک واقعیِ کاربر روی PDF،
+      // یک مسابقهٔ زمان‌بندی (race) وجود داشت: نوار جست‌وجوی خودِ HTM
+      // (in-page-search.js) به‌صورت بی‌قیدوشرط روی document خودش Ctrl+F
+      // را قاپ می‌زد (preventDefault + focus روی کادر جست‌وجوی خودش)،
+      // و اگر همون لحظه فوکوس هنوز واقعاً به iframeِ PDF منتقل نشده
+      // بود (که در ویوئرهای PDF مبتنی بر پلاگین گاهی چند میلی‌ثانیه
+      // طول می‌کشد)، این قاپیدن برنده می‌شد. راه‌حل قطعی: وقتی HTM با
+      // یک PDF مقایسه می‌شود، از طریق پارامتر noCtrlF=1 به in-page-
+      // search.js می‌گیم که اصلاً این قاپیدن رو فعال نکنه - این‌جوری
+      // Ctrl+F همیشه به رفتار پیش‌فرضِ مرورگر (بر اساس فوکوس واقعی)
+      // واگذار می‌شه، نه به مسابقهٔ زمان‌بندیِ یک اسکریپت.
+      const withHtmCompareParams = url => {
+        if (isPdfUrl(url) || !hasPdfInSet) return url;
+        const [base, hash] = url.split("#");
+        const separator = base.includes("?") ? "&" : "?";
+        return `${base}${separator}noCtrlF=1${hash ? `#${hash}` : ""}`;
+      };
+
+      const withPdfViewerParams = url => isPdfUrl(url) ? `${url}#navpanes=0` : withHtmCompareParams(url);
 
       // Item جدید (رفع اشکال ۲، به‌شکل قطعی): به‌جای فوکوس خودکار (که
       // امتحان شد و قابل‌اعتماد نبود - رجوع کنید به تاریخچهٔ این

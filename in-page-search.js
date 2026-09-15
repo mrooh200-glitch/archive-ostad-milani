@@ -7556,18 +7556,31 @@
       }
     });
 
-    document.addEventListener("keydown", event => {
-      const isMac = navigator.platform.toUpperCase().includes("MAC");
+    // Item جدید (رفع اشکال ۳ در نمای «مطالعهٔ کنار هم» با یک PDF):
+    // وقتی این صفحهٔ HTM به‌عنوان نیمهٔ دومِ یک مقایسه با یک فایل PDF
+    // باز شده باشه (index.htm این رو با پارامتر noCtrlF=1 به آدرس این
+    // صفحه اضافه می‌کنه)، این قاپیدنِ بی‌قیدوشرطِ Ctrl+F اصلاً فعال
+    // نمی‌شه - چون حتی بعد از کلیک واقعیِ کاربر روی PDF، اگه فوکوس هنوز
+    // دقیقاً همون لحظه به iframeِ PDF نرسیده باشه، این قاپیدن می‌تونه
+    // زودتر از فوکوس واقعی برنده بشه و کاربر رو به‌جای PDF، به نوار
+    // جست‌وجوی همین صفحه ببره. در این حالت خاص، Ctrl+F به رفتار
+    // پیش‌فرضِ مرورگر (بر اساس فوکوس واقعی) واگذار می‌شه.
+    const disableCtrlFHijack = new URLSearchParams(location.search).get("noCtrlF") === "1";
 
-      if (
-        (isMac && event.metaKey && event.key.toLowerCase() === "f") ||
-        (!isMac && event.ctrlKey && event.key.toLowerCase() === "f")
-      ) {
-        event.preventDefault();
-        input.focus();
-        input.select();
-      }
-    });
+    if (!disableCtrlFHijack) {
+      document.addEventListener("keydown", event => {
+        const isMac = navigator.platform.toUpperCase().includes("MAC");
+
+        if (
+          (isMac && event.metaKey && event.key.toLowerCase() === "f") ||
+          (!isMac && event.ctrlKey && event.key.toLowerCase() === "f")
+        ) {
+          event.preventDefault();
+          input.focus();
+          input.select();
+        }
+      });
+    }
 
     applyIncomingQueryFromUrl();
 
