@@ -31,7 +31,7 @@
 // تغییر جایگزین می‌کند و مستقیماً commit می‌کند - یعنی هیچ‌وقت لازم
 // نیست خودتان یادتان باشد این عدد را بالا ببرید. مقدار زیر فقط یک
 // پیش‌فرضِ اولیه است (تا وقتی اولین اجرای آن workflow آن را عوض کند).
-const CACHE_VERSION = "milani-cache-0f60c816";
+const CACHE_VERSION = "milani-cache-07397108";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
