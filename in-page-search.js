@@ -7060,7 +7060,7 @@
     return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
   }
 
-  function findMatchIndexForFragment(fragmentText, occurrenceIndex) {
+  function findMatchIndexForFragment(fragmentText, occurrenceIndex, matchesToSearch) {
     if (!fragmentText) {
       return -1;
     }
@@ -7069,8 +7069,8 @@
     const wantedOccurrence = occurrenceIndex > 0 ? occurrenceIndex : 1;
     let seen = 0;
 
-    for (let i = 0; i < matches.length; i++) {
-      if (getMatchFragmentText(matches[i]) === normalizedFragment) {
+    for (let i = 0; i < matchesToSearch.length; i++) {
+      if (getMatchFragmentText(matchesToSearch[i]) === normalizedFragment) {
         seen++;
 
         if (seen === wantedOccurrence) {
@@ -7082,7 +7082,7 @@
     // Fewer matching occurrences here than the "occ" the link expected
     // (page content drifted, etc.) - fall back to the last one found
     // rather than missing entirely.
-    return seen > 0 ? matches.findIndex(
+    return seen > 0 ? matchesToSearch.findIndex(
       mark => getMatchFragmentText(mark) === normalizedFragment
     ) : -1;
   }
@@ -7166,8 +7166,7 @@
     return { index: indexesOnPage.length > 0 ? indexesOnPage[0] : -1, section };
   }
 
-  function applyIncomingQueryFromUrl() {
-    const params = new URLSearchParams(location.search);
+  function applyIncomingQuery(params) {
     const incomingQuery = params.get("q");
 
     if (!incomingQuery) {
@@ -7250,7 +7249,8 @@
     if (targetIndex === -1) {
       targetIndex = findMatchIndexForFragment(
         getTextFragmentFromHash(),
-        getOccurrenceFromUrl()
+        getOccurrenceFromUrl(),
+        allMatchesForTarget
       );
     }
 
@@ -7290,6 +7290,33 @@
     // تأخیر کوتاه برای اطمینان از تکمیل رندر و جلوگیری از تداخل با اسکرول مرورگر
     setTimeout(() => showMatch(0), 0);
   }
+
+  function applyIncomingQueryFromUrl() {
+    applyIncomingQuery(new URLSearchParams(location.search));
+  }
+
+  // Item جدید (رفع اتلاف وقت روی فایل‌های چندصدصفحه‌ای): وقتی این فایل
+  // از قبل در یک تب باز است، تب جستجوی متنیِ index.htm به‌جای بازکردنِ
+  // یک تب/بارگذاریِ کاملاً تازه برای هر نتیجه، همون تبِ بازشده رو با
+  // یک پیام مستقیم پیدا می‌کنه و همین‌جا (بدون رفرش کامل صفحه) به
+  // رخداد جدید می‌بریم - این چند ثانیه‌ی بارگذاری رو به چند میلی‌ثانیه
+  // کاهش می‌ده. آدرس نوار مرورگر هم به‌روز می‌شه (بدون رفرش) تا اگه
+  // کاربر بعداً صفحه رو دستی رفرش کرد یا لینکش رو کپی کرد، همچنان به
+  // همون رخداد اشاره کنه.
+  window.addEventListener("message", (event) => {
+    if (event.origin !== location.origin) return;
+    if (!event.data || event.data.type !== "in-page-navigate" || !event.data.params) return;
+
+    const params = new URLSearchParams(event.data.params);
+
+    try {
+      history.replaceState(null, "", location.pathname + "?" + params.toString());
+    } catch {
+      // history API در دسترس نبود - مشکلی نیست، فقط آدرس نوار به‌روز نمی‌شه
+    }
+
+    applyIncomingQuery(params);
+  });
 
   // Item جدید: وقتی کاربر فایل html کتاب را دانلود کرده و مستقیم در
   // مرورگر خودش باز می‌کند (پروتکل file://)، پایین صفحه نام سایت +
