@@ -8,7 +8,10 @@
  * آدرس چیزی شبیه این می‌شه: https://milani-archive-ai.YOUR-SUBDOMAIN.workers.dev
  */
 
-const WORKER_URL = "https://milani-archive-ai.mrooh200.workers.dev";
+// آدرس قبلی (milani-archive-ai.mrooh200.workers.dev) از شبکهٔ فعلی اصلاً در
+// دسترس نبود (خطای "Failed to fetch")؛ به همین خاطر یک Custom Domain
+// (api.ostadmilani.ir) که روی همین دامنهٔ اصلی سایت ساخته شده جایگزینش شد.
+const WORKER_URL = "https://api.ostadmilani.ir";
 
 let EMBEDDINGS = null; // کل داده‌های embeddings.json بعد از بارگذاری اینجا نگه داشته می‌شه
 let embeddingsLoadingPromise = null; // جلوگیری از دانلود همزمان/تکراری وقتی چند جست‌وجو هم‌پوشانی دارن
@@ -1471,6 +1474,10 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
         if (aiSearchStatus) aiSearchStatus.textContent = "در حال جست‌وجو…";
+        // رفع باگ: باکس نتایج با display:none شروع می‌شود و قبلاً فقط در
+        // حالت موفقیت‌آمیز (با نتیجه) باز می‌شد؛ در نتیجه هم پیام «در حال
+        // جست‌وجو…» و هم پیام خطا (پایین، در catch) دیده نمی‌شدند.
+        if (aiSearchResultsDropdown) aiSearchResultsDropdown.style.display = "block";
         try {
           const results = await semanticSearch(query, 5, aiSearchBookScope);
           // اگه در این فاصله کاربر متن رو پاک کرده یا چیز دیگه‌ای تایپ کرده،
@@ -1494,6 +1501,8 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
           if (myToken !== searchToken) return;
           if (aiSearchStatus) aiSearchStatus.textContent = err.message || "در جست‌وجو خطایی رخ داد. لطفاً مجدداً تلاش کنید.";
+          // رفع باگ: همینجا هم باکس باید باز بماند تا پیام خطا دیده شود.
+          if (aiSearchResultsDropdown) aiSearchResultsDropdown.style.display = "block";
           console.error(err);
         }
       }, 400); // debounce: صبر کن کاربر تایپش تموم بشه
