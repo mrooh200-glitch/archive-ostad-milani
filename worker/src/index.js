@@ -261,25 +261,37 @@ async function handleRewrite(request, env) {
   return jsonResponse({ ok: true, queries });
 }
 
-// متن پاسخ Gemini را برای بازنویسی می‌گیرد (بدون retry و با سقف زمان)؛ هر شکست → null.
+// متن پاسخ Gemini را برای بازنویسی می‌گیرد؛ هر شکست → null. مثل نسخهٔ روحبخش دو مدل
+// (gemini-3.5-flash و در شکست gemini-3.5-flash-lite) و سقف کل زمان REWRITE_BUDGET_MS.
+const REWRITE_MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite"];
+
 async function callGeminiForRewrite(env, requestBody) {
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent";
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REWRITE_BUDGET_MS);
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-      body: requestBody,
-      signal: controller.signal,
-    });
-    if (!res.ok) return null;
-    const json = await res.json();
-    const parts = json?.candidates?.[0]?.content?.parts || [];
-    return parts.map((p) => (typeof p.text === "string" ? p.text : "")).join("");
-  } finally {
-    clearTimeout(timeoutId);
+  const deadline = Date.now() + REWRITE_BUDGET_MS;
+  for (const model of REWRITE_MODELS) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), remaining);
+    try {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+        body: requestBody,
+        signal: controller.signal,
+      });
+      if (res.status === 401 || res.status === 403) return null;
+      if (!res.ok) continue;
+      const json = await res.json();
+      const parts = json?.candidates?.[0]?.content?.parts || [];
+      const text = parts.map((p) => (typeof p.text === "string" ? p.text : "")).join("");
+      if (text) return text;
+    } catch (err) {
+      console.error("rewrite gemini failed", model, String(err).slice(0, 200));
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
+  return null;
 }
 
 // ---------- /rerank : مرتب‌سازی دقیق‌تر نامزدهای جست‌وجو (reranker) ----------

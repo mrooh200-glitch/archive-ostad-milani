@@ -1754,13 +1754,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    function syncSearchCheckboxes() {
-      aiSearchResults.querySelectorAll(".ai-result-checkbox").forEach((checkbox) => {
-        const index = Number(checkbox.dataset.aiIndex);
-        checkbox.checked = searchSelectedIndexes.has(index);
-      });
-    }
-
     // شمارهٔ ردیف‌ها (و data-ai-index) سراسری است، نه شمارهٔ داخل صفحه؛ پس
     // انتخاب، کپی و خروجی روی همهٔ نتایج کار می‌کنند.
     function renderAiResultsHtml() {
