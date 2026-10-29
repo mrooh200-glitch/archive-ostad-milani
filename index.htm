@@ -1609,6 +1609,40 @@
       cursor: pointer;
     }
 
+    /* فیلتر کتاب‌ها بر اساس عنوان/نویسنده/موضوع - در پنل 📚 جست‌وجوی مفهومی و گفتگو */
+    .book-filter-row {
+      display: flex;
+      gap: 6px;
+      padding: 6px 10px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .book-filter-row select,
+    .book-filter-row input {
+      font: inherit;
+      font-size: 0.78rem;
+      padding: 3px 6px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: #fff;
+      min-width: 0;
+    }
+
+    .book-filter-row input {
+      flex: 1;
+    }
+
+    .ai-scope-list label[hidden] {
+      display: none;
+    }
+
+    .book-filter-empty {
+      margin: 0;
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      color: #9a3412;
+    }
+
     .ai-zoom-controls {
       display: flex;
       align-items: center;
@@ -2576,6 +2610,7 @@
 
       <button
         id="aiChatTabButton"
+        style="display:none;"
         class="tab-button"
         type="button"
         role="tab"
@@ -2618,6 +2653,8 @@
               <li
                 class="searchable-item"
                 data-title="معرفة الله تعالی بالله"
+                data-author="حسن میلانی"
+                data-subject="معرفت خدا، توحید، عرفان"
                 data-url="Ma_refatollah_Ta_ala_Bellah.htm">
                 <a
                   class="html-link"
@@ -2631,6 +2668,8 @@
               <li
                 class="searchable-item"
                 data-title="أصول المعارف الإلهيّة"
+                data-author="حسن میلانی"
+                data-subject="معارف الهی، کلام، فلسفه، عرفان"
                 data-url="Usul_Al_Maarif_Al_Ilahiyyah.htm">
                 <a
                   class="html-link"
@@ -2644,6 +2683,8 @@
               <li
                 class="searchable-item"
                 data-title="شناخت اجمالی کلام، فلسفه و عرفان"
+                data-author="حسن میلانی"
+                data-subject="کلام، فلسفه، عرفان"
                 data-url="Shenakht_Ejmali_Kalam_Falsafe_Erfan.htm">
                 <a
                   class="html-link"
@@ -2657,6 +2698,8 @@
               <li
                 class="searchable-item"
                 data-title="چرا مرا آفریدند؟!"
+                data-author="حسن میلانی"
+                data-subject="هدف آفرینش، فلسفهٔ خلقت"
                 data-url="Chera_Mara_Afaridand.htm">
                 <a
                   class="html-link"
@@ -2670,6 +2713,8 @@
               <li
                 class="searchable-item"
                 data-title="نقدی بر اندیشه‌های دکتر محمد صادقی تهرانی"
+                data-author="حسن میلانی"
+                data-subject="نقد، قرآن بسنده‌ای، کلام"
                 data-url="Naqd_Afkar_Sadeghi_Tehrani.htm">
                 <a
                   class="html-link"
@@ -2683,6 +2728,8 @@
               <li
                 class="searchable-item"
                 data-title="فراتر از عرفان"
+                data-author="حسن میلانی"
+                data-subject="عرفان، نقد عرفان، شریعت"
                 data-url="Faratar_Az_Erfan.htm">
                 <a
                   class="html-link"
@@ -2696,6 +2743,8 @@
               <li
                 class="searchable-item"
                 data-title="عرفان و تصوف در تشیع"
+                data-author="حسن میلانی"
+                data-subject="عرفان، تصوف، تشیع"
                 data-url="Erfan_va_Tasavvof_dar_Tashayyo.htm">
                 <a
                   class="html-link"
@@ -2718,6 +2767,8 @@
               <li
                 class="searchable-item"
                 data-title="معرفة الله تعالی بالله"
+                data-author="حسن میلانی"
+                data-subject="معرفت خدا، توحید، عرفان"
                 data-url="Marefat-Taala-Allah-bellah.pdf"
                 data-pdf="true">
                 <a
@@ -2732,6 +2783,8 @@
               <li
                 class="searchable-item"
                 data-title="أصول المعارف الإلهيّة"
+                data-author="حسن میلانی"
+                data-subject="معارف الهی، کلام، فلسفه، عرفان"
                 data-url="Usul_Al_Maarif_Al_Ilahiyyah.pdf"
                 data-pdf="true">
                 <a
@@ -2746,6 +2799,8 @@
               <li
                 class="searchable-item"
                 data-title="شناخت اجمالی کلام، فلسفه و عرفان"
+                data-author="حسن میلانی"
+                data-subject="کلام، فلسفه، عرفان"
                 data-url="Shenakht_Ejmali_Kalam_Falsafe_Erfan.pdf"
                 data-pdf="true">
                 <a
@@ -2760,6 +2815,8 @@
               <li
                 class="searchable-item"
                 data-title="چرا مرا آفریدند؟!"
+                data-author="حسن میلانی"
+                data-subject="هدف آفرینش، فلسفهٔ خلقت"
                 data-url="Chera_Mara_Afaridand.pdf"
                 data-pdf="true">
                 <a
@@ -2774,6 +2831,8 @@
               <li
                 class="searchable-item"
                 data-title="نقدی بر اندیشه‌های دکتر محمد صادقی تهرانی"
+                data-author="حسن میلانی"
+                data-subject="نقد، قرآن بسنده‌ای، کلام"
                 data-url="Naqd_Afkar_Sadeghi_Tehrani.pdf"
                 data-pdf="true">
                 <a
@@ -2788,6 +2847,8 @@
               <li
                 class="searchable-item"
                 data-title="فراتر از عرفان"
+                data-author="حسن میلانی"
+                data-subject="عرفان، نقد عرفان، شریعت"
                 data-url="Faratar_Az_Erfan.pdf"
                 data-pdf="true">
                 <a
@@ -2802,6 +2863,8 @@
               <li
                 class="searchable-item"
                 data-title="عرفان و تصوف در تشیع"
+                data-author="حسن میلانی"
+                data-subject="عرفان، تصوف، تشیع"
                 data-url="Erfan_va_Tasavvof_dar_Tashayyo.pdf"
                 data-pdf="true">
                 <a
@@ -2990,7 +3053,7 @@
                 class="search-box"
                 type="search"
                 autocomplete="off"
-                placeholder="برای نمونه: نسبت میان عرفان و فلسفه"
+                placeholder=""
                 aria-label="جست‌وجوی مفهومی"
                 title="جست‌وجو در این بخش بر پایهٔ نزدیکی مفهومی صورت می‌گیرد، نه صرفاً تطابق واژگانی؛ کافی است مفهوم یا موضوع مورد نظر خود را مطرح کنید تا مرتبط‌ترین بخش‌های متون آرشیو نمایش داده شود.">
             </div>

@@ -110,8 +110,22 @@ async function loadEmbeddings() {
     const embeddingsUrl = currentVersion
       ? `embeddings.json?v=${encodeURIComponent(currentVersion)}`
       : "embeddings.json";
-    const res = await fetch(embeddingsUrl, { cache: "no-store" });
-    const raw = await res.json();
+    // فایل حدود ۲۵ مگابایتی روی اینترنت ضعیف گاهی وسط راه قطع می‌شود؛ تا
+    // ۳ بار با وقفه تلاش می‌کنیم و در نهایت به‌جای خطای خام «Failed to
+    // fetch» پیام روشن فارسی می‌دهیم.
+    let raw = null;
+    for (let attempt = 1; attempt <= 3 && !raw; attempt++) {
+      try {
+        const res = await fetch(embeddingsUrl, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        raw = await res.json();
+      } catch (err) {
+        if (attempt === 3) {
+          throw new Error("بارگذاری پایگاه جست‌وجو کامل نشد (اتصال ضعیف یا قطع است). لطفاً دوباره تلاش کنید.");
+        }
+        await new Promise((r) => setTimeout(r, 800 * attempt));
+      }
+    }
     const decoded = raw.map((item) => ({ ...item, vector: base64ToVector(item.vector) }));
 
     EMBEDDINGS = decoded;
@@ -185,6 +199,117 @@ async function semanticSearch(query, topK = 5, bookFilter = null) {
   return scored.slice(0, topK);
 }
 
+// ---------- فیلتر کتاب‌ها بر اساس عنوان / نویسنده / موضوع (مشترک بین سه پنل 📚) ----------
+// متادیتای هر کتاب از data-author و data-subject روی <li class="searchable-item">
+// در index.htm می‌آید. field یکی از all|title|author|subject است.
+function bookFilterNormalize(text) {
+  return String(text || "")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .replace(/[يى]/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/\u200c/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function bookMatchesFilter(meta, field, query) {
+  const q = bookFilterNormalize(query);
+  if (!q) return true;
+  const fields = field === "all" || !field ? ["title", "author", "subject"] : [field];
+  return fields.some((f) => bookFilterNormalize(meta[f]).includes(q));
+}
+
+// متادیتای کتاب‌ها بر اساس عنوان (کلید گروه‌بندی در embeddings.json = عنوان کتاب)
+function getBookMetaByTitle() {
+  const map = new Map();
+  document.querySelectorAll(".searchable-item").forEach((li) => {
+    const title = li.dataset.title || (li.querySelector("a") ? li.querySelector("a").textContent.trim() : "");
+    if (title) map.set(title, { title, author: li.dataset.author || "", subject: li.dataset.subject || "" });
+  });
+  return map;
+}
+
+// یک ردیف «بر اساس [عنوان/نویسنده/موضوع] + کادر عبارت» قبل از فهرست کتاب‌ها می‌گذارد.
+// applyFilter(field, query) باید true برگرداند اگر اعمال شد، false اگر هیچ کتابی منطبق نبود.
+function attachBookFilter(listEl, applyFilter) {
+  if (!listEl || listEl.parentNode.querySelector(":scope > .book-filter-row")) return;
+  const row = document.createElement("div");
+  row.className = "book-filter-row";
+  row.innerHTML = `
+    <select aria-label="فیلتر بر اساس">
+      <option value="all">همه</option>
+      <option value="title">عنوان</option>
+      <option value="author">نویسنده</option>
+      <option value="subject">موضوع</option>
+    </select>
+    <input type="search" placeholder="فیلتر کتاب‌ها…" aria-label="عبارت فیلتر کتاب‌ها">`;
+  const empty = document.createElement("p");
+  empty.className = "book-filter-empty";
+  empty.textContent = "کتابی با این مشخصات یافت نشد.";
+  empty.hidden = true;
+  listEl.parentNode.insertBefore(row, listEl);
+  listEl.parentNode.insertBefore(empty, listEl);
+
+  const select = row.querySelector("select");
+  const input = row.querySelector("input");
+  const run = () => {
+    const query = input.value.trim();
+    empty.hidden = applyFilter(select.value, query) !== false;
+  };
+  input.addEventListener("input", run);
+  select.addEventListener("change", run);
+}
+
+// ---------- دیده‌شدن کامل جعبهٔ انتخاب کتاب هنگام باز شدن ----------
+// وقتی کادر جست‌وجو پایین صفحه است (مثلاً قبل از اولین جست‌وجو)، جعبه‌ای که
+// زیرش باز می‌شود از پایین نمایشگر بریده می‌شود. این تابع صفحه را به‌اندازهٔ
+// لازم پایین می‌برد (مثل وقتی که بنرهای بالای صفحه بعد از جست‌وجو بالا می‌روند)
+// تا کل جعبه دیده شود. اگر خودِ صفحه آن‌قدر بلند نیست که اسکرول شود، یک فاصلهٔ
+// موقت زیر صفحه اضافه می‌کند که با بسته‌شدن جعبه برداشته می‌شود.
+function revealPanelInViewport(panelEl) {
+  removeRevealSpacer();
+  if (!panelEl) return;
+  const MARGIN = 12;
+
+  const pass = (behavior) => {
+    if (!panelEl.isConnected) return;
+    const over = panelEl.getBoundingClientRect().bottom - (window.innerHeight - MARGIN);
+    if (over <= 1) return;
+
+    // برای این‌که اسکرول به اندازهٔ لازم ممکن شود، باید «پایان محتوای واقعی
+    // صفحه» (نه پایان body که ممکن است به‌خاطر min-height بزرگ‌تر از محتوا
+    // باشد) به‌اندازهٔ کافی پایین‌تر برود. یک فاصلهٔ موقت در انتهای body
+    // می‌گذاریم و ارتفاعش را از روی جای خودش (= پایان واقعی محتوا) حساب
+    // می‌کنیم.
+    const needEnd = window.scrollY + window.innerHeight + over;
+    let spacer = document.getElementById("scopeRevealSpacer");
+    if (!spacer) {
+      spacer = document.createElement("div");
+      spacer.id = "scopeRevealSpacer";
+      spacer.setAttribute("aria-hidden", "true");
+      spacer.style.cssText = "pointer-events:none;height:0px;";
+      document.body.appendChild(spacer);
+    }
+    const contentEnd = spacer.getBoundingClientRect().top + window.scrollY;
+    const curH = parseFloat(spacer.style.height) || 0;
+    const neededH = Math.ceil(needEnd - contentEnd);
+    if (neededH > curH) spacer.style.height = `${neededH}px`;
+    window.scrollBy({ top: over, behavior });
+  };
+
+  pass("smooth");
+  // بعد از پایان اسکرول نرم، یک بار دیگر (بدون انیمیشن) بررسی می‌کنیم تا
+  // حاشیهٔ پایین جعبه هم تأمین شود.
+  setTimeout(() => pass("auto"), 900);
+}
+
+function removeRevealSpacer() {
+  const spacer = document.getElementById("scopeRevealSpacer");
+  if (spacer) spacer.remove();
+}
+
+
 // ---------- ساخت لینک به همان قطعهٔ متنی داخل صفحه (Text Fragment مرورگر) ----------
 // این یه ویژگی استاندارد مرورگرهاست: با اضافه‌کردن #:~:text=... به انتهای لینک،
 
@@ -227,6 +352,24 @@ function setupScopeSelector(toggleId, panelId, listId, onToggle) {
         )
         .join("");
 
+      // فیلتر عنوان/نویسنده/موضوع: فقط کتاب‌های منطبق در فهرست و در دامنه می‌مانند.
+      const metaByTitle = getBookMetaByTitle();
+      attachBookFilter(list, (field, query) => {
+        const boxes = [...list.querySelectorAll(".ai-scope-checkbox")];
+        const matched = boxes.filter((cb) =>
+          !query || bookMatchesFilter(metaByTitle.get(cb.value) || { title: cb.value }, field, query)
+        );
+        if (matched.length === 0) return false;
+        boxes.forEach((cb) => {
+          const isMatch = matched.includes(cb);
+          cb.closest("label").hidden = !isMatch;
+          cb.checked = isMatch;
+          if (isMatch) selectedBooks.add(cb.value);
+          else selectedBooks.delete(cb.value);
+        });
+        return true;
+      });
+
       list.querySelectorAll(".ai-scope-checkbox").forEach((checkbox) => {
         checkbox.addEventListener("change", () => {
           if (checkbox.checked) {
@@ -246,12 +389,14 @@ function setupScopeSelector(toggleId, panelId, listId, onToggle) {
     if (isOpen) {
       panel.style.display = "none";
       toggle.setAttribute("aria-expanded", "false");
+      removeRevealSpacer();
       if (onToggle) onToggle(false);
       return;
     }
     await populateList();
     panel.style.display = "flex";
     toggle.setAttribute("aria-expanded", "true");
+    revealPanelInViewport(panel);
     if (onToggle) onToggle(true);
   });
 
@@ -259,6 +404,7 @@ function setupScopeSelector(toggleId, panelId, listId, onToggle) {
     if (panel.style.display !== "none" && !panel.contains(event.target) && event.target !== toggle) {
       panel.style.display = "none";
       toggle.setAttribute("aria-expanded", "false");
+      removeRevealSpacer();
       if (onToggle) onToggle(false);
     }
   });
@@ -267,6 +413,7 @@ function setupScopeSelector(toggleId, panelId, listId, onToggle) {
     button.addEventListener("click", () => {
       const checkAll = button.dataset.scopeAction === "all";
       list.querySelectorAll(".ai-scope-checkbox").forEach((checkbox) => {
+        if (checkbox.closest("label").hidden) return; // کتاب‌های فیلترشده دست نمی‌خورند
         checkbox.checked = checkAll;
         if (checkAll) {
           selectedBooks.add(checkbox.value);
