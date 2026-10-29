@@ -199,6 +199,52 @@ async function semanticSearch(query, topK = 5, bookFilter = null) {
   return scored.slice(0, topK);
 }
 
+// ---------- بازیابی دقیق: ۴۰ نامزد ← reranker ----------
+// reranker سؤال و هر نامزد را با هم می‌خواند. اگر خطا داد یا دیر کرد، ترتیب cosine می‌ماند.
+const RERANK_CANDIDATES = 40;
+// آستانهٔ حداقل شباهت cosine (همان عددِ سایت روحبخش)؛ زیر آن نتیجه‌ای نشان داده نمی‌شود.
+const CHAT_RERANK_MIN_TOP_SCORE = 0.5;
+const RERANK_CLIENT_TIMEOUT_MS = 10000;
+
+async function rerankCandidatesAi(query, candidates) {
+  try {
+    const res = await fetch(`${WORKER_URL}/rerank`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, candidates: candidates.map((c) => c.text) }),
+      signal: typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(RERANK_CLIENT_TIMEOUT_MS) : undefined,
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.ok !== true || !Array.isArray(data.order)) return null;
+    const ordered = [];
+    const seen = new Set();
+    for (const row of data.order) {
+      const c = row && Number.isInteger(row.id) ? candidates[row.id] : null;
+      if (c && !seen.has(row.id)) {
+        seen.add(row.id);
+        ordered.push(c);
+      }
+    }
+    return ordered.length > 0 ? ordered : null;
+  } catch {
+    return null;
+  }
+}
+
+// ---------- بازیابی برای تب جست‌وجوی مفهومی: آستانه + reranker ----------
+// همان روشِ گفتگو: ۴۰ نامزد ← reranker ← ۵ نتیجه. اگر بالاترین شباهت cosine زیر
+// آستانه باشد، نتیجهٔ بی‌ربط نشان داده نمی‌شود (belowThreshold). اگر reranker
+// خطا داد، بی‌صدا ترتیب cosine می‌ماند.
+async function semanticSearchPrecise(query, topK = 5, bookFilter = null) {
+  const candidates = await semanticSearch(query, RERANK_CANDIDATES, bookFilter);
+  if (candidates.length === 0) return { results: [], belowThreshold: false };
+  if (candidates[0].score < CHAT_RERANK_MIN_TOP_SCORE) return { results: [], belowThreshold: true };
+  if (candidates.length <= topK) return { results: candidates, belowThreshold: false };
+  const reranked = await rerankCandidatesAi(query, candidates);
+  return { results: (reranked || candidates).slice(0, topK), belowThreshold: false };
+}
+
 // ---------- فیلتر کتاب‌ها بر اساس عنوان / نویسنده / موضوع (مشترک بین سه پنل 📚) ----------
 // متادیتای هر کتاب از data-author و data-subject روی <li class="searchable-item">
 // در index.htm می‌آید. field یکی از all|title|author|subject است.
@@ -1626,7 +1672,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // جست‌وجو…» و هم پیام خطا (پایین، در catch) دیده نمی‌شدند.
         if (aiSearchResultsDropdown) aiSearchResultsDropdown.style.display = "block";
         try {
-          const results = await semanticSearch(query, 5, aiSearchBookScope);
+          const { results, belowThreshold } = await semanticSearchPrecise(query, 5, aiSearchBookScope);
           // اگه در این فاصله کاربر متن رو پاک کرده یا چیز دیگه‌ای تایپ کرده،
           // این جواب دیگه منسوخ شده و نباید روی وضعیت فعلی بشینه.
           if (myToken !== searchToken) return;
@@ -1638,10 +1684,12 @@ document.addEventListener("DOMContentLoaded", () => {
             trackEvent("semanticSearch", query);
           }
 
-          if (aiSearchStatus) aiSearchStatus.textContent = "";
+          if (aiSearchStatus) {
+            aiSearchStatus.textContent = belowThreshold ? "در آرشیو مطلب مرتبطی پیدا نشد. سؤال را کامل‌تر یا با کلمات دیگری بنویسید." : "";
+          }
           latestSearchResults = results;
           searchSelectedIndexes.clear();
-          if (aiSearchResultsDropdown) aiSearchResultsDropdown.style.display = results.length > 0 ? "block" : "none";
+          if (aiSearchResultsDropdown) aiSearchResultsDropdown.style.display = results.length > 0 || belowThreshold ? "block" : "none";
           activeResultIndex = -1;
           updateAiSearchNavButtons();
           renderAiResultsHtml();
